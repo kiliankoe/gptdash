@@ -13,6 +13,7 @@ export default {
         green: "#629103",
         orange: "#ffab00",
         "bg-blue": "#07006c",
+        "dark-red": "#73023a",
       },
     },
   },

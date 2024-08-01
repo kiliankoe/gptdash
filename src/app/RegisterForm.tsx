@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Button from "./components/Button";
 
 const RegisterForm = () => {
   const [name, setName] = useState<string | null>(null);
 
   return (
-    <form action="/api/register" method="post" className="flex flex-col">
+    <form
+      action="/api/register"
+      method="post"
+      className="flex flex-col gap-y-2"
+    >
       <input
         type="text"
         name="name"
@@ -15,13 +20,9 @@ const RegisterForm = () => {
         onChange={(e) => setName(e.target.value)}
         className="border-orange text-orange bg-bg-blue w-full border-2 p-2 text-center"
       />
-      <button
-        type="submit"
-        disabled={!name}
-        className="text-green hover:text-orange px-4 py-2 font-bold disabled:text-gray-500"
-      >
+      <Button type="submit" disabled={!name}>
         Los geht&apos;s!
-      </button>
+      </Button>
     </form>
   );
 };
