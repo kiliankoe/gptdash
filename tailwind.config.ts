@@ -7,6 +7,12 @@ export default {
     extend: {
       fontFamily: {
         sans: ["var(--font-geist-sans)", ...fontFamily.sans],
+        xolonium: ["Xolonium", ...fontFamily.sans],
+      },
+      colors: {
+        green: "#629103",
+        orange: "#ffab00",
+        "bg-blue": "#07006c",
       },
     },
   },
