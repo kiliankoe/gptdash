@@ -7,8 +7,8 @@ export default function HomePage() {
         <div className="flex flex-col items-end">
           <h1 className="text-6xl font-bold sm:text-[5rem]">GPTDash</h1>
           <a href="https://datenspuren.de/2024/">
-            <h2 className="text-orange -translate-y-3 text-xs underline">
-              Datenspuren 2024
+            <h2 className="text-orange -translate-y-3 text-sm italic underline">
+              Datenspuren 2024 Edition
             </h2>
           </a>
         </div>
