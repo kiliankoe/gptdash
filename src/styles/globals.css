@@ -1,3 +1,102 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+body {
+  margin: 0 auto;
+  padding: 0;
+  background-color: #07006c;
+  color: #ffab00;
+  font-family: "Xolonium";
+}
+
+a {
+  color: #629103;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+header {
+  margin: 0 auto;
+  padding: 1rem 0;
+  perspective: 100px;
+  perspective-origin: 50% 100%;
+  text-align: center;
+  position: static;
+  width: 800px;
+}
+h1 {
+  text-align: center;
+  font-size: 400%;
+  font-family: "Xolonium";
+  color: #629103;
+  background-size: 100%;
+  /* padding-bottom: 500px; */
+  vertical-align: top;
+  transform: translate3d(0px, 0px, 0px);
+}
+h2 date {
+  display: block;
+}
+
+@keyframes arrive_l {
+  from {
+    transform: translateZ(-100px);
+  }
+  to {
+    transform: translateZ(5px);
+  }
+}
+@keyframes arrive_r {
+  from {
+    transform: translateZ(-50px);
+  }
+  to {
+    transform: translateZ(25px);
+  }
+}
+
+main {
+  max-width: 43em;
+  margin: auto;
+  padding: 0.5rem;
+  background-color: #07006c;
+  border-radius: 1rem;
+}
+
+ul {
+  list-style-type: none;
+}
+
+.videos {
+  display: inline-block;
+  margin: 2rem 0;
+  padding: 0.5rem;
+  background-color: #629103;
+  /* la couleur du soleil couchant */
+  color: #73023a;
+  font-weight: bold;
+  border-radius: 0.5rem;
+}
+
+footer {
+  clear: both;
+  margin: 4rem auto 1rem;
+}
+
+footer h2 {
+  text-align: center;
+  font-size: 100%;
+}
+footer ul {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-around;
+}
+footer li {
+  margin: 0.3rem;
+}
