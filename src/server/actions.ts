@@ -2,13 +2,13 @@
 
 import { appState } from "./state";
 
-export async function getGameState() {
-  return appState.games[0]!;
+export async function getGameState(id: string) {
+  return appState.games.find((game) => game.id === id);
 }
 
-export async function addPlayer(name: string) {
+export async function addPlayer(name: string, gameId: string) {
   const player = { id: crypto.randomUUID(), name };
-  appState.games[0]?.players.push(player);
+  appState.games.find((game) => game.id === gameId)?.players.push(player);
 }
 
 export async function startGame() {

@@ -1,16 +1,19 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { addPlayer } from "../server/actions";
 import Button from "./components/Button";
 
 const RegisterForm = () => {
   const [name, setName] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleSubmit = async () => {
     if (!name) return;
-    await addPlayer(name);
+    await addPlayer(name, "ds24");
     setName(null);
+    router.push(`/game/ds24`);
   };
 
   const handleKeyDown = async (
