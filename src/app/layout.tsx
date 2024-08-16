@@ -2,6 +2,7 @@ import "~/styles/globals.css";
 
 import { GeistSans } from "geist/font/sans";
 import { type Metadata } from "next";
+import { getGameState } from "~/server/actions";
 
 export const metadata: Metadata = {
   title: "GPTDash",
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -22,7 +23,16 @@ export default function RootLayout({
           type="text/css"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {process.env.NODE_ENV === "development" && (
+          <footer>
+            <code className="text-[10px] text-white">
+              {JSON.stringify(await getGameState("ds24"), null, 2)}
+            </code>
+          </footer>
+        )}
+      </body>
     </html>
   );
 }
