@@ -33,7 +33,7 @@ const RegisterForm = () => {
         value={name ?? ""}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="border-orange text-orange bg-bg-blue w-full border-2 p-2 text-center"
+        className="w-full border-2 border-orange bg-bg-blue p-2 text-center text-orange"
       />
       <Button disabled={!name} onClick={() => handleSubmit()}>
         Los geht&apos;s!

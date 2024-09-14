@@ -1,8 +1,9 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import useSWR from "swr";
+import { useQuery } from "react-query";
 import { getGameState } from "~/server/actions";
+
 import { appState, type Game } from "~/server/state";
 
 export const GameContext = createContext<{
@@ -18,12 +19,13 @@ export const GameContext = createContext<{
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const {
-    data: game,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    data: game,
     error,
     isLoading,
-  } = useSWR("/api/gamestate", () => getGameState("ds24"), {
-    refreshInterval: 500,
+  } = useQuery({
+    queryKey: ["gamestate", "ds24"],
+    queryFn: () => getGameState("ds24"),
   });
   return (
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -34,8 +36,5 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useGame() {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const { game, error, isLoading } = useContext(GameContext);
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  return { game, error, isLoading };
+  return useContext(GameContext);
 }

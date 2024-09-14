@@ -3,14 +3,27 @@
 import { appState } from "./state";
 
 export async function getGameState(id: string) {
-  return appState.games.find((game) => game.id === id);
+  const game = appState.games[id];
+  if (!game) {
+    console.log("Game not found");
+    throw new Error("Game not found");
+  }
+  console.log("found game", game.id);
+  return game;
 }
 
 export async function addPlayer(name: string, gameId: string) {
   const player = { id: crypto.randomUUID(), name };
   console.log("Adding player", name);
-  appState.games.find((game) => game.id === gameId)?.players.push(player);
-  console.log(appState.games);
+  const game = appState.games[gameId];
+  if (!game) {
+    throw new Error("Game not found");
+  }
+  if (game.players.find((player) => player.name === name)) {
+    throw new Error("Player with that name already exists");
+  }
+  appState.games[gameId] = { ...game, players: [...game.players, player] };
+  return player.id;
 }
 
 export async function startGame() {

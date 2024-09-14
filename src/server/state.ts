@@ -18,12 +18,12 @@ export type Game = {
 };
 
 export type AppState = {
-  games: Game[];
+  games: Record<string, Game>;
 };
 
 export const appState: AppState = {
-  games: [
-    {
+  games: {
+    ds24: {
       id: "ds24",
       players: [
         { id: "1", name: "kilian" },
@@ -32,5 +32,5 @@ export const appState: AppState = {
       ],
       status: "waitingToStart",
     },
-  ],
+  },
 };

@@ -1,7 +1,8 @@
 import "~/styles/globals.css";
 
 import { GeistSans } from "geist/font/sans";
-import { type Metadata } from "next";
+import type { Metadata } from "next";
+import ClientLayout from "./ClientLayout";
 import DevFooter from "./components/DevFooter";
 
 export const metadata: Metadata = {
@@ -24,8 +25,10 @@ export default async function RootLayout({
         />
       </head>
       <body>
-        {children}
-        {process.env.NODE_ENV === "development" && <DevFooter />}
+        <ClientLayout>
+          {children}
+          {process.env.NODE_ENV === "development" && <DevFooter />}
+        </ClientLayout>
       </body>
     </html>
   );
