@@ -2,19 +2,17 @@
 
 import { createContext, useContext } from "react";
 import { useQuery } from "react-query";
-import { getGameState } from "~/server/actions";
 
-import { appState, type Game } from "~/server/state";
+import { type Game } from "~/server/state";
 
 export const GameContext = createContext<{
   game?: Game;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: any;
+  error: unknown;
   isLoading: boolean;
 }>({
-  game: appState.games[0],
+  game: undefined,
   error: null,
-  isLoading: false,
+  isLoading: true,
 });
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
@@ -24,12 +22,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     error,
     isLoading,
   } = useQuery({
-    queryKey: ["gamestate", "ds24"],
-    queryFn: () => getGameState("ds24"),
+    queryKey: ["game", "ds24"],
+    queryFn: () => fetch("/api/game/ds24").then((res) => res.json()),
+    refetchInterval: 1000,
   });
+
   return (
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    <GameContext.Provider value={{ game, error, isLoading }}>
+    <GameContext.Provider
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      value={{ game, error, isLoading }}
+    >
       {children}
     </GameContext.Provider>
   );

@@ -5,22 +5,20 @@ import { appState } from "./state";
 export async function getGameState(id: string) {
   const game = appState.games[id];
   if (!game) {
-    console.log("Game not found");
-    throw new Error("Game not found");
+    throw new Error("Spiel nicht gefunden");
   }
-  console.log("found game", game.id);
   return game;
 }
 
 export async function addPlayer(name: string, gameId: string) {
   const player = { id: crypto.randomUUID(), name };
-  console.log("Adding player", name);
+  console.log("Adding player", name, "to game", gameId);
   const game = appState.games[gameId];
   if (!game) {
-    throw new Error("Game not found");
+    throw new Error("Spiel nicht gefunden");
   }
   if (game.players.find((player) => player.name === name)) {
-    throw new Error("Player with that name already exists");
+    throw new Error("Eine Person mit diesem Namen existiert bereits");
   }
   appState.games[gameId] = { ...game, players: [...game.players, player] };
   return player.id;
@@ -28,11 +26,11 @@ export async function addPlayer(name: string, gameId: string) {
 
 export async function startGame() {
   console.log("Starting game");
-  appState.games[0]!.status = "waitingForPrompt";
+  appState.games.ds24!.status = "waitingForPrompt";
 }
 
 export async function setPrompt(prompt: string) {
   console.log("Setting prompt", prompt);
-  appState.games[0]!.status = "prompting";
-  appState.games[0]!.currentPrompt = prompt;
+  appState.games.ds24!.status = "prompting";
+  appState.games.ds24!.currentPrompt = prompt;
 }

@@ -2,16 +2,24 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { addPlayer } from "../server/actions";
 import Button from "./components/Button";
 
 const RegisterForm = () => {
   const [name, setName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const handleSubmit = async () => {
     if (!name) return;
-    await addPlayer(name, "ds24");
+    const res = await fetch("/api/game/ds24/players", {
+      method: "POST",
+      body: name,
+    });
+    if (!res.ok) {
+      setError(await res.text());
+      return;
+    }
+    // TODO: save player id in local storage
     setName(null);
     router.push(`/game/ds24`);
   };
@@ -38,6 +46,7 @@ const RegisterForm = () => {
       <Button disabled={!name} onClick={() => handleSubmit()}>
         Los geht&apos;s!
       </Button>
+      {error && <p className="text-red-500">{error}</p>}
     </div>
   );
 };

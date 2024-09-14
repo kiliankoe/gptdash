@@ -1,5 +1,8 @@
 import RegisterForm from "./RegisterForm";
 
+// TODO: Check local storage for player id
+// If it exists, show username and button to join game
+
 export default function HomePage() {
   return (
     <main className="flex min-h-screen items-center justify-center">

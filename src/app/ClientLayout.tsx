@@ -1,8 +1,9 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "react-query";
+import { GameProvider } from "./components/GameProvider";
 
-const queryClient = new QueryClient();
+export const queryClient = new QueryClient();
 
 export default function ClientLayout({
   children,
@@ -10,6 +11,8 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <GameProvider>{children}</GameProvider>
+    </QueryClientProvider>
   );
 }
