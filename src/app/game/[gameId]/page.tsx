@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getGameState } from "~/server/actions";
+import { WaitingToStart } from "./WaitingToStart";
 
 export default async function GamePage({
   params,
@@ -10,7 +11,7 @@ export default async function GamePage({
   if (!game) return notFound();
   switch (game.status) {
     case "waitingToStart":
-      return <div>Waiting to start</div>;
+      return <WaitingToStart />;
     case "waitingForPrompt":
       return <div>Waiting for prompt</div>;
     case "prompting":

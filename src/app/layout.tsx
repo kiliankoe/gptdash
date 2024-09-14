@@ -2,7 +2,7 @@ import "~/styles/globals.css";
 
 import { GeistSans } from "geist/font/sans";
 import { type Metadata } from "next";
-import { getGameState } from "~/server/actions";
+import DevFooter from "./components/DevFooter";
 
 export const metadata: Metadata = {
   title: "GPTDash",
@@ -25,13 +25,7 @@ export default async function RootLayout({
       </head>
       <body>
         {children}
-        {process.env.NODE_ENV === "development" && (
-          <footer>
-            <code className="text-[10px] text-white">
-              {JSON.stringify(await getGameState("ds24"), null, 2)}
-            </code>
-          </footer>
-        )}
+        {process.env.NODE_ENV === "development" && <DevFooter />}
       </body>
     </html>
   );

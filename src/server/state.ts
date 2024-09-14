@@ -3,15 +3,17 @@ export type Player = {
   name: string;
 };
 
+export type GameStatus =
+  | "waitingToStart"
+  | "waitingForPrompt"
+  | "prompting"
+  | "voting"
+  | "leaderboard";
+
 export type Game = {
   id: string;
   players: Player[];
-  status:
-    | "waitingToStart"
-    | "waitingForPrompt"
-    | "prompting"
-    | "voting"
-    | "leaderboard";
+  status: GameStatus;
   currentPrompt?: string;
 };
 
@@ -20,5 +22,15 @@ export type AppState = {
 };
 
 export const appState: AppState = {
-  games: [{ id: "ds24", players: [], status: "waitingToStart" }],
+  games: [
+    {
+      id: "ds24",
+      players: [
+        { id: "1", name: "kilian" },
+        { id: "2", name: "momo" },
+        { id: "3", name: "max" },
+      ],
+      status: "waitingToStart",
+    },
+  ],
 };
