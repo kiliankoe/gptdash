@@ -8,6 +8,7 @@ export const env = createEnv({
    */
   server: {
     DATABASE_URL: z.string().url(),
+    HTTP_BASIC_AUTH: z.string(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
