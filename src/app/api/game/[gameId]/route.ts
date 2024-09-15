@@ -9,7 +9,14 @@ export async function GET(
 ) {
   try {
     const game = await getGameState(params.gameId);
-    return Response.json(game);
+    const gameWithoutIDs = {
+      ...game,
+      players: game.players.map(({ name, points }) => ({
+        name,
+        points,
+      })),
+    };
+    return Response.json(gameWithoutIDs);
   } catch (error) {
     return new Response("Game not found", { status: 404 });
   }
