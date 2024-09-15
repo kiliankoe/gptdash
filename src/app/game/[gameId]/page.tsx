@@ -1,14 +1,14 @@
-import { notFound } from "next/navigation";
-import { getGameState } from "~/server/actions";
+"use client";
+
+import { useGame } from "~/app/components/GameProvider";
 import { WaitingToStart } from "./WaitingToStart";
 
-export default async function GamePage({
-  params,
-}: {
-  params: { gameId: string };
-}) {
-  const game = await getGameState(params.gameId);
-  if (!game) return notFound();
+export default function GamePage({ params }: { params: { gameId: string } }) {
+  const { game, isLoading } = useGame();
+  if (isLoading) return <div>Lade Spiel...</div>;
+  if (!game) {
+    return <div>Spiel nicht gefunden, probier&apos;s mal mit F5 🤔</div>;
+  }
   switch (game.status) {
     case "waitingToStart":
       return <WaitingToStart />;

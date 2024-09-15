@@ -23,7 +23,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     isLoading,
   } = useQuery({
     queryKey: ["game", "ds24"],
-    queryFn: () => fetch("/api/game/ds24").then((res) => res.json()),
+    queryFn: () =>
+      fetch("/api/game/ds24")
+        .then((res) => {
+          if (!res.ok) {
+            console.error("Error fetching game state", res);
+          }
+          return res.json();
+        })
+        .catch((error) => {
+          console.error("Error fetching game state", error);
+        }),
     refetchInterval: 1000,
   });
 

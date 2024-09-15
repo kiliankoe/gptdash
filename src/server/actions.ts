@@ -11,7 +11,7 @@ export async function getGameState(id: string) {
 }
 
 export async function addPlayer(name: string, gameId: string) {
-  const player = { id: crypto.randomUUID(), name };
+  const player = { id: crypto.randomUUID(), name, points: 0 };
   console.log("Adding player", name, "to game", gameId);
   const game = appState.games[gameId];
   if (!game) {
@@ -32,5 +32,5 @@ export async function startGame() {
 export async function setPrompt(prompt: string) {
   console.log("Setting prompt", prompt);
   appState.games.ds24!.status = "prompting";
-  appState.games.ds24!.currentPrompt = prompt;
+  // TODO: set prompt
 }

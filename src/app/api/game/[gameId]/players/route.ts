@@ -1,8 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { addPlayer } from "~/server/actions";
 
-export const dynamic = "force-dynamic";
-
 export async function POST(
   request: NextRequest,
   { params }: { params: { gameId: string } },
