@@ -4,7 +4,7 @@ import { isGameStatus } from "~/server/state";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { gameId: string } },
+  {}: { params: { gameId: string } },
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let requestBody: any;

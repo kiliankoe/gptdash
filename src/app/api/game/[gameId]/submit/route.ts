@@ -3,7 +3,7 @@ import { submitAnswer } from "~/server/actions";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { gameId: string } },
+  {}: { params: { gameId: string } },
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let requestBody: any;
@@ -14,10 +14,12 @@ export async function POST(
     return new NextResponse("Invalid JSON", { status: 400 });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
   const player: string = requestBody?.player;
   if (!player) {
     return new NextResponse("Missing player field", { status: 400 });
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
   const answer: string = requestBody?.answer;
   if (!answer) {
     return new NextResponse("Missing answer field", { status: 400 });

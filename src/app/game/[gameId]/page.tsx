@@ -4,7 +4,7 @@ import { useGame } from "~/app/components/GameProvider";
 import Prompting from "./Prompting";
 import { WaitingToStart } from "./WaitingToStart";
 
-export default function GamePage({ params }: { params: { gameId: string } }) {
+export default function GamePage({}: { params: { gameId: string } }) {
   const { game, isLoading } = useGame();
   if (isLoading) return <div>Lade Spiel...</div>;
   if (!game) {

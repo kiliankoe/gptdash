@@ -19,7 +19,9 @@ const RegisterForm = () => {
       setError(await res.text());
       return;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const json = await res.json();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     window.localStorage.setItem("playerId", json.playerId);
     setName(null);
     router.push(`/game/ds24`);
