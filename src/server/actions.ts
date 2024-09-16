@@ -1,5 +1,3 @@
-"use server";
-
 import { appState } from "./state";
 
 export async function getGameState(id: string) {
