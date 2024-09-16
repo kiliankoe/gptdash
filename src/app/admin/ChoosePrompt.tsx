@@ -13,8 +13,7 @@ export default function ChoosePrompt() {
 
   return (
     <div>
-      <input
-        type="text"
+      <textarea
         placeholder="Prompt"
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}

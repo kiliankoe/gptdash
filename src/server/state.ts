@@ -45,13 +45,30 @@ export const appState: AppState = {
   games: {
     ds24: {
       id: "ds24",
-      players: [
-        { id: "1", name: "kilian", points: 0 },
-        { id: "2", name: "momo", points: 0 },
-        { id: "3", name: "max", points: 0 },
-      ],
+      players: [],
       status: "waitingToStart",
       rounds: [],
     },
   },
 };
+
+// export const appState: AppState = {
+//   games: {
+//     ds24: {
+//       id: "ds24",
+//       players: [
+//         { id: "1", name: "kilian", points: 0 },
+//         { id: "2", name: "momo", points: 0 },
+//         { id: "3", name: "max", points: 0 },
+//       ],
+//       status: "prompting",
+//       rounds: [
+//         {
+//           prompt: "Was ist eine gute Antwort auf diese Frage?",
+//           submissions: [],
+//           aiAnswer: null,
+//         },
+//       ],
+//     },
+//   },
+// };

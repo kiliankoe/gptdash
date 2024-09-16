@@ -24,7 +24,7 @@ export default async function RootLayout({
           type="text/css"
         />
       </head>
-      <body>
+      <body className="m-2">
         <ClientLayout>
           {children}
           {process.env.NODE_ENV === "development" && <DevFooter />}

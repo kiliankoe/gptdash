@@ -1,6 +1,7 @@
 "use client";
 
 import { useGame } from "~/app/components/GameProvider";
+import Prompting from "./Prompting";
 import { WaitingToStart } from "./WaitingToStart";
 
 export default function GamePage({ params }: { params: { gameId: string } }) {
@@ -13,9 +14,9 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
     case "waitingToStart":
       return <WaitingToStart />;
     case "waitingForPrompt":
-      return <div>Waiting for prompt</div>;
+      return <div>Prompt wird ausgewählt! Gleich geht&apos;s weiter!</div>;
     case "prompting":
-      return <div>Prompting</div>;
+      return <Prompting />;
     case "voting":
       return <div>Voting</div>;
     case "leaderboard":

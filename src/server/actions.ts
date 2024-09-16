@@ -38,3 +38,29 @@ export async function startNewRound(prompt: string) {
     rounds: [...game.rounds, { prompt, submissions: [], aiAnswer: null }],
   };
 }
+
+export async function submitAnswer(player: string, answer: string) {
+  console.log("Submitting answer:", answer);
+
+  // TODO: Run spell check/correction on answer?
+
+  const game = appState.games.ds24!;
+  if (!game.players.find((p) => p.id === player)) {
+    throw new Error("Player not found");
+  }
+  const roundIndex = game.rounds.length - 1;
+  if (roundIndex < 0) {
+    throw new Error("No round found");
+  }
+
+  game.rounds[roundIndex]?.submissions.push({
+    author: player,
+    answer,
+    supporters: [],
+  });
+
+  appState.games.ds24 = {
+    ...game,
+    rounds: [...game.rounds],
+  };
+}

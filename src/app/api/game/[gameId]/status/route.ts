@@ -6,8 +6,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { gameId: string } },
 ) {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const requestBody = await request.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let requestBody: any;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    requestBody = await request.json();
+  } catch (error) {
+    return new NextResponse("Invalid JSON", { status: 400 });
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
   const status: string = requestBody?.status;
@@ -33,6 +39,9 @@ export async function POST(
       // }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       const prompt: string = requestBody?.prompt;
+      if (!prompt) {
+        return new NextResponse("Missing prompt", { status: 400 });
+      }
       await startNewRound(prompt);
       return new NextResponse("", { status: 200 });
     case "voting":

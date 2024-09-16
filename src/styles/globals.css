@@ -25,6 +25,7 @@ header {
   position: static;
   width: 800px;
 }
+
 h1 {
   text-align: center;
   font-size: 400%;
@@ -35,8 +36,14 @@ h1 {
   vertical-align: top;
   transform: translate3d(0px, 0px, 0px);
 }
-h2 date {
-  display: block;
+
+h2 {
+  font-family: "Xolonium";
+  font-size: 160%;
+}
+
+h3 {
+  font-size: 140%;
 }
 
 @keyframes arrive_l {

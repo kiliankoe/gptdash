@@ -19,7 +19,8 @@ const RegisterForm = () => {
       setError(await res.text());
       return;
     }
-    // TODO: save player id in local storage
+    const json = await res.json();
+    window.localStorage.setItem("playerId", json.playerId);
     setName(null);
     router.push(`/game/ds24`);
   };
