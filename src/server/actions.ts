@@ -53,14 +53,24 @@ export async function submitAnswer(player: string, answer: string) {
     throw new Error("No round found");
   }
 
-  game.rounds[roundIndex]?.submissions.push({
-    author: player,
-    answer,
-    supporters: [],
-  });
+  if (game.rounds[roundIndex]?.submissions.find((s) => s.author === player)) {
+    game.rounds[roundIndex].submissions.find(
+      (s) => s.author === player,
+    )!.answer = answer;
+    appState.games.ds24 = {
+      ...game,
+      rounds: [...game.rounds],
+    };
+  } else {
+    game.rounds[roundIndex]?.submissions.push({
+      author: player,
+      answer,
+      supporters: [],
+    });
 
-  appState.games.ds24 = {
-    ...game,
-    rounds: [...game.rounds],
-  };
+    appState.games.ds24 = {
+      ...game,
+      rounds: [...game.rounds],
+    };
+  }
 }

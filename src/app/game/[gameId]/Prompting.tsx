@@ -38,13 +38,12 @@ export default function Prompting() {
         placeholder="Deine Antwort"
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
-        disabled={hasSubmitted}
         className="h-[200px] w-full bg-slate-800 p-2 text-lg text-white"
       />
       <p>Antworte bitte in drei kurzen Sätzen Fließtext.</p>
 
-      <Button onClick={handleSubmit} disabled={hasSubmitted}>
-        Absenden
+      <Button onClick={handleSubmit}>
+        {hasSubmitted ? "Absenden" : "Nochmal absenden"}
       </Button>
     </div>
   );
