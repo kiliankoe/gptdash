@@ -29,6 +29,9 @@ export default function AdminPage() {
     case "waitingForPrompt":
       return <ChoosePrompt />;
     case "prompting":
+      // TODO: List all submissions with names and allow editing for typos.
+      // TODO: Show AI answer
+      // TODO: Show button to close round and continue with voting.
       return <div>Prompting</div>;
     case "voting":
       return <div>Voting</div>;
