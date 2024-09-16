@@ -15,6 +15,13 @@ export async function GET(
         name,
         points,
       })),
+      rounds: game.rounds.map((round) => ({
+        ...round,
+        submissions: round.submissions.map((submission) => ({
+          ...submission,
+          author: game.players.find((p) => p.id === submission.author)?.name,
+        })),
+      })),
     };
     return Response.json(gameWithoutIDs);
   } catch (error) {
