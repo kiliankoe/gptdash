@@ -3,6 +3,7 @@
 import Button from "../components/Button";
 import { useGame } from "../components/GameProvider";
 import PlayerList from "../components/PlayerList";
+import ChoosePrompt from "./ChoosePrompt";
 
 export default function AdminPage() {
   const { game, isLoading } = useGame();
@@ -14,14 +15,19 @@ export default function AdminPage() {
         <div className="flex flex-col gap-y-4">
           <PlayerList showScores />
           <Button
-            onClick={() => fetch("/api/game/ds24/status", { method: "POST" })}
+            onClick={() =>
+              fetch("/api/game/ds24/status", {
+                method: "POST",
+                body: JSON.stringify({ status: "waitingForPrompt" }),
+              })
+            }
           >
             Runde starten
           </Button>
         </div>
       );
     case "waitingForPrompt":
-      return <div>Waiting for prompt</div>;
+      return <ChoosePrompt />;
     case "prompting":
       return <div>Prompting</div>;
     case "voting":

@@ -38,5 +38,5 @@ function isAuthenticated(req: NextRequest) {
 }
 
 export const config = {
-  matcher: "/admin/:path*",
+  matcher: ["/admin/:path*", "/api/game/:gameId/status"],
 };

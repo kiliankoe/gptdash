@@ -26,8 +26,8 @@ export type Game = {
 };
 
 export type Round = {
-  prompt?: string;
-  aiAnswer?: string;
+  prompt: string;
+  aiAnswer: string | null;
   submissions: Submission[];
 };
 

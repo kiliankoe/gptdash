@@ -29,8 +29,12 @@ export async function startGame() {
   appState.games.ds24!.status = "waitingForPrompt";
 }
 
-export async function setPrompt(prompt: string) {
-  console.log("Setting prompt", prompt);
-  appState.games.ds24!.status = "prompting";
-  // TODO: set prompt
+export async function startNewRound(prompt: string) {
+  console.log("Starting new round with prompt:", prompt);
+  const game = appState.games.ds24!;
+  appState.games.ds24 = {
+    ...game,
+    status: "prompting",
+    rounds: [...game.rounds, { prompt, submissions: [], aiAnswer: null }],
+  };
 }
