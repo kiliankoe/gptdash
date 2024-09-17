@@ -5,6 +5,9 @@ import { useGame } from "../components/GameProvider";
 import PlayerList from "../components/PlayerList";
 import ChoosePrompt from "./ChoosePrompt";
 
+// TODO: Show buttons for quick & dirty game administration
+// e.g. restart round, remove player, etc
+
 export default function AdminPage() {
   const { game, isLoading } = useGame();
   if (isLoading) return <div>Lade Spiel...</div>;
