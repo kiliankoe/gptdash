@@ -2,6 +2,7 @@
 
 import { useGame } from "~/app/components/GameProvider";
 import Prompting from "./Prompting";
+import Voting from "./Voting";
 import { WaitingToStart } from "./WaitingToStart";
 
 export default function GamePage({}: { params: { gameId: string } }) {
@@ -18,7 +19,7 @@ export default function GamePage({}: { params: { gameId: string } }) {
     case "prompting":
       return <Prompting />;
     case "voting":
-      return <div>Voting</div>;
+      return <Voting />;
     case "leaderboard":
       return <div>Leaderboard</div>;
   }
