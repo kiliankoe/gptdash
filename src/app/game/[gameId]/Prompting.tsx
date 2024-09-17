@@ -43,7 +43,7 @@ export default function Prompting() {
       <p>Antworte bitte in drei kurzen Sätzen Fließtext.</p>
 
       <Button onClick={handleSubmit}>
-        {hasSubmitted ? "Absenden" : "Nochmal absenden"}
+        {hasSubmitted ? "Nochmal absenden" : "Absenden"}
       </Button>
     </div>
   );
