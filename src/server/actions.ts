@@ -115,3 +115,12 @@ export async function submitAnswer(player: string, answer: string) {
     };
   }
 }
+
+export async function closeRound() {
+  console.log("Closing round");
+  const game = appState.games.ds24!;
+  game.status = "voting";
+  appState.games.ds24 = {
+    ...game,
+  };
+}
