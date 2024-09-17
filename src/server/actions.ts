@@ -37,7 +37,9 @@ export async function startNewRound(prompt: string) {
     rounds: [...game.rounds, { prompt, submissions: [], aiAnswer: null }],
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const aiClient = getOpenAIClient();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   const completion = await aiClient.chat.completions.create({
     model: "gpt-3.5-turbo", // zulässige Optionen sind gpt-4o, gpt-4o-mini, gpt-3.5-turbo
     messages: [
@@ -53,6 +55,7 @@ export async function startNewRound(prompt: string) {
     ],
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
   const answer = completion.choices[0]?.message.content;
   // This feels kinda dirty, but we need to get the last round again.
   // And any possible submissions from very fast users.
@@ -70,6 +73,7 @@ export async function startNewRound(prompt: string) {
       ...game.rounds.slice(0, -1),
       {
         ...lastRound,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         aiAnswer: answer,
       },
     ],
