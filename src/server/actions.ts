@@ -1,4 +1,4 @@
-import { getOpenAIClient } from "./OpenAIClient";
+import { respondToPrompt } from "./ai";
 import { appState } from "./state";
 
 export async function getGameState(id: string) {
@@ -37,32 +37,11 @@ export async function startNewRound(prompt: string) {
     rounds: [...game.rounds, { prompt, submissions: [], aiAnswer: null }],
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const aiClient = getOpenAIClient();
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-  const completion = await aiClient.chat.completions.create({
-    model: "gpt-3.5-turbo", // zulässige Optionen sind gpt-4o, gpt-4o-mini, gpt-3.5-turbo
-    messages: [
-      {
-        role: "system",
-        content:
-          "Bitte antworte in drei kurzen Sätzen auf die folgende Frage. Nur drei kurze Sätze, keine Stichpunkte, bitte nur in Fließtext und nicht lang oder umschweifend. Formuliere die kurzen Sätze bitte so wie ein Mensch, der die Antwort innerhalb von 2 Minuten selbst schreibt. Vermeide komplexe Ausdrücke und Formulierungen. Einfach nur drei normale kurze Sätze. Die Frage lautet:",
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-  });
+  const aiAnswer = await respondToPrompt(prompt);
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-  const answer = completion.choices[0]?.message.content;
   // This feels kinda dirty, but we need to get the last round again.
   // And any possible submissions from very fast users.
   game = appState.games.ds24!;
-  if (!answer) {
-    throw new Error("No AI answer");
-  }
   const lastRound = game.rounds[game.rounds.length - 1];
   if (!lastRound) {
     throw new Error("No last round");
@@ -73,8 +52,7 @@ export async function startNewRound(prompt: string) {
       ...game.rounds.slice(0, -1),
       {
         ...lastRound,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        aiAnswer: answer,
+        aiAnswer,
       },
     ],
   };
