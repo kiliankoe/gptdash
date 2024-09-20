@@ -3,6 +3,7 @@
 import Button from "../components/Button";
 import { useGame } from "../components/GameProvider";
 import PlayerList from "../components/PlayerList";
+import AdminVote from "./AdminVote";
 import ChoosePrompt from "./ChoosePrompt";
 import SubmissionList from "./SubmissionList";
 
@@ -35,7 +36,7 @@ export default function AdminPage() {
     case "prompting":
       return <SubmissionList />;
     case "voting":
-      return <div>Voting</div>;
+      return <AdminVote />;
     case "leaderboard":
       return <div>Leaderboard</div>;
   }

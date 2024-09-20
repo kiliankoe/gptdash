@@ -139,3 +139,13 @@ export async function voteAnswer(answerAuthor: string, voteAuthor: string) {
     rounds: [...game.rounds],
   };
 }
+
+export async function closeVoting() {
+  console.log("Closing voting");
+  // TODO: Calculate points
+  const game = appState.games.ds24!;
+  game.status = "leaderboard";
+  appState.games.ds24 = {
+    ...game,
+  };
+}

@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { closeRound, startGame, startNewRound } from "~/server/actions";
+import {
+  closeRound,
+  closeVoting,
+  startGame,
+  startNewRound,
+} from "~/server/actions";
 import { isGameStatus } from "~/server/state";
 
 export async function POST(
@@ -48,6 +53,7 @@ export async function POST(
       await closeRound();
       return new NextResponse("", { status: 200 });
     case "leaderboard":
-      return new NextResponse("Not implemented", { status: 501 });
+      await closeVoting();
+      return new NextResponse("", { status: 200 });
   }
 }
