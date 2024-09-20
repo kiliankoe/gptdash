@@ -14,7 +14,7 @@ export async function setAppState(state: AppState) {
     throw new Error("Game not found");
   }
   appState.games.ds24 = {
-    ...state.games.ds24!,
+    ...state.games.ds24,
   };
 }
 
