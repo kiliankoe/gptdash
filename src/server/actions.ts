@@ -102,3 +102,36 @@ export async function closeRound() {
     ...game,
   };
 }
+
+export async function voteAnswer(answerAuthor: string, voteAuthor: string) {
+  console.log(`${voteAuthor} votes for ${answerAuthor}`);
+
+  const game = appState.games.ds24!;
+  if (!game.players.find((p) => p.id === voteAuthor)) {
+    throw new Error("Player not found");
+  }
+  const roundIndex = game.rounds.length - 1;
+  if (roundIndex < 0) {
+    throw new Error("No round found");
+  }
+  const answerAuthorId = game.players.find((p) => p.name === answerAuthor)?.id;
+  if (!answerAuthorId) {
+    throw new Error("Answer author not found");
+  }
+  if (
+    !game.rounds[roundIndex]?.submissions.find(
+      (s) => s.author === answerAuthorId,
+    )
+  ) {
+    throw new Error("Answer not found");
+  }
+
+  game.rounds[roundIndex]?.submissions
+    .find((s) => s.author === answerAuthorId)!
+    .supporters.push(voteAuthor);
+
+  appState.games.ds24 = {
+    ...game,
+    rounds: [...game.rounds],
+  };
+}
