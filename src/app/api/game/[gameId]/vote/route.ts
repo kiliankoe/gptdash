@@ -3,7 +3,7 @@ import { voteAnswer } from "~/server/actions";
 
 export async function POST(
   request: Request,
-  { params }: { params: { gameId: string } },
+  {}: { params: { gameId: string } },
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let requestBody: any;

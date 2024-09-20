@@ -7,7 +7,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const body: AppState = await request.json();
-  setAppState(body);
+  await setAppState(body);
   return new NextResponse("", { status: 200 });
 }
