@@ -130,6 +130,14 @@ export async function voteAnswer(answerAuthor: string, voteAuthor: string) {
     throw new Error("Answer not found");
   }
 
+  if (
+    game.rounds[roundIndex]?.submissions.find((s) =>
+      s.supporters.includes(voteAuthor),
+    )
+  ) {
+    throw new Error("Player already voted");
+  }
+
   game.rounds[roundIndex]?.submissions
     .find((s) => s.author === answerAuthorId)!
     .supporters.push(voteAuthor);
