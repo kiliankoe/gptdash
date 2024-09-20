@@ -177,29 +177,36 @@ export async function closeVoting() {
 }
 
 function calculatePoints() {
-  let players = appState.games.ds24?.players;
+  const players = appState.games.ds24?.players;
   if (!players) return;
+
   const lastRound =
     appState.games.ds24?.rounds[appState.games.ds24?.rounds.length - 1];
   if (!lastRound) return;
+
   const submissions = lastRound.submissions;
   if (!submissions) return;
+
   submissions.forEach((s) => {
     const points = s.supporters.length;
     const player = players?.find((p) => p.id === s.author);
-    if (!player) return;
-    if (player?.name === "AI") return;
-    player.points += points;
+
+    if (player && player.name !== "AI") {
+      player.points += points;
+    }
   });
-  players = [...players];
-  const aiSupporters = submissions.find((s) => s.author === "ai")?.supporters;
-  if (!aiSupporters) return;
-  aiSupporters.forEach((s) => {
-    const player = players?.find((p) => p.id === s);
-    if (!player) return;
-    player.points += 1;
-  });
-  players = [...players];
+
+  const aiSubmission = submissions.find((s) => s.author === "ai");
+  if (aiSubmission) {
+    aiSubmission.supporters.forEach((supporterId) => {
+      const supporter = players?.find((p) => p.id === supporterId);
+      if (supporter) {
+        supporter.points += 1;
+      }
+    });
+  }
+
+  console.log("Got point totals for:", players);
 
   appState.games.ds24 = {
     ...appState.games.ds24!,
