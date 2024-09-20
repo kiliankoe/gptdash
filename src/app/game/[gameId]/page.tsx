@@ -1,6 +1,7 @@
 "use client";
 
 import { useGame } from "~/app/components/GameProvider";
+import Leaderboard from "./Leaderboard";
 import Prompting from "./Prompting";
 import Voting from "./Voting";
 import { WaitingToStart } from "./WaitingToStart";
@@ -23,6 +24,6 @@ export default function GamePage({}: { params: { gameId: string } }) {
     case "voting":
       return <Voting />;
     case "leaderboard":
-      return <div>Leaderboard</div>;
+      return <Leaderboard />;
   }
 }

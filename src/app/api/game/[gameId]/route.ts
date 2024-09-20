@@ -11,10 +11,10 @@ export async function GET(
     const game = await getGameState(params.gameId);
     const gameWithoutIDs = {
       ...game,
-      players: game.players.map(({ name, points }) => ({
-        name,
-        points,
-      })),
+      // players: game.players.map(({ name, points }) => ({
+      //   name,
+      //   points,
+      // })),
       rounds: game.rounds.map((round) => ({
         ...round,
         submissions: round.submissions.map((submission) => ({

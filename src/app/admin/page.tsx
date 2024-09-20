@@ -54,6 +54,19 @@ export default function AdminPage() {
     case "voting":
       return <AdminVote />;
     case "leaderboard":
-      return <div>Leaderboard</div>;
+      return (
+        <div>
+          <Button
+            onClick={() =>
+              fetch("/api/game/ds24/status", {
+                method: "POST",
+                body: JSON.stringify({ status: "waitingForPrompt" }),
+              })
+            }
+          >
+            Neue Runde starten
+          </Button>
+        </div>
+      );
   }
 }
