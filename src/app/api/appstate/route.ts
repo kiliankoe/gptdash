@@ -8,9 +8,6 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const body: AppState = await request.json();
-  if (!body.games.ds24) {
-    return new NextResponse("Game not found", { status: 400 });
-  }
   setAppState(body);
   return new NextResponse("", { status: 200 });
 }
