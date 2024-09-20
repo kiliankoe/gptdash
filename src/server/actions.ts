@@ -53,7 +53,7 @@ export async function startNewRound(prompt: string) {
   game = appState.games.ds24!;
   const lastRound = game.rounds[game.rounds.length - 1];
   lastRound?.submissions.push({
-    author: "ai",
+    author: "0",
     answer: aiAnswer,
     supporters: [],
   });
