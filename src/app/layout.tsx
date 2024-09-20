@@ -1,7 +1,6 @@
-import "~/styles/globals.css";
-
 import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
+import "~/styles/globals.css";
 import ClientLayout from "./ClientLayout";
 import DevFooter from "./components/DevFooter";
 

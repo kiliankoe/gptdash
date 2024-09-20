@@ -17,7 +17,7 @@ export default function SubmissionList() {
         onClick={() =>
           fetch("/api/game/ds24/status", {
             method: "POST",
-            body: JSON.stringify({ status: "voting" }),
+            body: JSON.stringify({ status: "prevoting" }),
           })
         }
       >

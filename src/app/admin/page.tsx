@@ -35,6 +35,22 @@ export default function AdminPage() {
       return <ChoosePrompt />;
     case "prompting":
       return <SubmissionList />;
+    case "prevoting":
+      return (
+        <div>
+          <p>Submissions nachbearbeiten</p>
+          <Button
+            onClick={() =>
+              fetch("/api/game/ds24/status", {
+                method: "POST",
+                body: JSON.stringify({ status: "voting" }),
+              })
+            }
+          >
+            Abstimmung starten
+          </Button>
+        </div>
+      );
     case "voting":
       return <AdminVote />;
     case "leaderboard":

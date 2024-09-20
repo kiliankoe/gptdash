@@ -8,6 +8,7 @@ export const gameStatuses = [
   "waitingToStart",
   "waitingForPrompt",
   "prompting",
+  "prevoting",
   "voting",
   "leaderboard",
 ] as const;
@@ -56,41 +57,3 @@ export const appState: AppState = {
     },
   },
 };
-
-// export const appState: AppState = {
-//   games: {
-//     ds24: {
-//       id: "ds24",
-//       players: [
-//         { id: "0", name: "AI", points: 0 },
-//         { id: "1", name: "kilian", points: 0 },
-//         { id: "2", name: "momo", points: 0 },
-//         { id: "3", name: "max", points: 0 },
-//       ],
-//       status: "voting",
-//       rounds: [
-//         {
-//           prompt: "Was ist eine gute Antwort auf diese Frage?",
-//           submissions: [
-//             {
-//               author: "0",
-//               answer:
-//                 "Hier steht jetzt etwas mehr Text. Ganze drei Sätze, damit es eine längere Antwort ist. Einer fehlt noch.",
-//               supporters: [],
-//             },
-//             {
-//               author: "1",
-//               answer: "Antwort 1",
-//               supporters: [],
-//             },
-//             {
-//               author: "2",
-//               answer: "Antwort 2",
-//               supporters: [],
-//             },
-//           ],
-//         },
-//       ],
-//     },
-//   },
-// };

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   closeRound,
   closeVoting,
+  goToPrevoting,
   startGame,
   startNewRound,
 } from "~/server/actions";
@@ -48,6 +49,9 @@ export async function POST(
         return new NextResponse("Missing prompt", { status: 400 });
       }
       await startNewRound(prompt);
+      return new NextResponse("", { status: 200 });
+    case "prevoting":
+      await goToPrevoting();
       return new NextResponse("", { status: 200 });
     case "voting":
       await closeRound();

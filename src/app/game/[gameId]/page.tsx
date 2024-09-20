@@ -18,6 +18,8 @@ export default function GamePage({}: { params: { gameId: string } }) {
       return <div>Prompt wird ausgewählt! Gleich geht&apos;s weiter!</div>;
     case "prompting":
       return <Prompting />;
+    case "prevoting":
+      return <div>Kurze Denkpause, gleich geht&apos;s weiter!</div>;
     case "voting":
       return <Voting />;
     case "leaderboard":

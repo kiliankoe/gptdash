@@ -1,5 +1,5 @@
 import { respondToPrompt } from "./ai";
-import { appState } from "./state";
+import { appState, type AppState } from "./state";
 
 export async function getGameState(id: string) {
   const game = appState.games[id];
@@ -7,6 +7,15 @@ export async function getGameState(id: string) {
     throw new Error("Spiel nicht gefunden");
   }
   return game;
+}
+
+export async function setAppState(state: AppState) {
+  if (!state.games.ds24) {
+    throw new Error("Game not found");
+  }
+  appState.games.ds24 = {
+    ...state.games.ds24!,
+  };
 }
 
 export async function addPlayer(name: string, gameId: string) {
@@ -96,6 +105,15 @@ export async function submitAnswer(player: string, answer: string) {
       rounds: [...game.rounds],
     };
   }
+}
+
+export async function goToPrevoting() {
+  console.log("Going to prevoting");
+  const game = appState.games.ds24!;
+  game.status = "prevoting";
+  appState.games.ds24 = {
+    ...game,
+  };
 }
 
 export async function closeRound() {
