@@ -34,7 +34,7 @@ export async function startNewRound(prompt: string) {
   appState.games.ds24 = {
     ...game,
     status: "prompting",
-    rounds: [...game.rounds, { prompt, submissions: [], aiAnswer: null }],
+    rounds: [...game.rounds, { prompt, submissions: [] }],
   };
 
   const aiAnswer = await respondToPrompt(prompt);
@@ -43,6 +43,11 @@ export async function startNewRound(prompt: string) {
   // And any possible submissions from very fast users.
   game = appState.games.ds24!;
   const lastRound = game.rounds[game.rounds.length - 1];
+  lastRound?.submissions.push({
+    author: "ai",
+    answer: aiAnswer,
+    supporters: [],
+  });
   if (!lastRound) {
     throw new Error("No last round");
   }
@@ -52,7 +57,6 @@ export async function startNewRound(prompt: string) {
       ...game.rounds.slice(0, -1),
       {
         ...lastRound,
-        aiAnswer,
       },
     ],
   };

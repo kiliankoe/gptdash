@@ -18,12 +18,7 @@ export default function Voting() {
   const { game, isLoading } = useGame();
   const player = usePlayer();
 
-  const allSubmissions = game?.rounds[
-    game.rounds.length - 1
-  ]?.submissions.concat({
-    author: "ai",
-    answer: game?.rounds[game.rounds.length - 1]?.aiAnswer,
-  } as Submission);
+  const allSubmissions = game?.rounds[game.rounds.length - 1]?.submissions;
 
   const shuffledSubmissionsRef = useRef<Submission[] | null>(null);
 

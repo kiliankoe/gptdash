@@ -7,8 +7,6 @@ export default function SubmissionList() {
   if (!game) return <div>Lade Spiel...</div>;
   return (
     <div>
-      <h2>AI</h2>
-      {game.rounds[game.rounds.length - 1]?.aiAnswer}
       <h2>Antworten</h2>
       {game.rounds[game.rounds.length - 1]?.submissions.map((s) => (
         <div key={s.author}>
