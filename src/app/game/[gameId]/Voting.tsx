@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import Button from "~/app/components/Button";
 import { useGame } from "~/app/components/GameProvider";
 import usePlayer from "~/app/components/usePlayer";
@@ -17,6 +17,7 @@ function shuffleArray<T>(array: T[]): T[] {
 export default function Voting() {
   const { game, isLoading } = useGame();
   const player = usePlayer();
+  const [hasVoted, setHasVoted] = useState(false);
 
   const allSubmissions = game?.rounds[game.rounds.length - 1]?.submissions;
 
@@ -49,8 +50,9 @@ export default function Voting() {
                     answerAuthor: s.author,
                     voteAuthor: player,
                   }),
-                })
+                }).then(() => setHasVoted(true))
               }
+              disabled={hasVoted}
             >
               ↑ Für diese Antwort abstimmen
             </Button>
