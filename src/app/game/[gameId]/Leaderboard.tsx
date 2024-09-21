@@ -23,7 +23,7 @@ export default function Leaderboard() {
       {submissions?.map((submission) => (
         <div key={submission.author}>
           <h2>{submission.author}</h2>
-          <p>"{submission.answer}"</p>
+          <p>&ldquo;{submission.answer}&rdquo;</p>
           <p>Voters: {submission.supporters.map((supporter) => (
             game?.players.find((p) => p.id === supporter)
           )?.name)}</p>
