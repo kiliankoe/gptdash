@@ -198,20 +198,29 @@ function calculatePoints() {
     }
   });
 
+  appState.games.ds24 = {
+    ...appState.games.ds24!,
+    players: updatedPlayers,
+  };
+
+  const newlyupdatedPlayers = appState.games.ds24?.players.map((player) => ({
+    ...player,
+  }));
+
   const aiSubmission = submissions.find((s) => s.author === "ai");
   if (aiSubmission) {
     aiSubmission.supporters.forEach((supporterId) => {
-      const supporter = updatedPlayers.find((p) => p.id === supporterId);
+      const supporter = newlyupdatedPlayers.find((p) => p.id === supporterId);
       if (supporter) {
         supporter.points += 100;
       }
     });
   }
 
-  console.log("Got point totals for:", updatedPlayers);
+  console.log("Got point totals for:", newlyupdatedPlayers);
 
   appState.games.ds24 = {
-    ...appState.games.ds24!,
-    players: updatedPlayers,
+    ...appState.games.ds24,
+    players: newlyupdatedPlayers,
   };
 }
