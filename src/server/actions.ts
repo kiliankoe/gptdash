@@ -187,9 +187,11 @@ function calculatePoints() {
   const submissions = lastRound.submissions;
   if (!submissions) return;
 
+  const updatedPlayers = players.map((player) => ({ ...player }));
+
   submissions.forEach((s) => {
     const points = s.supporters.length;
-    const player = players?.find((p) => p.id === s.author);
+    const player = updatedPlayers.find((p) => p.id === s.author);
 
     if (player && player.name !== "AI") {
       player.points += points * 100;
@@ -199,17 +201,17 @@ function calculatePoints() {
   const aiSubmission = submissions.find((s) => s.author === "ai");
   if (aiSubmission) {
     aiSubmission.supporters.forEach((supporterId) => {
-      const supporter = players?.find((p) => p.id === supporterId);
+      const supporter = updatedPlayers.find((p) => p.id === supporterId);
       if (supporter) {
         supporter.points += 100;
       }
     });
   }
 
-  console.log("Got point totals for:", players);
+  console.log("Got point totals for:", updatedPlayers);
 
   appState.games.ds24 = {
     ...appState.games.ds24!,
-    players: [...players],
+    players: updatedPlayers,
   };
 }
