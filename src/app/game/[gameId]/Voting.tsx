@@ -40,7 +40,7 @@ export default function Voting() {
       <h2>Wähle die Antwort der KI aus!</h2>
       <ul>
         {submissions.map((s) => (
-          <li key={s.author} className="flex flex-col gap-y-2">
+          <li key={s.author} className="flex flex-col gap-y-2 mb-4">
             {s.answer}
             <Button
               onClick={() =>

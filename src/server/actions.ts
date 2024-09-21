@@ -192,7 +192,7 @@ function calculatePoints() {
     const player = players?.find((p) => p.id === s.author);
 
     if (player && player.name !== "AI") {
-      player.points += points;
+      player.points += points * 100;
     }
   });
 
@@ -201,7 +201,7 @@ function calculatePoints() {
     aiSubmission.supporters.forEach((supporterId) => {
       const supporter = players?.find((p) => p.id === supporterId);
       if (supporter) {
-        supporter.points += 1;
+        supporter.points += 100;
       }
     });
   }

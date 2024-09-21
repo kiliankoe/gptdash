@@ -12,21 +12,24 @@ export default function Leaderboard() {
     .filter((p) => p.name !== "AI")
     .sort((a, b) => b.points - a.points);
 
+  const submissions = game.rounds[game.rounds.length - 1]?.submissions;
+  
   const aiSubmission = game.rounds[game.rounds.length - 1]?.submissions.find(
     (s) => s.author === "AI",
   );
 
   return (
     <div>
-      <h2>Die korrekte Antwort war</h2>
-      <p>{aiSubmission?.answer}</p>
-      <br />
-      <h2>Richtig lagen</h2>
-      <ul>
-        {aiSubmission?.supporters.map((s) => (
-          <li key={s}>{game.players.find((p) => p.id === s)?.name}</li>
-        ))}
-      </ul>
+      {submissions?.map((submission) => (
+        <div key={submission.author}>
+          <h2>{submission.author}</h2>
+          <p>"{submission.answer}"</p>
+          <p>Voters: {submission.supporters.map((supporter) => (
+            game?.players.find((p) => p.id === supporter)
+          )?.name)}</p>
+          <p>+ {submission.supporters.length * 100} points!</p>
+        </div>
+      ))}
       <br />
       <h2>Leaderboard</h2>
       <ul>
