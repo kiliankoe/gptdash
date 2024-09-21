@@ -15,7 +15,7 @@ export async function respondToPrompt(prompt: string) {
         {
           role: "system",
           content:
-            "Bitte antworte in drei kurzen Sätzen auf die folgende Frage. Nur drei kurze Sätze, keine Stichpunkte, bitte nur in Fließtext und nicht lang oder umschweifend. Formuliere die kurzen Sätze bitte so wie ein Mensch, der die Antwort innerhalb von 2 Minuten selbst schreibt. Vermeide komplexe Ausdrücke und Formulierungen. Einfach nur drei normale kurze Sätze. Die Frage lautet:",
+            "Bitte antworte in drei kurzen Sätzen auf die folgende Frage oder Aufforderung. Nur drei kurze Sätze, keine Stichpunkte, bitte nur in Fließtext und nicht lang oder umschweifend. Formuliere die kurzen Sätze bitte so wie ein Mensch, der die Antwort innerhalb von 2 Minuten selbst schreibt. Vermeide komplexe Ausdrücke und Formulierungen. Einfach nur drei normale kurze Sätze. Eine ganz kleine Menge Humor ist auch nicht verkehrt. Die Frage lautet:",
         },
         {
           role: "user",
