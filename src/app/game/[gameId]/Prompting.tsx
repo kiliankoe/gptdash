@@ -11,10 +11,6 @@ export default function Prompting() {
   const [answer, setAnswer] = useState<string>("");
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
-  if (!player) {
-    // TODO: Send back to root?
-  }
-
   if (isLoading) return <div>Lade Spiel...</div>;
   if (!game) {
     return <div>Spiel nicht gefunden, probier&apos;s mal mit F5 🤔</div>;

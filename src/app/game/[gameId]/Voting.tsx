@@ -19,17 +19,23 @@ export default function Voting() {
   const player = usePlayer();
   const [hasVoted, setHasVoted] = useState(false);
 
+  const playerName = game?.players.find((p) => p.id === player)?.name;
+
   const allSubmissions = game?.rounds[game.rounds.length - 1]?.submissions;
+  const ownSubmission = allSubmissions?.find((s) => s.author === playerName);
+  const otherSubmissions = allSubmissions?.filter(
+    (s) => s.author !== playerName,
+  );
 
   const shuffledSubmissionsRef = useRef<Submission[] | null>(null);
 
   const submissions = useMemo(() => {
-    if (!allSubmissions) return [];
+    if (!otherSubmissions) return [];
     if (!shuffledSubmissionsRef.current) {
-      shuffledSubmissionsRef.current = shuffleArray([...allSubmissions]);
+      shuffledSubmissionsRef.current = shuffleArray([...otherSubmissions]);
     }
     return shuffledSubmissionsRef.current;
-  }, [allSubmissions]);
+  }, [otherSubmissions]);
 
   if (isLoading) return <div>Lade Spiel...</div>;
   if (!game)
@@ -59,6 +65,8 @@ export default function Voting() {
           </li>
         ))}
       </ul>
+      <p>Deine Antwort:</p>
+      <p>{ownSubmission?.answer}</p>
     </div>
   );
 }
