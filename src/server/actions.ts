@@ -207,7 +207,7 @@ function calculatePoints() {
     ...player,
   }));
 
-  const aiSubmission = submissions.find((s) => s.author === "ai");
+  const aiSubmission = submissions.find((s) => s.author === "0");
   if (aiSubmission) {
     aiSubmission.supporters.forEach((supporterId) => {
       const supporter = newlyupdatedPlayers.find((p) => p.id === supporterId);
