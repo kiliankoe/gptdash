@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gptdash.dev/protocol/v1/c2s/game-create.schema.json",
+  "title": "game:create (client → server)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "config": { "$ref": "../common.schema.json#/$defs/SessionConfig" }
+  },
+  "required": ["config"]
+}
+
