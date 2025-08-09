@@ -39,13 +39,25 @@ export default function Lobby() {
 
   useEffect(() => {
     const sock = getSocket();
+
+    // Add connection status logging
+    sock.on("connect", () => {
+      console.log("[Lobby] Socket connected, requesting current state");
+    });
+
+    sock.on("disconnect", () => {
+      console.log("[Lobby] Socket disconnected");
+    });
+
     sock.on("game:state", (payload: any) => {
       const { phase, players, round, you, sessionCode } = payload;
       console.log("[Lobby] Received game:state:", {
         phase,
         playersCount: players?.length,
+        players: players?.map((p: any) => ({ id: p.id, name: p.name })),
         you: you?.role,
         playerId: you?.playerId,
+        sessionCodeMatch: sessionCode === code,
       });
 
       // Restore playerId if missing (happens after page refresh)
@@ -54,12 +66,25 @@ export default function Lobby() {
         localStorage.setItem("playerId", you.playerId);
       }
 
-      useGameStore.getState().setState({ phase, players, round, you, sessionCode });
+      // Validate that we have players data
+      if (!players || !Array.isArray(players)) {
+        console.warn("[Lobby] Received invalid players data:", players);
+      }
+
+      useGameStore.getState().setState({ phase, players: players || [], round, you, sessionCode });
     });
+
+    // Request initial state if connected
+    if (sock.connected) {
+      console.log("[Lobby] Socket already connected, ready to receive state");
+    }
+
     return () => {
       sock.off("game:state");
+      sock.off("connect");
+      sock.off("disconnect");
     };
-  }, []);
+  }, [code]);
 
   // Auto-navigate when game starts
   useEffect(() => {

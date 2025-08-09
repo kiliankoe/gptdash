@@ -29,7 +29,7 @@ export default function Play() {
   const [showSubmitFeedback, setShowSubmitFeedback] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Check if player has valid session token
+  // Check if player has valid session token and handle reconnection
   useEffect(() => {
     const sessionCode = localStorage.getItem("sessionCode");
     const playerToken = localStorage.getItem("playerToken");
@@ -43,17 +43,41 @@ export default function Play() {
     }
 
     // If we have tokens but no playerId, we're in a broken state (likely from refresh)
-    // The socket resume should fix this, but if it doesn't work, we'll redirect
+    // Try to resume the session explicitly
     if (!playerId) {
-      console.log("[Play] Missing playerId, waiting for resume or will redirect");
-      const timeout = setTimeout(() => {
-        // If still no playerId after 3 seconds, assume resume failed
-        if (!localStorage.getItem("playerId")) {
-          console.log("[Play] Resume failed, redirecting to home");
-          navigate(`/?join=${code}`);
-        }
-      }, 3000);
-      return () => clearTimeout(timeout);
+      console.log("[Play] Missing playerId, attempting to resume session");
+      const sock = getSocket();
+
+      // Try to resume with explicit timeout and error handling
+      const resumeTimeout = setTimeout(() => {
+        console.log("[Play] Resume timeout, redirecting to home");
+        navigate(`/?join=${code}`);
+      }, 5000);
+
+      const attemptResume = () => {
+        sock.emit("game:resume", { sessionCode, role: "player", token: playerToken }, (res: any) => {
+          clearTimeout(resumeTimeout);
+          if (res?.error) {
+            console.warn("[Play] Resume failed:", res.error);
+            // Clear invalid tokens and redirect
+            localStorage.removeItem("sessionCode");
+            localStorage.removeItem("playerToken");
+            localStorage.removeItem("playerId");
+            navigate(`/?join=${code}`);
+          } else {
+            console.log("[Play] Successfully resumed session");
+            // The game:state event should restore the playerId
+          }
+        });
+      };
+
+      if (sock.connected) {
+        attemptResume();
+      } else {
+        sock.once("connect", attemptResume);
+      }
+
+      return () => clearTimeout(resumeTimeout);
     }
   }, [code, navigate]);
 
@@ -77,6 +101,17 @@ export default function Play() {
         localStorage.setItem("playerId", you.playerId);
       }
 
+      // Validate that we're actually in the game - if not, redirect to rejoin
+      if (!you || !you.playerId) {
+        const storedPlayerId = localStorage.getItem("playerId");
+        const storedSessionCode = localStorage.getItem("sessionCode");
+        if (storedPlayerId && storedSessionCode === code) {
+          console.warn("[Play] Not found in game state but have stored session, redirecting to rejoin");
+          navigate(`/?join=${code}`);
+          return;
+        }
+      }
+
       useGameStore.getState().setState({ phase, players, round, you });
     });
     return () => {
@@ -84,7 +119,7 @@ export default function Play() {
       sock.off("game:results");
       sock.off("game:state");
     };
-  }, []);
+  }, [code, navigate]);
 
   // Clear state when moving to a new round or phase
   useEffect(() => {
