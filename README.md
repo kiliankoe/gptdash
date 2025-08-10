@@ -4,7 +4,7 @@ A real-time party game based loosely on [Balderdash](https://en.wikipedia.org/wi
 
 Originally built for [Datenspuren 2024](https://www.datenspuren.de/2024/).
 
-Sorry, the German is currently only in German. PRs welcome 😁
+Sorry, the game is currently only in German. PRs welcome 😁
 
 ## Quick Start
 
