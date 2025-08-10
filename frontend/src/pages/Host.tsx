@@ -251,7 +251,7 @@ export default function Host() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div className="card">
-        <h2>Spielleiter Konsole</h2>
+        <h2>Host Übersicht</h2>
         {msg && (
           <div className="subtle" style={{ marginBottom: 8 }}>
             {msg}
