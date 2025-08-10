@@ -76,7 +76,18 @@ export default function Lobby() {
 
     // Request initial state if connected
     if (sock.connected) {
-      console.log("[Lobby] Socket already connected, ready to receive state");
+      console.log("[Lobby] Socket already connected, requesting current state via resume");
+      const sessionCode = localStorage.getItem("sessionCode");
+      const playerToken = localStorage.getItem("playerToken");
+      if (sessionCode && playerToken) {
+        sock.emit("game:resume", { sessionCode, role: "player", token: playerToken }, (res: any) => {
+          if (res?.error) {
+            console.warn("[Lobby] Resume failed:", res.error);
+          } else {
+            console.log("[Lobby] Successfully requested current state");
+          }
+        });
+      }
     }
 
     return () => {
@@ -114,7 +125,7 @@ export default function Lobby() {
       )}
 
       <div className="card">
-        <h3>Spieler:in ({players.length})</h3>
+        <h3>{players.length} Mitspielende</h3>
         {players.length > 0 ? (
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {players.map((p, index) => (

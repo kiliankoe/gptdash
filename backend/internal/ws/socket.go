@@ -117,6 +117,8 @@ func (srv *Server) Mount(r *gin.Engine) *socketio.Server {
             "scores":      sess2.ScoresArray(),
         }
         s.Emit("game:state", payloadOut)
+        // Also broadcast updated state to all other connections (they need to see this player is back)
+        srv.emitStateTo(payload.SessionCode)
         return map[string]any{"ok": true}
     })
 

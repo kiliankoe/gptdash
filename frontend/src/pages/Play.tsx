@@ -416,44 +416,64 @@ export default function Play() {
 
           <div className="card">
             <h3>Aktuelle Punkte</h3>
-            <div style={{ display: "grid", gap: 8 }}>
-              {results.scores
-                .sort((a, b) => b.Points - a.Points) // Sort by points descending
-                .map((s, index) => {
+            <div style={{ display: "grid", gap: 12 }}>
+              {(() => {
+                const sortedScores = results.scores.sort((a, b) => b.Points - a.Points);
+                const maxScore = Math.max(...sortedScores.map((s) => s.Points), 1);
+                return sortedScores.map((s, index) => {
                   const player = players.find((p) => p.id === s.PlayerID);
                   const displayName = player?.name || s.PlayerID || `Spieler:in ${index + 1}`;
+                  const barWidth = (s.Points / maxScore) * 100;
                   return (
-                    <div
-                      key={s.PlayerID}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        padding: 8,
-                        borderRadius: 4,
-                        background: index === 0 ? "var(--yellow-subtle)" : "var(--bg-subtle)",
-                      }}
-                    >
-                      <span>
-                        {index === 0 ? "🥇 " : `${index + 1}. `}
-                        <strong>{displayName}</strong>
-                        {!player && (
-                          <span
-                            style={{
-                              color: "var(--subtle)",
-                              marginLeft: 4,
-                              fontSize: "0.8em",
-                            }}
-                          >
-                            (ID: {s.PlayerID})
-                          </span>
-                        )}
-                      </span>
-                      <span style={{ fontWeight: "bold" }}>
-                        {s.Points} {s.Points > 1 ? "Punkte" : "Punkt"}
-                      </span>
+                    <div key={s.PlayerID} style={{ display: "grid", gap: 4 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <span>
+                          {index === 0 ? "🥇 " : `${index + 1}. `}
+                          <strong>{displayName}</strong>
+                          {!player && (
+                            <span
+                              style={{
+                                color: "var(--muted)",
+                                marginLeft: 4,
+                                fontSize: "0.8em",
+                              }}
+                            >
+                              (ID: {s.PlayerID})
+                            </span>
+                          )}
+                        </span>
+                        <span style={{ fontWeight: "bold", minWidth: "80px", textAlign: "right" }}>
+                          {s.Points} {s.Points > 1 ? "Punkte" : "Punkt"}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          height: "8px",
+                          background: "rgba(255, 255, 255, 0.1)",
+                          borderRadius: "4px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${barWidth}%`,
+                            background: index === 0 ? "var(--yellow)" : "var(--accent)",
+                            borderRadius: "4px",
+                            transition: "width 0.5s ease-in-out",
+                          }}
+                        />
+                      </div>
                     </div>
                   );
-                })}
+                });
+              })()}
             </div>
           </div>
         </div>
