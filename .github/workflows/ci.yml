@@ -40,6 +40,12 @@ jobs:
       working-directory: ./backend
       run: go mod download
 
+    - name: Copy frontend dist for backend tests
+      run: |
+        rm -rf backend/static/dist
+        mkdir -p backend/static/dist
+        cp -R frontend/dist/* backend/static/dist/
+
     - name: Run backend tests
       working-directory: ./backend
       run: go test -v ./...
