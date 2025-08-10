@@ -1,9 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://gptdash.dev/protocol/v1/c2s/game-advance.schema.json",
-  "title": "game:advance (client → server, host only)",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {}
-}
-
