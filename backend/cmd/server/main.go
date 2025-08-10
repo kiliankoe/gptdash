@@ -52,6 +52,8 @@ Environment Variables:
   GM_USER             GM interface username for basic auth
   GM_PASS             GM interface password for basic auth
   SINGLE_SESSION      Allow only one active session (default: true)
+  EXPORT_ENABLED      Export game results to file (default: true)
+  EXPORT_FILE         Path to export game results (default: ./gptdash-results.txt)
 
 Examples:
   %s                  Start server with default settings
@@ -107,7 +109,7 @@ Visit http://localhost:8080 after starting the server.
 
     // Socket server + game manager
     rm := game.NewRoomManager()
-    sock := ws.New(rm)
+    sock := ws.New(rm, cfg)
     // Providers
     oa := openai.New(cfg.OpenAIKey, cfg.OpenAIBaseURL)
     ol := ollama.New(cfg.OllamaHost)

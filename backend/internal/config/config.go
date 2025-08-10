@@ -13,6 +13,8 @@ type Config struct {
 	GMUser          string
 	GMPass          string
 	SingleSession   bool
+	ExportEnabled   bool
+	ExportFile      string
 }
 
 func FromEnv() Config {
@@ -27,6 +29,8 @@ func FromEnv() Config {
 	c.GMUser = os.Getenv("GM_USER")
 	c.GMPass = os.Getenv("GM_PASS")
 	c.SingleSession = getenv("SINGLE_SESSION", "true") == "true"
+	c.ExportEnabled = getenv("EXPORT_ENABLED", "true") == "true"
+	c.ExportFile = getenv("EXPORT_FILE", "./gptdash-results.txt")
 	return c
 }
 

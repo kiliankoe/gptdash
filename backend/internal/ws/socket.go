@@ -7,6 +7,7 @@ import (
 
     "github.com/gin-gonic/gin"
     socketio "github.com/googollee/go-socket.io"
+    "github.com/kiliankoe/gptdash/internal/config"
     "github.com/kiliankoe/gptdash/internal/game"
     "github.com/rs/zerolog/log"
 )
@@ -23,6 +24,7 @@ type Server struct {
     provider     AIProvider
     provByName   map[string]AIProvider
     systemPrompt string
+    config       config.Config
 }
 
 type AIProvider interface {
@@ -30,8 +32,8 @@ type AIProvider interface {
     CompleteWithSystem(ctx context.Context, model string, systemPrompt string, prompt string) (string, error)
 }
 
-func New(rm *game.RoomManager) *Server {
-    return &Server{RM: rm, members: make(map[string]map[string]socketio.Conn)}
+func New(rm *game.RoomManager, cfg config.Config) *Server {
+    return &Server{RM: rm, members: make(map[string]map[string]socketio.Conn), config: cfg}
 }
 
 func (srv *Server) SetProvider(p AIProvider) { srv.provider = p }
@@ -192,8 +194,19 @@ func (srv *Server) Mount(r *gin.Engine) *socketio.Server {
         sess, err := srv.RM.Get(ctx.Code)
         if err != nil { return srv.err(s, "session_not_found", "Session not found") }
         // capture phase before advance to decide what to emit
-        // simplistic: we will emit based on current phase after advance
+        previousPhase := sess.GetPhase()
         if err := sess.Advance(ctx.Token); err != nil { return srv.err(s, "bad_request", err.Error()) }
+        currentPhase := sess.GetPhase()
+        log.Info().Str("code", ctx.Code).Str("from", string(previousPhase)).Str("to", string(currentPhase)).Msg("phase transition")
+        
+        // Export game data if we just entered Scoreboard phase (round complete)
+        if currentPhase == game.PhaseScoreboard && srv.config.ExportEnabled {
+            if exportErr := game.ExportSession(sess, srv.config.ExportFile); exportErr != nil {
+                log.Error().Err(exportErr).Str("code", ctx.Code).Msg("failed to export game data")
+            } else {
+                log.Info().Str("code", ctx.Code).Str("file", srv.config.ExportFile).Msg("exported game data")
+            }
+        }
         log.Info().Str("code", ctx.Code).Msg("game:advance")
         // Emit state update
         srv.emitStateTo(ctx.Code)

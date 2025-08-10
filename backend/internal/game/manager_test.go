@@ -338,7 +338,7 @@ func TestScoringLogic(t *testing.T) {
 	// Alice votes for Bob (+2 points to Bob)
 	// Bob votes for AI (+1 point to Bob for correct guess)
 	// Charlie votes for Bob (+2 points to Bob)
-	session.Vote(playerToken1, submissionID2) // Alice -> Bob
+	session.Vote(playerToken1, submissionID2)  // Alice -> Bob
 	session.Vote(playerToken2, aiSubmissionID) // Bob -> AI (correct)
 	session.Vote(playerToken3, submissionID2)  // Charlie -> Bob
 
@@ -401,7 +401,7 @@ func TestAuthenticationAndAuthorization(t *testing.T) {
 
 	// Test valid player operations (after SetPrompt we're in Answering phase)
 	_, playerToken := session.Join("Alice")
-	
+
 	_, err = session.Submit(playerToken, "Valid answer")
 	if err != nil {
 		t.Fatalf("should be able to submit with valid player token: %v", err)
@@ -427,7 +427,7 @@ func TestInvalidPhaseActions(t *testing.T) {
 		t.Fatalf("expected ErrInvalidPhase when submitting in Lobby, got %v", err)
 	}
 
-	// Test voting in wrong phase  
+	// Test voting in wrong phase
 	err = session.Vote(playerToken, "some-submission-id")
 	if err != ErrInvalidPhase {
 		t.Fatalf("expected ErrInvalidPhase when voting in Lobby, got %v", err)
