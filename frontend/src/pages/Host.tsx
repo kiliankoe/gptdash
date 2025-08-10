@@ -98,7 +98,7 @@ export default function Host() {
   }, [phase]);
 
   const onCreate = async () => {
-    const res = await fetch("/api/gm/create", {
+    const res = await fetch("/api/host/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

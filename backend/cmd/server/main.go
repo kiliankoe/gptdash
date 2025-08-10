@@ -112,13 +112,13 @@ Visit http://localhost:8080 after starting the server.
     io := sock.Mount(r)
     defer io.Close()
 
-    // GM-protected route (serves the SPA index behind basic auth)
+    // Host-protected routes (serves the SPA index behind basic auth)
     if cfg.GMUser != "" && cfg.GMPass != "" {
         auth := gin.BasicAuth(gin.Accounts{cfg.GMUser: cfg.GMPass})
-        r.GET("/gm", auth, func(c *gin.Context) {
+        r.GET("/host", auth, func(c *gin.Context) {
             staticserver.Handler().ServeHTTP(c.Writer, c.Request)
         })
-        r.GET("/gm/*any", auth, func(c *gin.Context) {
+        r.GET("/host/*any", auth, func(c *gin.Context) {
             staticserver.Handler().ServeHTTP(c.Writer, c.Request)
         })
     }
@@ -134,7 +134,7 @@ Visit http://localhost:8080 after starting the server.
     if cfg.GMUser != "" && cfg.GMPass != "" {
         auth := gin.BasicAuth(gin.Accounts{cfg.GMUser: cfg.GMPass})
         type createReq struct{ Config game.SessionConfig `json:"config"` }
-        r.POST("/api/gm/create", auth, func(c *gin.Context) {
+        r.POST("/api/host/create", auth, func(c *gin.Context) {
             var req createReq
             if err := c.BindJSON(&req); err != nil {
                 c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_config"})
