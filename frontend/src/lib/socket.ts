@@ -9,7 +9,6 @@ export function getSocket() {
       transports: ["websocket", "polling"],
       autoConnect: true,
     });
-    // Diagnostics
     socket.on("connect", () => console.log("[socket] connected", socket!.id));
     socket.on("disconnect", (reason: any) => console.log("[socket] disconnect", reason));
     socket.on("connect_error", (err: any) => console.warn("[socket] connect_error", (err as any)?.message || err));

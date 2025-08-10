@@ -121,7 +121,6 @@ func (s *SessionCtx) SetPrompt(hostToken string, prompt string) error {
 	if s.Phase != PhaseLobby && s.Phase != PhasePromptSet && s.Phase != PhaseScoreboard {
 		return ErrInvalidPhase
 	}
-	// create new round and switch to Answering
 	s.RoundIx++
 	r := &Round{ID: uuid.NewString(), Index: s.RoundIx, Prompt: prompt, Status: PhaseAnswering}
 	s.Rounds = append(s.Rounds, r)
@@ -367,7 +366,6 @@ func (s *SessionCtx) AddAISubmission(text string) (string, error) {
 	id := uuid.NewString()
 	sub := &Submission{ID: id, PlayerID: "AI", Text: text}
 	s.submissions[id] = sub
-	// mark on current round
 	s.Rounds[s.RoundIx-1].AISubmissionID = id
 	return id, nil
 }

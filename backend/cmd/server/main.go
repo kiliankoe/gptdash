@@ -69,7 +69,6 @@ Visit http://localhost:8080 after starting the server.
         return
     }
 
-    // Determine port
     port := *portFlag
     if port == "" {
         port = os.Getenv("PORT")
@@ -78,12 +77,10 @@ Visit http://localhost:8080 after starting the server.
         port = "8080"
     }
 
-    // zerolog setup (human-friendly console)
     zerolog.TimeFieldFormat = time.RFC3339
     cw := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
     zerologlog.Logger = zerologlog.Output(cw)
 
-    // Gin setup with custom logger (skip /socket.io noise)
     gin.SetMode(gin.ReleaseMode)
     r := gin.New()
     r.Use(gin.Recovery())
@@ -99,18 +96,14 @@ Visit http://localhost:8080 after starting the server.
         zerologlog.Info().Str("path", path).Int("status", status).Dur("dur", dur).Msg("http")
     })
 
-	// Healthcheck
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true, "time": time.Now().UTC()})
 	})
 
-    // Config
     cfg := config.FromEnv()
 
-    // Socket server + game manager
     rm := game.NewRoomManager()
     sock := ws.New(rm, cfg)
-    // Providers
     oa := openai.New(cfg.OpenAIKey, cfg.OpenAIBaseURL)
     ol := ollama.New(cfg.OllamaHost)
     sock.SetProvider(oa) // default fallback

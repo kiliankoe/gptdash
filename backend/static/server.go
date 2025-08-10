@@ -28,15 +28,12 @@ func Handler() http.Handler {
 			http.Error(w, "index not found", http.StatusNotFound)
 			return
 		}
-		// set content-type
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		// avoid redirects by serving content directly
 		// (avoid using FileServer for index route)
 		// include small cache busting header for index
 		w.Header().Set("Cache-Control", "no-cache")
-		// Set status code explicitly before writing
 		w.WriteHeader(http.StatusOK)
-		// Write the HTML
 		_, _ = w.Write(b)
 	})
 }
