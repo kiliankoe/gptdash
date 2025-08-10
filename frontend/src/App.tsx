@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { getSocket } from "./lib/socket";
 import { useGameStore } from "./store/useGameStore";
 import "./styles.css";
+import { VERSION } from "./version";
 
 export default function App() {
   const setState = useGameStore((s) => s.setState);
@@ -43,6 +44,20 @@ export default function App() {
         </h1>
       </header>
       <Outlet />
+      <div
+        style={{
+          position: "fixed",
+          bottom: 8,
+          left: 8,
+          fontSize: 10,
+          color: "#999",
+          opacity: 0.7,
+          userSelect: "none",
+          pointerEvents: "none",
+        }}
+      >
+        {VERSION}
+      </div>
     </div>
   );
 }

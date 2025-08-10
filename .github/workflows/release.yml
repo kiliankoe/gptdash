@@ -30,7 +30,11 @@ jobs:
 
     - name: Get version from tag
       id: get_version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        # Remove 'v' prefix if it exists for consistency
+        VERSION=${VERSION#v}
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
     - name: Build full application
       run: |
@@ -46,8 +50,8 @@ jobs:
         make clean
         make frontend
         cd backend
-        GOOS=darwin GOARCH=amd64 go build -o ../gptdash-darwin-amd64 ./cmd/server
-        GOOS=darwin GOARCH=arm64 go build -o ../gptdash-darwin-arm64 ./cmd/server
+        GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o ../gptdash-darwin-amd64 ./cmd/server
+        GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o ../gptdash-darwin-arm64 ./cmd/server
         cd ..
         tar -czf gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz gptdash-darwin-amd64 README.md
         tar -czf gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz gptdash-darwin-arm64 README.md
@@ -55,7 +59,7 @@ jobs:
     - name: Build for Windows (cross-compile)
       run: |
         cd backend
-        GOOS=windows GOARCH=amd64 go build -o ../gptdash.exe ./cmd/server
+        GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o ../gptdash.exe ./cmd/server
         cd ..
         zip gptdash-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip gptdash.exe README.md
 
