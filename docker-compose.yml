@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  gptdash:
+    restart: unless-stopped
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+
+      # AI Provider settings (choose one)
+      - DEFAULT_PROVIDER=openai  # or "ollama"
+      - DEFAULT_MODEL=gpt-3.5-turbo  # or "mistral" for ollama
+
+      # OpenAI settings (if using OpenAI provider)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - OPENAI_BASE_URL=https://api.openai.com/v1  # optional, for custom endpoints
+
+      # Ollama settings (if using Ollama provider)
+      # - OLLAMA_HOST=http://ollama:11434  # if running ollama in docker
+
+      # GM/Host credentials for creating sessions
+      - GM_USER=admin
+      - GM_PASS=admin123
+
+      # Session management
+      - SINGLE_SESSION=true  # Only allow one active session at a time
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Uncomment if you want to run Ollama alongside GPTdash
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   restart: unless-stopped
+  #   # GPU support (uncomment if you have NVIDIA GPU)
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: 1
+  #   #           capabilities: [gpu]
+
+# Uncomment if using ollama service
+# volumes:
+#   ollama_data:
