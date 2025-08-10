@@ -34,6 +34,8 @@ func Handler() http.Handler {
 		// (avoid using FileServer for index route)
 		// include small cache busting header for index
 		w.Header().Set("Cache-Control", "no-cache")
+		// Set status code explicitly before writing
+		w.WriteHeader(http.StatusOK)
 		// Write the HTML
 		_, _ = w.Write(b)
 	})

@@ -1,10 +1,11 @@
 import io from "socket.io-client";
 
-let socket: SocketIOClient.Socket | null = null;
+// Using 'any' to avoid TS type friction between client versions
+let socket: any = null;
 
 export function getSocket() {
   if (!socket) {
-    socket = io(import.meta.env.VITE_API_URL || "", {
+    socket = io(import.meta.env.VITE_API_URL || window.location.origin, {
       transports: ["websocket", "polling"],
       autoConnect: true,
     });
