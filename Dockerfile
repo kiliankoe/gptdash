@@ -1,12 +1,19 @@
 # Multi-stage Dockerfile for GPTdash
+ARG VERSION=unknown
+
 # Stage 1: Build frontend
 FROM node:24-alpine AS frontend
+ARG VERSION
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend/ ./
+
+# Generate version.ts file like the Makefile does
+RUN echo "export const VERSION = \"$VERSION\";" > src/version.ts
+
 RUN npm run build
 
 # Stage 2: Build Go backend with embedded frontend
