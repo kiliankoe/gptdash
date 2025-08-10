@@ -2,7 +2,8 @@ name: CI - Build and Test
 
 on:
   push:
-    branches: ['*']
+    branches:
+      - main
     tags: ['*']
   pull_request:
     branches: ['*']
