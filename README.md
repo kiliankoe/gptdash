@@ -10,6 +10,8 @@ Sorry, the German is currently only in German. PRs welcome 😁
 
 The game is available as a pre-built binary containing backend and frontend or as a docker image. Pick whatever works best for you. Or, you know, just build it from source.
 
+Either OpenAI or Ollama are supported as AI providers. For OpenAI, it is suggested to use gpt-3.5-turbo or older. Newer models make the game less fun.
+
 ### Using Docker
 ```bash
 docker run -p 8080:8080 -e OPENAI_API_KEY=your-key ghcr.io/kiliankoe/gptdash:latest
