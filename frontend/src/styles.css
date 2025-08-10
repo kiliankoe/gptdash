@@ -1,0 +1,109 @@
+@font-face {
+  font-family: "5by7";
+  src: url("./assets/5by7.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+:root {
+  --bg: #291e66;
+  --text: #ffffff;
+  --muted: #cbd5e1;
+  --accent: #e64f8e;
+  --purple: #9671aa;
+  --green: #71b76e;
+  --blue: #6195c5;
+  --yellow: #dae16f;
+  --header: #ff9900;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Ubuntu,
+    Cantarell,
+    Noto Sans,
+    Helvetica,
+    Arial,
+    "Apple Color Emoji",
+    "Segoe UI Emoji";
+}
+
+input,
+select,
+textarea,
+button {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 10px 12px;
+  outline: none;
+}
+input::placeholder {
+  color: var(--muted);
+}
+
+button {
+  cursor: pointer;
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  font-weight: 600;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.title {
+  font-family: "5by7", monospace;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--header);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "5by7", monospace;
+  color: var(--header);
+  margin-top: 0;
+}
+
+.subtle {
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.col {
+  display: grid;
+  gap: 12px;
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gptdash.dev/protocol/v1/s2c/game-results.schema.json",
+  "title": "game:results (server → client)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "aiSubmissionId": { "$ref": "../common.schema.json#/$defs/UUID" },
+    "votes": {
+      "type": "array",
+      "items": { "$ref": "../common.schema.json#/$defs/Vote" }
+    },
+    "scores": {
+      "type": "array",
+      "items": { "$ref": "../common.schema.json#/$defs/Score" }
+    },
+    "submissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "../common.schema.json#/$defs/UUID" },
+          "text": { "type": "string" },
+          "authorId": { "type": ["string", "null"] }
+        },
+        "required": ["id", "text"]
+      }
+    }
+  },
+  "required": ["aiSubmissionId", "votes", "scores", "submissions"]
+}

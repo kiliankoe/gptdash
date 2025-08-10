@@ -1,2 +1,51 @@
-docker-compose.yml
-Dockerfile
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# CI/CD
+.github
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node.js
+frontend/node_modules
+frontend/dist
+.npm
+
+# Go
+backend/static/dist
+gptdash
+*.exe
+
+# Environment and logs
+.env*
+*.log
+
+# Claude
+.claude
+
+# Build artifacts
+build/
+dist/
+
+# Test files
+*_test.go
+test/
+tests/
+
+# Temporary files
+tmp/
+temp/

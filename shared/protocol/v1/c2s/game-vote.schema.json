@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gptdash.dev/protocol/v1/c2s/game-vote.schema.json",
+  "title": "game:vote (client → server)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "submissionId": { "$ref": "../common.schema.json#/$defs/UUID" }
+  },
+  "required": ["submissionId"]
+}
+

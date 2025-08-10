@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gptdash.dev/protocol/v1/c2s/game-setPrompt.schema.json",
+  "title": "game:setPrompt (client → server, host only)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "prompt": { "type": "string", "minLength": 5, "maxLength": 400 }
+  },
+  "required": ["prompt"]
+}
+
