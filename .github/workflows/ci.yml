@@ -35,7 +35,9 @@ jobs:
 
     - name: Build frontend
       working-directory: ./frontend
-      run: npm run build
+      run: |
+        echo "export const VERSION = \"ci-$(git rev-parse --short HEAD)\";" > src/version.ts
+        npm run build
 
     - name: Install backend dependencies
       working-directory: ./backend

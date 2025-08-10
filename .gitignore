@@ -46,6 +46,7 @@ yarn-error.log*
 .idea
 
 frontend/dist
+frontend/src/version.ts
 backend/static/dist
 gptdash
 gptdash-results.txt

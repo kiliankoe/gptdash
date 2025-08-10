@@ -20,7 +20,7 @@ import (
     zerologlog "github.com/rs/zerolog/log"
 )
 
-const version = "v2.0.0-dev"
+var version = "dev" // Set at build time via -ldflags
 
 func main() {
     var (
