@@ -12,7 +12,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build Go backend with embedded frontend
-FROM golang:1.25-alpine AS backend
+FROM golang:1.24-alpine AS backend
 RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /app
