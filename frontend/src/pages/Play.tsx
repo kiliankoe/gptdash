@@ -203,7 +203,7 @@ export default function Play() {
       <div style={{ marginBottom: 16 }}>
         {round?.prompt ? (
           <div className="card" style={{ background: "var(--purple)", color: "white", padding: 16 }}>
-            <h3 style={{ margin: "0 0 8px 0" }}>Frage:</h3>
+            <h3 style={{ margin: "0 0 8px 0" }}>Frage</h3>
             <div style={{ fontSize: "1.1em", fontWeight: "normal" }}>{round.prompt}</div>
           </div>
         ) : phase === "Answering" || phase === "Voting" ? (
@@ -448,7 +448,13 @@ export default function Play() {
                             </span>
                           )}
                         </span>
-                        <span style={{ fontWeight: "bold", minWidth: "80px", textAlign: "right" }}>
+                        <span
+                          style={{
+                            fontWeight: "bold",
+                            minWidth: "80px",
+                            textAlign: "right",
+                          }}
+                        >
                           {s.Points} {s.Points > 1 ? "Punkte" : "Punkt"}
                         </span>
                       </div>
