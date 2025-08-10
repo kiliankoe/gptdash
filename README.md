@@ -6,6 +6,10 @@ Originally built for [Datenspuren 2024](https://www.datenspuren.de/2024/).
 
 Sorry, the game is currently only in German. PRs welcome 😁
 
+| Answer | Host Overview | Voting | Results |
+| --- | --- | --- | --- |
+| <img alt="Answer" src="https://github.com/user-attachments/assets/98e7ace8-3928-4ff5-9b92-f607075d788e" width="220" /> | <img alt="Host Overview" src="https://github.com/user-attachments/assets/0dfe3a5e-cde5-4e91-83fe-9de21b361ce5" width="220" /> | <img alt="Voting" src="https://github.com/user-attachments/assets/476e65d6-b315-4882-8ab7-23e83642f0dc" width="220" /> | <img alt="Results" src="https://github.com/user-attachments/assets/aad82619-29ee-4352-a0e5-149aace15f82" width="220" /> |
+
 ## Quick Start
 
 The game is available as a pre-built binary containing backend and frontend or as a docker image. Pick whatever works best for you. Or, you know, just build it from source.
