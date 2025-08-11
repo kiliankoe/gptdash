@@ -50,3 +50,4 @@ frontend/src/version.ts
 backend/static/dist
 gptdash
 gptdash-results.txt
+result

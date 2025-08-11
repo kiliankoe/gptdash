@@ -40,6 +40,7 @@ gptdash
 # Build artifacts
 build/
 dist/
+result
 
 # Test files
 *_test.go
