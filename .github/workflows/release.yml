@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - '*'
+      - "*"
 
 jobs:
   release:
@@ -12,92 +12,90 @@ jobs:
       contents: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '24'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
 
-    - name: Setup Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.24'
-        cache-dependency-path: backend/go.sum
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.24"
+          cache-dependency-path: backend/go.sum
 
-    - name: Get version from tag
-      id: get_version
-      run: |
-        VERSION=${GITHUB_REF#refs/tags/}
-        # Remove 'v' prefix if it exists for consistency
-        VERSION=${VERSION#v}
-        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          # Remove 'v' prefix if it exists for consistency
+          VERSION=${VERSION#v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Build full application
-      run: |
-        echo "Building version ${{ steps.get_version.outputs.VERSION }}..."
-        make build
+      - name: Build full application
+        run: |
+          echo "Building version ${{ steps.get_version.outputs.VERSION }}..."
+          make build
 
-    - name: Create tarball
-      run: |
-        tar -czf gptdash-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz gptdash README.md
+      - name: Create tarball
+        run: |
+          tar -czf gptdash-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz gptdash README.md
 
-    - name: Build for macOS (cross-compile)
-      run: |
-        make clean
-        make frontend
-        cd backend
-        GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o ../gptdash-darwin-amd64 ./cmd/server
-        GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o ../gptdash-darwin-arm64 ./cmd/server
-        cd ..
-        tar -czf gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz gptdash-darwin-amd64 README.md
-        tar -czf gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz gptdash-darwin-arm64 README.md
+      - name: Build for macOS (cross-compile)
+        run: |
+          make clean
+          make frontend
+          cd backend
+          GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o ../gptdash-darwin-amd64 ./cmd/server
+          GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o ../gptdash-darwin-arm64 ./cmd/server
+          cd ..
+          tar -czf gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz gptdash-darwin-amd64 README.md
+          tar -czf gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz gptdash-darwin-arm64 README.md
 
-    - name: Build for Windows (cross-compile)
-      run: |
-        cd backend
-        GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o ../gptdash.exe ./cmd/server
-        cd ..
-        zip gptdash-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip gptdash.exe README.md
+      - name: Build for Windows (cross-compile)
+        run: |
+          cd backend
+          GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o ../gptdash.exe ./cmd/server
+          cd ..
+          zip gptdash-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip gptdash.exe README.md
 
-    - name: Generate changelog
-      id: changelog
-      run: |
-        echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
-        echo "## What's Changed" >> $GITHUB_OUTPUT
-        echo "" >> $GITHUB_OUTPUT
-        echo "Full Changelog: https://github.com/${{ github.repository }}/compare/$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')...${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "## What's Changed" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "Full Changelog: https://github.com/${{ github.repository }}/compare/$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')...${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      with:
-        name: GPTdash ${{ steps.get_version.outputs.VERSION }}
-        body: |
-          ${{ steps.changelog.outputs.CHANGELOG }}
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: GPTdash ${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ${{ steps.changelog.outputs.CHANGELOG }}
 
-          ## Installation
+            ## Installation
 
-          Download the appropriate binary for your platform:
-          - **Linux**: `gptdash-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz`
-          - **macOS Intel**: `gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz`
-          - **macOS Apple Silicon**: `gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz`
-          - **Windows**: `gptdash-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip`
+            Download the appropriate binary for your platform:
+            - **Linux**: `gptdash-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz`
+            - **macOS Intel**: `gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz`
+            - **macOS Apple Silicon**: `gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz`
+            - **Windows**: `gptdash-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip`
 
-          Extract and run with `./gptdash` (or `gptdash.exe` on Windows).
+            ## Docker
 
-          ## Docker
-
-          ```bash
-          docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.VERSION }}
-          ```
-        files: |
-          gptdash-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-          gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-          gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
-          gptdash-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip
-        draft: false
-        prerelease: false
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.VERSION }}
+            ```
+          files: |
+            gptdash-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
+            gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
+            gptdash-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
+            gptdash-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip
+          draft: false
+          prerelease: false

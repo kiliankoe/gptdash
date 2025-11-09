@@ -4,81 +4,81 @@ on:
   push:
     branches:
       - main
-    tags: ['*']
+    tags: ["*"]
   pull_request:
-    branches: ['*']
+    branches: ["*"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '24'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
 
-    - name: Setup Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.24'
-        cache-dependency-path: backend/go.sum
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.24"
+          cache-dependency-path: backend/go.sum
 
-    - name: Install frontend dependencies
-      working-directory: ./frontend
-      run: npm ci
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
 
-    - name: Build frontend
-      working-directory: ./frontend
-      run: |
-        echo "export const VERSION = \"ci-$(git rev-parse --short HEAD)\";" > src/version.ts
-        npm run build
+      - name: Build frontend
+        working-directory: ./frontend
+        run: |
+          echo "export const VERSION = \"ci-$(git rev-parse --short HEAD)\";" > src/version.ts
+          npm run build
 
-    - name: Install backend dependencies
-      working-directory: ./backend
-      run: go mod download
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: go mod download
 
-    - name: Copy frontend dist for backend tests
-      run: |
-        rm -rf backend/static/dist
-        mkdir -p backend/static/dist
-        cp -R frontend/dist/* backend/static/dist/
+      - name: Copy frontend dist for backend tests
+        run: |
+          rm -rf backend/static/dist
+          mkdir -p backend/static/dist
+          cp -R frontend/dist/* backend/static/dist/
 
-    - name: Run backend tests
-      working-directory: ./backend
-      run: go test -v ./...
+      - name: Run backend tests
+        working-directory: ./backend
+        run: go test -v ./...
 
-    - name: Build backend with embedded frontend
-      run: make backend
+      - name: Build backend with embedded frontend
+        run: make backend
 
-    - name: Verify binary was created
-      run: |
-        if [ ! -f "./gptdash" ]; then
-          echo "❌ Binary not found!"
-          exit 1
-        fi
-        echo "✅ Binary created successfully"
-        ls -lah ./gptdash
+      - name: Verify binary was created
+        run: |
+          if [ ! -f "./gptdash" ]; then
+            echo "❌ Binary not found!"
+            exit 1
+          fi
+          echo "✅ Binary created successfully"
+          ls -lah ./gptdash
 
-    - name: Test binary startup (quick smoke test)
-      run: |
-        echo "Testing binary help command..."
-        ./gptdash --help
-        echo ""
-        echo "Testing binary version command..."
-        ./gptdash --version
-        echo "✅ Binary startup test completed"
+      - name: Test binary startup (quick smoke test)
+        run: |
+          echo "Testing binary help command..."
+          ./gptdash --help
+          echo ""
+          echo "Testing binary version command..."
+          ./gptdash --version
+          echo "✅ Binary startup test completed"
 
-    # Upload binary as artifact for potential use in releases
-    - name: Upload binary artifact
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: actions/upload-artifact@v4
-      with:
-        name: gptdash-binary-${{ github.ref_name }}
-        path: ./gptdash
-        retention-days: 90
+      # Upload binary as artifact for potential use in releases
+      - name: Upload binary artifact
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: gptdash-binary-${{ github.ref_name }}
+          path: ./gptdash
+          retention-days: 90
