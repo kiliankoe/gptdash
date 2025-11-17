@@ -1,0 +1,152 @@
+use serde::{Deserialize, Serialize};
+
+/// Opaque ID types for type safety
+pub type GameId = String;
+pub type RoundId = String;
+pub type SubmissionId = String;
+pub type VoteId = String;
+pub type PlayerId = String;
+pub type VoterId = String;
+pub type PromptId = String;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GamePhase {
+    Lobby,
+    PromptSelection,
+    Writing,
+    Reveal,
+    Voting,
+    Results,
+    Podium,
+    Intermission,
+    Ended,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RoundState {
+    Setup,
+    Collecting,
+    Revealing,
+    OpenForVotes,
+    Scoring,
+    Closed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameConfig {
+    pub writing_seconds: u32,
+    pub voting_seconds: u32,
+    pub max_answer_chars: usize,
+}
+
+impl Default for GameConfig {
+    fn default() -> Self {
+        Self {
+            writing_seconds: 60,
+            voting_seconds: 30,
+            max_answer_chars: 500,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Game {
+    pub id: GameId,
+    pub version: u64,
+    pub phase: GamePhase,
+    pub round_no: u32,
+    pub config: GameConfig,
+    pub current_round_id: Option<RoundId>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Prompt {
+    pub id: PromptId,
+    pub text: Option<String>,
+    pub image_url: Option<String>,
+    pub source: PromptSource,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum PromptSource {
+    Host,
+    Audience,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Round {
+    pub id: RoundId,
+    pub game_id: GameId,
+    pub number: u32,
+    pub state: RoundState,
+    pub prompt_candidates: Vec<Prompt>,
+    pub selected_prompt: Option<Prompt>,
+    pub submission_deadline: Option<String>,
+    pub reveal_order: Vec<SubmissionId>,
+    pub ai_submission_id: Option<SubmissionId>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum AuthorKind {
+    Player,
+    Ai,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Submission {
+    pub id: SubmissionId,
+    pub round_id: RoundId,
+    pub author_kind: AuthorKind,
+    pub author_ref: Option<PlayerId>,
+    pub original_text: String,
+    pub display_text: String,
+    pub edited_by_host: Option<bool>,
+    pub tts_asset_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Vote {
+    pub id: VoteId,
+    pub round_id: RoundId,
+    pub voter_id: VoterId,
+    pub ai_pick_submission_id: SubmissionId,
+    pub funny_pick_submission_id: SubmissionId,
+    pub ts: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ScoreKind {
+    Player,
+    Audience,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Score {
+    pub id: String,
+    pub kind: ScoreKind,
+    pub ref_id: String,
+    pub ai_detect_points: u32,
+    pub funny_points: u32,
+    pub total: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Player {
+    pub id: PlayerId,
+    pub token: String,
+    pub display_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    Host,
+    Beamer,
+    Player,
+    Audience,
+}
