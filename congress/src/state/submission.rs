@@ -28,6 +28,10 @@ impl AppState {
             .write()
             .await
             .insert(submission.id.clone(), submission.clone());
+
+        // Broadcast updated submissions list
+        self.broadcast_submissions(round_id).await;
+
         Ok(submission)
     }
 
@@ -37,14 +41,38 @@ impl AppState {
         submission_id: &str,
         new_text: String,
     ) -> Result<(), String> {
-        let mut submissions = self.submissions.write().await;
-        if let Some(submission) = submissions.get_mut(submission_id) {
-            submission.display_text = new_text;
-            submission.edited_by_host = Some(true);
-            Ok(())
-        } else {
-            Err("Submission not found".to_string())
-        }
+        let round_id = {
+            let mut submissions = self.submissions.write().await;
+            if let Some(submission) = submissions.get_mut(submission_id) {
+                submission.display_text = new_text;
+                submission.edited_by_host = Some(true);
+                submission.round_id.clone()
+            } else {
+                return Err("Submission not found".to_string());
+            }
+        };
+
+        // Broadcast updated submissions list
+        self.broadcast_submissions(&round_id).await;
+
+        Ok(())
+    }
+
+    /// Broadcast submissions list for a round to all clients
+    async fn broadcast_submissions(&self, round_id: &str) {
+        let submissions = self.get_submissions(round_id).await;
+
+        // Public broadcast (no author_kind to prevent spoilers)
+        let public_infos: Vec<_> = submissions.iter().map(|s| s.into()).collect();
+        self.broadcast_to_all(crate::protocol::ServerMessage::Submissions {
+            list: public_infos,
+        });
+
+        // Host-only broadcast (includes author_kind for managing the game)
+        let host_infos: Vec<_> = submissions.iter().map(|s| s.into()).collect();
+        self.broadcast_to_host(crate::protocol::ServerMessage::HostSubmissions {
+            list: host_infos,
+        });
     }
 
     /// Get submissions for a round

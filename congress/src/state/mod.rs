@@ -20,13 +20,19 @@ pub struct AppState {
     pub votes: Arc<RwLock<HashMap<VoteId, Vote>>>,
     pub players: Arc<RwLock<HashMap<PlayerId, Player>>>,
     pub scores: Arc<RwLock<Vec<Score>>>,
-    /// Broadcast channel for sending messages to Beamer clients
+    /// Broadcast channel for sending messages to all clients
+    pub broadcast: broadcast::Sender<ServerMessage>,
+    /// Broadcast channel for sending messages to Host clients only
+    pub host_broadcast: broadcast::Sender<ServerMessage>,
+    /// Broadcast channel for sending messages to Beamer clients only
     pub beamer_broadcast: broadcast::Sender<ServerMessage>,
 }
 
 impl AppState {
     pub fn new() -> Self {
-        let (tx, _rx) = broadcast::channel(100);
+        let (broadcast_tx, _rx) = broadcast::channel(100);
+        let (host_tx, _rx) = broadcast::channel(100);
+        let (beamer_tx, _rx) = broadcast::channel(100);
         Self {
             game: Arc::new(RwLock::new(None)),
             rounds: Arc::new(RwLock::new(HashMap::new())),
@@ -34,8 +40,20 @@ impl AppState {
             votes: Arc::new(RwLock::new(HashMap::new())),
             players: Arc::new(RwLock::new(HashMap::new())),
             scores: Arc::new(RwLock::new(Vec::new())),
-            beamer_broadcast: tx,
+            broadcast: broadcast_tx,
+            host_broadcast: host_tx,
+            beamer_broadcast: beamer_tx,
         }
+    }
+
+    /// Broadcast a message to all connected clients
+    pub fn broadcast_to_all(&self, msg: ServerMessage) {
+        let _ = self.broadcast.send(msg);
+    }
+
+    /// Broadcast a message to host clients only
+    pub fn broadcast_to_host(&self, msg: ServerMessage) {
+        let _ = self.host_broadcast.send(msg);
     }
 }
 
@@ -447,5 +465,109 @@ mod tests {
             .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("does not belong to round"));
+    }
+
+    #[tokio::test]
+    async fn test_results_phase_requires_ai_submission() {
+        let state = AppState::new();
+        state.create_game().await;
+
+        state.transition_phase(GamePhase::PromptSelection).await.unwrap();
+        let round = state.start_round().await.unwrap();
+
+        // Add and select prompt
+        let prompt = state
+            .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+            .await
+            .unwrap();
+        state.select_prompt(&round.id, &prompt.id).await.unwrap();
+
+        // Add submissions
+        let player = state.create_player().await;
+        let sub1 = state
+            .submit_answer(&round.id, Some(player.id.clone()), "Player answer".to_string())
+            .await
+            .unwrap();
+        let _sub2 = state
+            .submit_answer(&round.id, None, "AI answer".to_string())
+            .await
+            .unwrap();
+
+        // Set reveal order
+        state
+            .set_reveal_order(&round.id, vec![sub1.id.clone()])
+            .await
+            .unwrap();
+
+        // Progress through phases
+        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state.transition_phase(GamePhase::Reveal).await.unwrap();
+        state.transition_phase(GamePhase::Voting).await.unwrap();
+
+        // Try to go to RESULTS without setting AI submission
+        let result = state.transition_phase(GamePhase::Results).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("AI submission to be set"));
+    }
+
+    #[tokio::test]
+    async fn test_scoring_is_idempotent() {
+        let state = AppState::new();
+        state.create_game().await;
+
+        state.transition_phase(GamePhase::PromptSelection).await.unwrap();
+        let round = state.start_round().await.unwrap();
+
+        // Setup full round
+        let prompt = state
+            .add_prompt(&round.id, "Test".to_string(), PromptSource::Host)
+            .await
+            .unwrap();
+        state.select_prompt(&round.id, &prompt.id).await.unwrap();
+
+        let player = state.create_player().await;
+        let player_sub = state
+            .submit_answer(&round.id, Some(player.id.clone()), "Player".to_string())
+            .await
+            .unwrap();
+        let ai_sub = state
+            .submit_answer(&round.id, None, "AI".to_string())
+            .await
+            .unwrap();
+
+        state.set_ai_submission(&round.id, ai_sub.id.clone()).await.unwrap();
+        state
+            .set_reveal_order(&round.id, vec![player_sub.id.clone(), ai_sub.id.clone()])
+            .await
+            .unwrap();
+
+        // Add a vote
+        let vote = Vote {
+            id: ulid::Ulid::new().to_string(),
+            round_id: round.id.clone(),
+            voter_id: "voter1".to_string(),
+            ai_pick_submission_id: player_sub.id.clone(),
+            funny_pick_submission_id: player_sub.id.clone(),
+            ts: chrono::Utc::now().to_rfc3339(),
+        };
+        state.votes.write().await.insert(vote.id.clone(), vote);
+
+        // Progress to RESULTS (first time)
+        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state.transition_phase(GamePhase::Reveal).await.unwrap();
+        state.transition_phase(GamePhase::Voting).await.unwrap();
+        state.transition_phase(GamePhase::Results).await.unwrap();
+
+        let (scores1, _) = state.get_leaderboards().await;
+        assert_eq!(scores1.len(), 1);
+        assert_eq!(scores1[0].total, 2); // 1 AI + 1 funny
+
+        // Re-enter RESULTS (should not duplicate scores)
+        state.transition_phase(GamePhase::Intermission).await.unwrap();
+        state.transition_phase(GamePhase::Results).await.unwrap();
+
+        let (scores2, _) = state.get_leaderboards().await;
+        assert_eq!(scores2.len(), 1);
+        assert_eq!(scores2[0].total, 2); // Still 2, not 4!
     }
 }

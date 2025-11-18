@@ -17,6 +17,7 @@ impl AppState {
             submission_deadline: None,
             reveal_order: Vec::new(),
             ai_submission_id: None,
+            scored_at: None,
         };
 
         self.rounds
@@ -243,6 +244,37 @@ impl AppState {
         let mut rounds = self.rounds.write().await;
         if let Some(round) = rounds.get_mut(round_id) {
             round.reveal_order = order;
+            Ok(())
+        } else {
+            Err("Round not found".to_string())
+        }
+    }
+
+    /// Set which submission is the AI submission for scoring
+    pub async fn set_ai_submission(
+        &self,
+        round_id: &str,
+        submission_id: SubmissionId,
+    ) -> Result<(), String> {
+        // Validate submission exists and belongs to this round
+        let submissions = self.submissions.read().await;
+        match submissions.get(&submission_id) {
+            Some(sub) if sub.round_id == round_id => {}
+            Some(_) => {
+                return Err(format!(
+                    "Submission {} does not belong to round {}",
+                    submission_id, round_id
+                ));
+            }
+            None => {
+                return Err(format!("Submission {} not found", submission_id));
+            }
+        }
+        drop(submissions);
+
+        let mut rounds = self.rounds.write().await;
+        if let Some(round) = rounds.get_mut(round_id) {
+            round.ai_submission_id = Some(submission_id);
             Ok(())
         } else {
             Err("Round not found".to_string())

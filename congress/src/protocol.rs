@@ -46,6 +46,9 @@ pub enum ClientMessage {
     HostSetRevealOrder {
         order: Vec<SubmissionId>,
     },
+    HostSetAiSubmission {
+        submission_id: SubmissionId,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +67,9 @@ pub enum ServerMessage {
     },
     Submissions {
         list: Vec<SubmissionInfo>,
+    },
+    HostSubmissions {
+        list: Vec<HostSubmissionInfo>,
     },
     VoteAck {
         msg_id: String,
@@ -99,14 +105,31 @@ pub enum ServerMessage {
     },
 }
 
+/// Public submission info (no author_kind to prevent spoilers)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubmissionInfo {
+    pub id: SubmissionId,
+    pub display_text: String,
+}
+
+impl From<&Submission> for SubmissionInfo {
+    fn from(s: &Submission) -> Self {
+        Self {
+            id: s.id.clone(),
+            display_text: s.display_text.clone(),
+        }
+    }
+}
+
+/// Host-only submission info (includes author_kind)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostSubmissionInfo {
     pub id: SubmissionId,
     pub display_text: String,
     pub author_kind: AuthorKind,
 }
 
-impl From<&Submission> for SubmissionInfo {
+impl From<&Submission> for HostSubmissionInfo {
     fn from(s: &Submission) -> Self {
         Self {
             id: s.id.clone(),

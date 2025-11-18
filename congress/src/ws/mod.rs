@@ -72,8 +72,18 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
         }
     }
 
-    // Subscribe to broadcast channel if Beamer
-    let mut broadcast_rx = if role == Role::Beamer {
+    // Subscribe to general broadcast (all clients)
+    let mut broadcast_rx = state.broadcast.subscribe();
+
+    // Subscribe to Host-specific broadcast if Host
+    let mut host_broadcast_rx = if role == Role::Host {
+        Some(state.host_broadcast.subscribe())
+    } else {
+        None
+    };
+
+    // Subscribe to Beamer-specific broadcast if Beamer
+    let mut beamer_broadcast_rx = if role == Role::Beamer {
         Some(state.beamer_broadcast.subscribe())
     } else {
         None
@@ -82,9 +92,39 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
     // Handle incoming messages and broadcasts
     loop {
         tokio::select! {
-            // Handle broadcast messages (Beamer only)
-            broadcast_msg = async {
-                match &mut broadcast_rx {
+            // Handle general broadcasts (all clients)
+            broadcast_msg = broadcast_rx.recv() => {
+                if let Ok(msg) = broadcast_msg {
+                    if let Ok(json) = serde_json::to_string(&msg) {
+                        if sender.send(Message::Text(json.into())).await.is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Handle Host-specific broadcasts
+            host_msg = async {
+                match &mut host_broadcast_rx {
+                    Some(rx) => rx.recv().await.ok(),
+                    None => {
+                        // Non-Host: wait forever
+                        std::future::pending::<Option<ServerMessage>>().await
+                    }
+                }
+            } => {
+                if let Some(msg) = host_msg {
+                    if let Ok(json) = serde_json::to_string(&msg) {
+                        if sender.send(Message::Text(json.into())).await.is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Handle Beamer-specific broadcasts
+            beamer_msg = async {
+                match &mut beamer_broadcast_rx {
                     Some(rx) => rx.recv().await.ok(),
                     None => {
                         // Non-Beamer: wait forever
@@ -92,7 +132,7 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                     }
                 }
             } => {
-                if let Some(msg) = broadcast_msg {
+                if let Some(msg) = beamer_msg {
                     if let Ok(json) = serde_json::to_string(&msg) {
                         if sender.send(Message::Text(json.into())).await.is_err() {
                             break;

@@ -85,6 +85,13 @@ pub async fn handle_message(
             }
             handle_host_set_reveal_order(state, order).await
         }
+
+        ClientMessage::HostSetAiSubmission { submission_id } => {
+            if *role != Role::Host {
+                return unauthorized("Only host can set AI submission");
+            }
+            handle_host_set_ai_submission(state, submission_id).await
+        }
     }
 }
 
@@ -273,6 +280,22 @@ async fn handle_host_set_reveal_order(
         Ok(_) => None,
         Err(e) => Some(ServerMessage::Error {
             code: "REVEAL_ORDER_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+async fn handle_host_set_ai_submission(
+    state: &Arc<AppState>,
+    submission_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host setting AI submission: {}", submission_id);
+    let round = state.get_current_round().await?;
+
+    match state.set_ai_submission(&round.id, submission_id).await {
+        Ok(_) => None,
+        Err(e) => Some(ServerMessage::Error {
+            code: "SET_AI_SUBMISSION_FAILED".to_string(),
             msg: e,
         }),
     }

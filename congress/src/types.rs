@@ -87,6 +87,7 @@ pub struct Round {
     pub submission_deadline: Option<String>,
     pub reveal_order: Vec<SubmissionId>,
     pub ai_submission_id: Option<SubmissionId>,
+    pub scored_at: Option<String>, // Timestamp when scores were computed (for idempotency)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

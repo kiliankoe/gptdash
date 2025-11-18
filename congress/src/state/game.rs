@@ -108,6 +108,21 @@ impl AppState {
                     return Err("Voting phase requires an active round".to_string());
                 }
             }
+            GamePhase::Results => {
+                // Requires AI submission to be designated for scoring
+                if let Some(round_id) = &game.current_round_id {
+                    let rounds = self.rounds.read().await;
+                    if let Some(round) = rounds.get(round_id) {
+                        if round.ai_submission_id.is_none() {
+                            return Err("Results phase requires AI submission to be set (use HostSetAiSubmission)".to_string());
+                        }
+                    } else {
+                        return Err("Current round not found".to_string());
+                    }
+                } else {
+                    return Err("Results phase requires an active round".to_string());
+                }
+            }
             _ => {} // No preconditions for other phases
         }
         Ok(())
@@ -138,14 +153,82 @@ impl AppState {
             // Re-acquire lock and apply transition
             let mut game = self.game.write().await;
             if let Some(ref mut g) = *game {
-                g.phase = new_phase;
+                g.phase = new_phase.clone();
                 g.version += 1;
+
+                let round_id = g.current_round_id.clone();
+                drop(game);
+
+                // Handle phase-specific actions
+                if new_phase == GamePhase::Results {
+                    // Compute scores when entering RESULTS phase (idempotent)
+                    if let Some(rid) = round_id {
+                        // Check if already scored
+                        let rounds = self.rounds.read().await;
+                        let already_scored = rounds
+                            .get(&rid)
+                            .map(|r| r.scored_at.is_some())
+                            .unwrap_or(false);
+                        drop(rounds);
+
+                        if !already_scored {
+                            match self.compute_scores(&rid).await {
+                                Ok(_) => {
+                                    // Mark round as scored
+                                    let mut rounds = self.rounds.write().await;
+                                    if let Some(round) = rounds.get_mut(&rid) {
+                                        round.scored_at = Some(chrono::Utc::now().to_rfc3339());
+                                    }
+                                    drop(rounds);
+
+                                    // Broadcast scores to all clients
+                                    let (all_players, top_audience) = self.get_leaderboards().await;
+                                    self.broadcast_to_all(crate::protocol::ServerMessage::Scores {
+                                        players: all_players,
+                                        audience_top: top_audience.into_iter().take(10).collect(),
+                                    });
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to compute scores: {}", e);
+                                    // Note: Phase transition still succeeds but scores aren't computed
+                                    // Error is already bubbled up from precondition check
+                                }
+                            }
+                        } else {
+                            // Already scored, just re-broadcast the existing scores
+                            let (all_players, top_audience) = self.get_leaderboards().await;
+                            self.broadcast_to_all(crate::protocol::ServerMessage::Scores {
+                                players: all_players,
+                                audience_top: top_audience.into_iter().take(10).collect(),
+                            });
+                        }
+                    }
+                }
+
+                // Broadcast phase change to all clients
+                self.broadcast_phase_change().await;
+
                 Ok(())
             } else {
                 Err("Game was removed during transition".to_string())
             }
         } else {
             Err("No active game".to_string())
+        }
+    }
+
+    /// Broadcast current phase to all clients
+    async fn broadcast_phase_change(&self) {
+        if let Some(game) = self.get_game().await {
+            let round = self.get_current_round().await;
+            let deadline = round.and_then(|r| r.submission_deadline);
+
+            self.broadcast_to_all(crate::protocol::ServerMessage::Phase {
+                phase: game.phase,
+                round_no: game.round_no,
+                server_now: chrono::Utc::now().to_rfc3339(),
+                deadline,
+            });
         }
     }
 }
