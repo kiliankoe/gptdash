@@ -1,3 +1,4 @@
+mod broadcast;
 mod protocol;
 mod state;
 mod types;
@@ -27,6 +28,9 @@ async fn main() {
     // Initialize a default game
     let state = Arc::new(AppState::new());
     state.create_game().await;
+
+    // Spawn background task for broadcasting vote counts to Beamer
+    broadcast::spawn_vote_broadcaster(state.clone());
 
     let app = Router::new()
         .route("/ws", get(ws::ws_handler))

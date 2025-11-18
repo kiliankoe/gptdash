@@ -1,12 +1,15 @@
 mod game;
 mod player;
 mod round;
+mod score;
 mod submission;
+mod vote;
 
+use crate::protocol::ServerMessage;
 use crate::types::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{broadcast, RwLock};
 
 /// Shared application state
 #[derive(Clone)]
@@ -16,16 +19,22 @@ pub struct AppState {
     pub submissions: Arc<RwLock<HashMap<SubmissionId, Submission>>>,
     pub votes: Arc<RwLock<HashMap<VoteId, Vote>>>,
     pub players: Arc<RwLock<HashMap<PlayerId, Player>>>,
+    pub scores: Arc<RwLock<Vec<Score>>>,
+    /// Broadcast channel for sending messages to Beamer clients
+    pub beamer_broadcast: broadcast::Sender<ServerMessage>,
 }
 
 impl AppState {
     pub fn new() -> Self {
+        let (tx, _rx) = broadcast::channel(100);
         Self {
             game: Arc::new(RwLock::new(None)),
             rounds: Arc::new(RwLock::new(HashMap::new())),
             submissions: Arc::new(RwLock::new(HashMap::new())),
             votes: Arc::new(RwLock::new(HashMap::new())),
             players: Arc::new(RwLock::new(HashMap::new())),
+            scores: Arc::new(RwLock::new(Vec::new())),
+            beamer_broadcast: tx,
         }
     }
 }

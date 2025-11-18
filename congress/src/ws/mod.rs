@@ -72,50 +72,82 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
         }
     }
 
-    // Handle incoming messages
-    while let Some(msg) = receiver.next().await {
-        match msg {
-            Ok(Message::Text(text)) => {
-                tracing::debug!("Received message: {}", text);
+    // Subscribe to broadcast channel if Beamer
+    let mut broadcast_rx = if role == Role::Beamer {
+        Some(state.beamer_broadcast.subscribe())
+    } else {
+        None
+    };
 
-                match serde_json::from_str::<ClientMessage>(&text) {
-                    Ok(client_msg) => {
-                        if let Some(response) =
-                            handlers::handle_message(client_msg, &role, &state).await
-                        {
-                            if let Ok(json) = serde_json::to_string(&response) {
-                                if sender.send(Message::Text(json.into())).await.is_err() {
-                                    tracing::error!("Failed to send response");
-                                    break;
+    // Handle incoming messages and broadcasts
+    loop {
+        tokio::select! {
+            // Handle broadcast messages (Beamer only)
+            broadcast_msg = async {
+                match &mut broadcast_rx {
+                    Some(rx) => rx.recv().await.ok(),
+                    None => {
+                        // Non-Beamer: wait forever
+                        std::future::pending::<Option<ServerMessage>>().await
+                    }
+                }
+            } => {
+                if let Some(msg) = broadcast_msg {
+                    if let Ok(json) = serde_json::to_string(&msg) {
+                        if sender.send(Message::Text(json.into())).await.is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Handle client messages
+            ws_msg = receiver.next() => {
+                match ws_msg {
+                    Some(Ok(Message::Text(text))) => {
+                        tracing::debug!("Received message: {}", text);
+
+                        match serde_json::from_str::<ClientMessage>(&text) {
+                            Ok(client_msg) => {
+                                if let Some(response) =
+                                    handlers::handle_message(client_msg, &role, &state).await
+                                {
+                                    if let Ok(json) = serde_json::to_string(&response) {
+                                        if sender.send(Message::Text(json.into())).await.is_err() {
+                                            tracing::error!("Failed to send response");
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to parse client message: {}", e);
+                                let error = ServerMessage::Error {
+                                    code: "PARSE_ERROR".to_string(),
+                                    msg: format!("Invalid message format: {}", e),
+                                };
+                                if let Ok(json) = serde_json::to_string(&error) {
+                                    let _ = sender.send(Message::Text(json.into())).await;
                                 }
                             }
                         }
                     }
-                    Err(e) => {
-                        tracing::error!("Failed to parse client message: {}", e);
-                        let error = ServerMessage::Error {
-                            code: "PARSE_ERROR".to_string(),
-                            msg: format!("Invalid message format: {}", e),
-                        };
-                        if let Ok(json) = serde_json::to_string(&error) {
-                            let _ = sender.send(Message::Text(json.into())).await;
+                    Some(Ok(Message::Close(_))) => {
+                        tracing::info!("WebSocket closed");
+                        break;
+                    }
+                    Some(Ok(Message::Ping(data))) => {
+                        if sender.send(Message::Pong(data)).await.is_err() {
+                            break;
                         }
                     }
+                    Some(Ok(_)) => {}
+                    Some(Err(e)) => {
+                        tracing::error!("WebSocket error: {}", e);
+                        break;
+                    }
+                    None => break,
                 }
-            }
-            Ok(Message::Close(_)) => {
-                tracing::info!("WebSocket closed");
-                break;
-            }
-            Ok(Message::Ping(data)) => {
-                if sender.send(Message::Pong(data)).await.is_err() {
-                    break;
-                }
-            }
-            Ok(_) => {}
-            Err(e) => {
-                tracing::error!("WebSocket error: {}", e);
-                break;
             }
         }
     }
