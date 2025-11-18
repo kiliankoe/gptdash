@@ -125,7 +125,15 @@ async fn handle_submit_answer(
     let round = state.get_current_round().await?;
 
     let player_id = if let Some(token) = player_token {
-        state.get_player_by_token(&token).await.map(|p| p.id)
+        match state.get_player_by_token(&token).await {
+            Some(player) => Some(player.id),
+            None => {
+                return Some(ServerMessage::Error {
+                    code: "INVALID_PLAYER_TOKEN".to_string(),
+                    msg: "Invalid player token".to_string(),
+                });
+            }
+        }
     } else {
         None
     };
@@ -177,10 +185,7 @@ async fn handle_submit_prompt(state: &Arc<AppState>, text: String) -> Option<Ser
     }
 }
 
-async fn handle_host_create_players(
-    state: &Arc<AppState>,
-    count: u32,
-) -> Option<ServerMessage> {
+async fn handle_host_create_players(state: &Arc<AppState>, count: u32) -> Option<ServerMessage> {
     tracing::info!("Host creating {} players", count);
     let mut players = Vec::new();
     for _ in 0..count {
@@ -283,12 +288,8 @@ mod tests {
         let state = Arc::new(AppState::new());
         let role = Role::Audience;
 
-        let result = handle_message(
-            ClientMessage::HostCreatePlayers { count: 3 },
-            &role,
-            &state,
-        )
-        .await;
+        let result =
+            handle_message(ClientMessage::HostCreatePlayers { count: 3 }, &role, &state).await;
 
         assert!(result.is_some());
         if let Some(ServerMessage::Error { code, .. }) = result {
@@ -301,12 +302,8 @@ mod tests {
         let state = Arc::new(AppState::new());
         let role = Role::Host;
 
-        let result = handle_message(
-            ClientMessage::HostCreatePlayers { count: 2 },
-            &role,
-            &state,
-        )
-        .await;
+        let result =
+            handle_message(ClientMessage::HostCreatePlayers { count: 2 }, &role, &state).await;
 
         assert!(result.is_some());
         if let Some(ServerMessage::PlayersCreated { players }) = result {
@@ -322,9 +319,10 @@ mod tests {
         state.create_game().await;
         let role = Role::Host;
 
+        // Test valid transition: Lobby -> PromptSelection
         let result = handle_message(
             ClientMessage::HostTransitionPhase {
-                phase: GamePhase::Writing,
+                phase: GamePhase::PromptSelection,
             },
             &role,
             &state,
@@ -333,7 +331,7 @@ mod tests {
 
         assert!(result.is_some());
         if let Some(ServerMessage::GameState { game }) = result {
-            assert_eq!(game.phase, GamePhase::Writing);
+            assert_eq!(game.phase, GamePhase::PromptSelection);
         } else {
             panic!("Expected GameState message");
         }

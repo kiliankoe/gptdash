@@ -32,7 +32,11 @@ impl AppState {
     }
 
     /// Edit a submission (host only)
-    pub async fn edit_submission(&self, submission_id: &str, new_text: String) -> Result<(), String> {
+    pub async fn edit_submission(
+        &self,
+        submission_id: &str,
+        new_text: String,
+    ) -> Result<(), String> {
         let mut submissions = self.submissions.write().await;
         if let Some(submission) = submissions.get_mut(submission_id) {
             submission.display_text = new_text;

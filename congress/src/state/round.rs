@@ -39,6 +39,39 @@ impl AppState {
 
     /// Start a new round
     pub async fn start_round(&self) -> Result<Round, String> {
+        // Validate game phase allows starting a new round
+        let game = self.game.read().await;
+        if let Some(ref g) = *game {
+            use GamePhase::*;
+            match g.phase {
+                Lobby | PromptSelection | Results | Podium => {
+                    // Valid phases for starting a round
+                }
+                _ => {
+                    return Err(format!(
+                        "Cannot start round in {:?} phase. Must be in Lobby, PromptSelection, Results, or Podium",
+                        g.phase
+                    ));
+                }
+            }
+
+            // If there's a current round, ensure it's closed
+            if let Some(ref current_round_id) = g.current_round_id {
+                let rounds = self.rounds.read().await;
+                if let Some(current_round) = rounds.get(current_round_id) {
+                    if current_round.state != RoundState::Closed {
+                        return Err(format!(
+                            "Cannot start new round while current round is in {:?} state",
+                            current_round.state
+                        ));
+                    }
+                }
+            }
+        } else {
+            return Err("No active game".to_string());
+        }
+        drop(game);
+
         let round = self.create_round().await?;
 
         let mut game = self.game.write().await;
@@ -49,6 +82,81 @@ impl AppState {
         }
 
         Ok(round)
+    }
+
+    /// Check if a round state transition is valid
+    fn is_valid_round_state_transition(from: &RoundState, to: &RoundState) -> bool {
+        use RoundState::*;
+
+        matches!(
+            (from, to),
+            (Setup, Collecting)
+                | (Collecting, Revealing)
+                | (Revealing, OpenForVotes)
+                | (OpenForVotes, Scoring)
+                | (Scoring, Closed)
+        )
+    }
+
+    /// Validate preconditions for a round state transition
+    fn validate_round_state_preconditions(round: &Round, to: &RoundState) -> Result<(), String> {
+        match to {
+            RoundState::Collecting => {
+                if round.selected_prompt.is_none() {
+                    return Err("Collecting state requires a selected prompt".to_string());
+                }
+            }
+            RoundState::Revealing => {
+                // Will be checked by caller - needs submission count
+            }
+            RoundState::OpenForVotes => {
+                if round.reveal_order.is_empty() {
+                    return Err("OpenForVotes state requires reveal order to be set".to_string());
+                }
+            }
+            _ => {} // No preconditions for other states
+        }
+        Ok(())
+    }
+
+    /// Transition round state with validation
+    pub async fn transition_round_state(
+        &self,
+        round_id: &str,
+        new_state: RoundState,
+    ) -> Result<(), String> {
+        let mut rounds = self.rounds.write().await;
+        if let Some(round) = rounds.get_mut(round_id) {
+            let current_state = &round.state;
+
+            // Validate transition is allowed
+            if !Self::is_valid_round_state_transition(current_state, &new_state) {
+                return Err(format!(
+                    "Invalid round state transition from {:?} to {:?}",
+                    current_state, new_state
+                ));
+            }
+
+            // Validate preconditions
+            Self::validate_round_state_preconditions(round, &new_state)?;
+
+            // Special check for Revealing: needs submissions
+            if new_state == RoundState::Revealing {
+                let submissions = self.submissions.read().await;
+                let submission_count = submissions
+                    .values()
+                    .filter(|s| s.round_id == round_id)
+                    .count();
+                if submission_count == 0 {
+                    return Err("Revealing state requires at least one submission".to_string());
+                }
+            }
+
+            round.state = new_state;
+            Ok(())
+        } else {
+            Err("Round not found".to_string())
+        }
     }
 
     /// Add a prompt candidate
@@ -74,10 +182,18 @@ impl AppState {
         }
     }
 
-    /// Select a prompt for the round
+    /// Select a prompt for the round and transition to Collecting
     pub async fn select_prompt(&self, round_id: &str, prompt_id: &str) -> Result<(), String> {
         let mut rounds = self.rounds.write().await;
         if let Some(round) = rounds.get_mut(round_id) {
+            // Validate current state
+            if round.state != RoundState::Setup {
+                return Err(format!(
+                    "Can only select prompt in Setup state, currently in {:?}",
+                    round.state
+                ));
+            }
+
             if let Some(prompt) = round
                 .prompt_candidates
                 .iter()
@@ -101,6 +217,29 @@ impl AppState {
         round_id: &str,
         order: Vec<SubmissionId>,
     ) -> Result<(), String> {
+        if order.is_empty() {
+            return Err("Reveal order cannot be empty".to_string());
+        }
+
+        // Validate all submission IDs belong to this round
+        let submissions = self.submissions.read().await;
+        for submission_id in &order {
+            match submissions.get(submission_id) {
+                Some(submission) => {
+                    if submission.round_id != round_id {
+                        return Err(format!(
+                            "Submission {} does not belong to round {}",
+                            submission_id, round_id
+                        ));
+                    }
+                }
+                None => {
+                    return Err(format!("Submission {} not found", submission_id));
+                }
+            }
+        }
+        drop(submissions);
+
         let mut rounds = self.rounds.write().await;
         if let Some(round) = rounds.get_mut(round_id) {
             round.reveal_order = order;
