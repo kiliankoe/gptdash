@@ -1,4 +1,5 @@
 use super::AppState;
+use crate::llm::GenerateRequest;
 use crate::types::*;
 
 impl AppState {
@@ -86,6 +87,7 @@ impl AppState {
     }
 
     /// Check if a round state transition is valid
+    #[cfg_attr(not(test), allow(dead_code))]
     fn is_valid_round_state_transition(from: &RoundState, to: &RoundState) -> bool {
         use RoundState::*;
 
@@ -100,6 +102,7 @@ impl AppState {
     }
 
     /// Validate preconditions for a round state transition
+    #[cfg_attr(not(test), allow(dead_code))]
     fn validate_round_state_preconditions(round: &Round, to: &RoundState) -> Result<(), String> {
         match to {
             RoundState::Collecting => {
@@ -121,6 +124,7 @@ impl AppState {
     }
 
     /// Transition round state with validation
+    #[cfg_attr(not(test), allow(dead_code))]
     pub async fn transition_round_state(
         &self,
         round_id: &str,
@@ -185,31 +189,127 @@ impl AppState {
 
     /// Select a prompt for the round and transition to Collecting
     pub async fn select_prompt(&self, round_id: &str, prompt_id: &str) -> Result<(), String> {
-        let mut rounds = self.rounds.write().await;
-        if let Some(round) = rounds.get_mut(round_id) {
-            // Validate current state
-            if round.state != RoundState::Setup {
-                return Err(format!(
-                    "Can only select prompt in Setup state, currently in {:?}",
-                    round.state
-                ));
-            }
+        let prompt_text = {
+            let mut rounds = self.rounds.write().await;
+            if let Some(round) = rounds.get_mut(round_id) {
+                // Validate current state
+                if round.state != RoundState::Setup {
+                    return Err(format!(
+                        "Can only select prompt in Setup state, currently in {:?}",
+                        round.state
+                    ));
+                }
 
-            if let Some(prompt) = round
-                .prompt_candidates
-                .iter()
-                .find(|p| p.id == prompt_id)
-                .cloned()
-            {
-                round.selected_prompt = Some(prompt);
-                round.state = RoundState::Collecting;
-                Ok(())
+                if let Some(prompt) = round
+                    .prompt_candidates
+                    .iter()
+                    .find(|p| p.id == prompt_id)
+                    .cloned()
+                {
+                    let text = prompt.text.clone();
+                    round.selected_prompt = Some(prompt);
+                    round.state = RoundState::Collecting;
+                    text
+                } else {
+                    return Err("Prompt not found".to_string());
+                }
             } else {
-                Err("Prompt not found".to_string())
+                return Err("Round not found".to_string());
             }
-        } else {
-            Err("Round not found".to_string())
+        };
+
+        // Kick off LLM generation in the background (don't block)
+        if let Some(text) = prompt_text {
+            let state = self.clone();
+            let round_id = round_id.to_string();
+            tokio::spawn(async move {
+                if let Err(e) = state.generate_ai_submissions(&round_id, &text).await {
+                    tracing::error!("Failed to generate AI submissions: {}", e);
+                }
+            });
         }
+
+        Ok(())
+    }
+
+    /// Generate AI submissions from all available LLM providers
+    pub async fn generate_ai_submissions(
+        &self,
+        round_id: &str,
+        prompt_text: &str,
+    ) -> Result<(), String> {
+        let llm = match &self.llm {
+            Some(manager) => manager,
+            None => {
+                tracing::warn!("No LLM providers available, skipping AI generation");
+                return Ok(());
+            }
+        };
+
+        tracing::info!("Generating AI submissions for prompt: {}", prompt_text);
+
+        // Get game config for max_answer_chars
+        let max_chars = {
+            let game = self.game.read().await;
+            game.as_ref()
+                .map(|g| g.config.max_answer_chars)
+                .unwrap_or(500)
+        };
+
+        let request = GenerateRequest {
+            prompt: prompt_text.to_string(),
+            image_url: None,
+            max_tokens: Some(self.llm_config.default_max_tokens),
+            timeout: self.llm_config.default_timeout,
+        };
+
+        // Generate from all providers concurrently
+        let responses = llm.generate_from_all(request).await;
+
+        if responses.is_empty() {
+            tracing::error!("No LLM providers generated responses");
+            return Err("All LLM providers failed".to_string());
+        }
+
+        // Store each AI submission with provider metadata
+        for (provider_name, response) in responses {
+            let submission_id = ulid::Ulid::new().to_string();
+
+            // Truncate if needed
+            let text = if response.text.len() > max_chars {
+                response.text.chars().take(max_chars).collect()
+            } else {
+                response.text.clone()
+            };
+
+            let submission = Submission {
+                id: submission_id.clone(),
+                round_id: round_id.to_string(),
+                author_kind: AuthorKind::Ai,
+                author_ref: Some(format!("{}:{}", provider_name, response.metadata.model)),
+                original_text: text.clone(),
+                display_text: text,
+                edited_by_host: Some(false),
+                tts_asset_url: None,
+            };
+
+            self.submissions
+                .write()
+                .await
+                .insert(submission_id.clone(), submission.clone());
+
+            tracing::info!(
+                "Generated AI submission from {}: {} chars in {}ms",
+                provider_name,
+                response.text.len(),
+                response.metadata.latency_ms
+            );
+        }
+
+        // Broadcast updated submissions list to all clients
+        self.broadcast_submissions(round_id).await;
+
+        Ok(())
     }
 
     /// Set reveal order

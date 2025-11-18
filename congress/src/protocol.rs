@@ -121,12 +121,13 @@ impl From<&Submission> for SubmissionInfo {
     }
 }
 
-/// Host-only submission info (includes author_kind)
+/// Host-only submission info (includes author_kind and provider metadata)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HostSubmissionInfo {
     pub id: SubmissionId,
     pub display_text: String,
     pub author_kind: AuthorKind,
+    pub author_ref: Option<String>, // For AI: "openai:gpt-4o-mini", for players: player ID
 }
 
 impl From<&Submission> for HostSubmissionInfo {
@@ -135,6 +136,7 @@ impl From<&Submission> for HostSubmissionInfo {
             id: s.id.clone(),
             display_text: s.display_text.clone(),
             author_kind: s.author_kind.clone(),
+            author_ref: s.author_ref.clone(),
         }
     }
 }

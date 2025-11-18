@@ -15,8 +15,12 @@ impl AppState {
 
         for vote in votes.values() {
             if vote.round_id == *round_id {
-                *ai_counts.entry(vote.ai_pick_submission_id.clone()).or_insert(0) += 1;
-                *funny_counts.entry(vote.funny_pick_submission_id.clone()).or_insert(0) += 1;
+                *ai_counts
+                    .entry(vote.ai_pick_submission_id.clone())
+                    .or_insert(0) += 1;
+                *funny_counts
+                    .entry(vote.funny_pick_submission_id.clone())
+                    .or_insert(0) += 1;
             }
         }
 
@@ -116,7 +120,13 @@ mod tests {
         let round1 = state.start_round().await.unwrap();
 
         // Close round1 and start round2
-        state.rounds.write().await.get_mut(&round1.id).unwrap().state = RoundState::Closed;
+        state
+            .rounds
+            .write()
+            .await
+            .get_mut(&round1.id)
+            .unwrap()
+            .state = RoundState::Closed;
         state.game.write().await.as_mut().unwrap().phase = GamePhase::Results;
         let round2 = state.start_round().await.unwrap();
 

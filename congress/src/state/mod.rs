@@ -5,6 +5,7 @@ mod score;
 mod submission;
 mod vote;
 
+use crate::llm::{LlmConfig, LlmManager};
 use crate::protocol::ServerMessage;
 use crate::types::*;
 use std::collections::HashMap;
@@ -20,6 +21,10 @@ pub struct AppState {
     pub votes: Arc<RwLock<HashMap<VoteId, Vote>>>,
     pub players: Arc<RwLock<HashMap<PlayerId, Player>>>,
     pub scores: Arc<RwLock<Vec<Score>>>,
+    /// LLM manager for generating AI answers
+    pub llm: Option<Arc<LlmManager>>,
+    /// LLM configuration (timeout, max tokens, etc.)
+    pub llm_config: LlmConfig,
     /// Broadcast channel for sending messages to all clients
     pub broadcast: broadcast::Sender<ServerMessage>,
     /// Broadcast channel for sending messages to Host clients only
@@ -30,6 +35,10 @@ pub struct AppState {
 
 impl AppState {
     pub fn new() -> Self {
+        Self::new_with_llm(None, LlmConfig::default())
+    }
+
+    pub fn new_with_llm(llm: Option<LlmManager>, llm_config: LlmConfig) -> Self {
         let (broadcast_tx, _rx) = broadcast::channel(100);
         let (host_tx, _rx) = broadcast::channel(100);
         let (beamer_tx, _rx) = broadcast::channel(100);
@@ -40,6 +49,8 @@ impl AppState {
             votes: Arc::new(RwLock::new(HashMap::new())),
             players: Arc::new(RwLock::new(HashMap::new())),
             scores: Arc::new(RwLock::new(Vec::new())),
+            llm: llm.map(Arc::new),
+            llm_config,
             broadcast: broadcast_tx,
             host_broadcast: host_tx,
             beamer_broadcast: beamer_tx,
@@ -472,7 +483,10 @@ mod tests {
         let state = AppState::new();
         state.create_game().await;
 
-        state.transition_phase(GamePhase::PromptSelection).await.unwrap();
+        state
+            .transition_phase(GamePhase::PromptSelection)
+            .await
+            .unwrap();
         let round = state.start_round().await.unwrap();
 
         // Add and select prompt
@@ -485,7 +499,11 @@ mod tests {
         // Add submissions
         let player = state.create_player().await;
         let sub1 = state
-            .submit_answer(&round.id, Some(player.id.clone()), "Player answer".to_string())
+            .submit_answer(
+                &round.id,
+                Some(player.id.clone()),
+                "Player answer".to_string(),
+            )
             .await
             .unwrap();
         let _sub2 = state
@@ -515,7 +533,10 @@ mod tests {
         let state = AppState::new();
         state.create_game().await;
 
-        state.transition_phase(GamePhase::PromptSelection).await.unwrap();
+        state
+            .transition_phase(GamePhase::PromptSelection)
+            .await
+            .unwrap();
         let round = state.start_round().await.unwrap();
 
         // Setup full round
@@ -535,7 +556,10 @@ mod tests {
             .await
             .unwrap();
 
-        state.set_ai_submission(&round.id, ai_sub.id.clone()).await.unwrap();
+        state
+            .set_ai_submission(&round.id, ai_sub.id.clone())
+            .await
+            .unwrap();
         state
             .set_reveal_order(&round.id, vec![player_sub.id.clone(), ai_sub.id.clone()])
             .await
@@ -563,7 +587,10 @@ mod tests {
         assert_eq!(scores1[0].total, 2); // 1 AI + 1 funny
 
         // Re-enter RESULTS (should not duplicate scores)
-        state.transition_phase(GamePhase::Intermission).await.unwrap();
+        state
+            .transition_phase(GamePhase::Intermission)
+            .await
+            .unwrap();
         state.transition_phase(GamePhase::Results).await.unwrap();
 
         let (scores2, _) = state.get_leaderboards().await;

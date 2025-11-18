@@ -98,27 +98,31 @@ impl AppState {
         for score in scores.iter() {
             match score.kind {
                 ScoreKind::Player => {
-                    let entry = player_totals.entry(score.ref_id.clone()).or_insert_with(|| Score {
-                        id: score.ref_id.clone(),
-                        kind: ScoreKind::Player,
-                        ref_id: score.ref_id.clone(),
-                        ai_detect_points: 0,
-                        funny_points: 0,
-                        total: 0,
-                    });
+                    let entry = player_totals
+                        .entry(score.ref_id.clone())
+                        .or_insert_with(|| Score {
+                            id: score.ref_id.clone(),
+                            kind: ScoreKind::Player,
+                            ref_id: score.ref_id.clone(),
+                            ai_detect_points: 0,
+                            funny_points: 0,
+                            total: 0,
+                        });
                     entry.ai_detect_points += score.ai_detect_points;
                     entry.funny_points += score.funny_points;
                     entry.total += score.total;
                 }
                 ScoreKind::Audience => {
-                    let entry = audience_totals.entry(score.ref_id.clone()).or_insert_with(|| Score {
-                        id: score.ref_id.clone(),
-                        kind: ScoreKind::Audience,
-                        ref_id: score.ref_id.clone(),
-                        ai_detect_points: 0,
-                        funny_points: 0,
-                        total: 0,
-                    });
+                    let entry = audience_totals
+                        .entry(score.ref_id.clone())
+                        .or_insert_with(|| Score {
+                            id: score.ref_id.clone(),
+                            kind: ScoreKind::Audience,
+                            ref_id: score.ref_id.clone(),
+                            ai_detect_points: 0,
+                            funny_points: 0,
+                            total: 0,
+                        });
                     entry.ai_detect_points += score.ai_detect_points;
                     entry.funny_points += score.funny_points;
                     entry.total += score.total;
@@ -148,8 +152,17 @@ mod tests {
         let round = state.start_round().await.unwrap();
 
         // Add AI submission
-        let ai_sub = state.submit_answer(&round.id, None, "AI answer".to_string()).await.unwrap();
-        state.rounds.write().await.get_mut(&round.id).unwrap().ai_submission_id = Some(ai_sub.id.clone());
+        let ai_sub = state
+            .submit_answer(&round.id, None, "AI answer".to_string())
+            .await
+            .unwrap();
+        state
+            .rounds
+            .write()
+            .await
+            .get_mut(&round.id)
+            .unwrap()
+            .ai_submission_id = Some(ai_sub.id.clone());
 
         let result = state.compute_scores(&round.id).await;
         assert!(result.is_ok());
@@ -166,11 +179,27 @@ mod tests {
         let round = state.start_round().await.unwrap();
 
         // Add AI submission and player submission
-        let ai_sub = state.submit_answer(&round.id, None, "AI answer".to_string()).await.unwrap();
+        let ai_sub = state
+            .submit_answer(&round.id, None, "AI answer".to_string())
+            .await
+            .unwrap();
         let player = state.create_player().await;
-        let player_sub = state.submit_answer(&round.id, Some(player.id.clone()), "Player answer".to_string()).await.unwrap();
+        let player_sub = state
+            .submit_answer(
+                &round.id,
+                Some(player.id.clone()),
+                "Player answer".to_string(),
+            )
+            .await
+            .unwrap();
 
-        state.rounds.write().await.get_mut(&round.id).unwrap().ai_submission_id = Some(ai_sub.id.clone());
+        state
+            .rounds
+            .write()
+            .await
+            .get_mut(&round.id)
+            .unwrap()
+            .ai_submission_id = Some(ai_sub.id.clone());
 
         // Two votes: both pick player's answer as AI (player fooled them)
         let vote1 = Vote {
@@ -214,11 +243,27 @@ mod tests {
         let round = state.start_round().await.unwrap();
 
         // Add AI submission
-        let ai_sub = state.submit_answer(&round.id, None, "AI answer".to_string()).await.unwrap();
+        let ai_sub = state
+            .submit_answer(&round.id, None, "AI answer".to_string())
+            .await
+            .unwrap();
         let player = state.create_player().await;
-        let player_sub = state.submit_answer(&round.id, Some(player.id.clone()), "Player answer".to_string()).await.unwrap();
+        let player_sub = state
+            .submit_answer(
+                &round.id,
+                Some(player.id.clone()),
+                "Player answer".to_string(),
+            )
+            .await
+            .unwrap();
 
-        state.rounds.write().await.get_mut(&round.id).unwrap().ai_submission_id = Some(ai_sub.id.clone());
+        state
+            .rounds
+            .write()
+            .await
+            .get_mut(&round.id)
+            .unwrap()
+            .ai_submission_id = Some(ai_sub.id.clone());
 
         // One vote correctly identifies AI
         let vote = Vote {
@@ -249,9 +294,21 @@ mod tests {
         // Round 1
         let round1 = state.start_round().await.unwrap();
         let player1 = state.create_player().await;
-        let ai_sub1 = state.submit_answer(&round1.id, None, "AI".to_string()).await.unwrap();
-        let p1_sub = state.submit_answer(&round1.id, Some(player1.id.clone()), "P1".to_string()).await.unwrap();
-        state.rounds.write().await.get_mut(&round1.id).unwrap().ai_submission_id = Some(ai_sub1.id.clone());
+        let ai_sub1 = state
+            .submit_answer(&round1.id, None, "AI".to_string())
+            .await
+            .unwrap();
+        let p1_sub = state
+            .submit_answer(&round1.id, Some(player1.id.clone()), "P1".to_string())
+            .await
+            .unwrap();
+        state
+            .rounds
+            .write()
+            .await
+            .get_mut(&round1.id)
+            .unwrap()
+            .ai_submission_id = Some(ai_sub1.id.clone());
 
         let vote1 = Vote {
             id: ulid::Ulid::new().to_string(),
@@ -280,9 +337,21 @@ mod tests {
 
         // Round 1: player gets 2 points
         let round1 = state.start_round().await.unwrap();
-        let ai_sub1 = state.submit_answer(&round1.id, None, "AI1".to_string()).await.unwrap();
-        let p_sub1 = state.submit_answer(&round1.id, Some(player.id.clone()), "P1".to_string()).await.unwrap();
-        state.rounds.write().await.get_mut(&round1.id).unwrap().ai_submission_id = Some(ai_sub1.id.clone());
+        let ai_sub1 = state
+            .submit_answer(&round1.id, None, "AI1".to_string())
+            .await
+            .unwrap();
+        let p_sub1 = state
+            .submit_answer(&round1.id, Some(player.id.clone()), "P1".to_string())
+            .await
+            .unwrap();
+        state
+            .rounds
+            .write()
+            .await
+            .get_mut(&round1.id)
+            .unwrap()
+            .ai_submission_id = Some(ai_sub1.id.clone());
 
         let vote1 = Vote {
             id: ulid::Ulid::new().to_string(),
@@ -296,14 +365,32 @@ mod tests {
         state.compute_scores(&round1.id).await.unwrap();
 
         // Close round1 and start round2
-        state.rounds.write().await.get_mut(&round1.id).unwrap().state = RoundState::Closed;
+        state
+            .rounds
+            .write()
+            .await
+            .get_mut(&round1.id)
+            .unwrap()
+            .state = RoundState::Closed;
         state.game.write().await.as_mut().unwrap().phase = GamePhase::Results;
         let round2 = state.start_round().await.unwrap();
 
         // Round 2: player gets 1 more point
-        let ai_sub2 = state.submit_answer(&round2.id, None, "AI2".to_string()).await.unwrap();
-        let p_sub2 = state.submit_answer(&round2.id, Some(player.id.clone()), "P2".to_string()).await.unwrap();
-        state.rounds.write().await.get_mut(&round2.id).unwrap().ai_submission_id = Some(ai_sub2.id.clone());
+        let ai_sub2 = state
+            .submit_answer(&round2.id, None, "AI2".to_string())
+            .await
+            .unwrap();
+        let p_sub2 = state
+            .submit_answer(&round2.id, Some(player.id.clone()), "P2".to_string())
+            .await
+            .unwrap();
+        state
+            .rounds
+            .write()
+            .await
+            .get_mut(&round2.id)
+            .unwrap()
+            .ai_submission_id = Some(ai_sub2.id.clone());
 
         let vote2 = Vote {
             id: ulid::Ulid::new().to_string(),

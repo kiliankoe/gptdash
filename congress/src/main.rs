@@ -1,4 +1,5 @@
 mod broadcast;
+mod llm;
 mod protocol;
 mod state;
 mod types;
@@ -25,8 +26,24 @@ async fn main() {
 
     tracing::info!("Starting GPTDash...");
 
+    // Initialize LLM providers
+    let llm_config = llm::LlmConfig::from_env();
+    let llm_manager = match llm_config.build_manager() {
+        Ok(manager) => {
+            tracing::info!("LLM providers initialized successfully");
+            Some(manager)
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to initialize LLM providers: {}. AI answers will not be available.",
+                e
+            );
+            None
+        }
+    };
+
     // Initialize a default game
-    let state = Arc::new(AppState::new());
+    let state = Arc::new(AppState::new_with_llm(llm_manager, llm_config));
     state.create_game().await;
 
     // Spawn background task for broadcasting vote counts to Beamer

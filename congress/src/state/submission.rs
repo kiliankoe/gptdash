@@ -59,14 +59,12 @@ impl AppState {
     }
 
     /// Broadcast submissions list for a round to all clients
-    async fn broadcast_submissions(&self, round_id: &str) {
+    pub async fn broadcast_submissions(&self, round_id: &str) {
         let submissions = self.get_submissions(round_id).await;
 
         // Public broadcast (no author_kind to prevent spoilers)
         let public_infos: Vec<_> = submissions.iter().map(|s| s.into()).collect();
-        self.broadcast_to_all(crate::protocol::ServerMessage::Submissions {
-            list: public_infos,
-        });
+        self.broadcast_to_all(crate::protocol::ServerMessage::Submissions { list: public_infos });
 
         // Host-only broadcast (includes author_kind for managing the game)
         let host_infos: Vec<_> = submissions.iter().map(|s| s.into()).collect();
