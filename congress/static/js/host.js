@@ -15,6 +15,9 @@ const gameState = {
 function init() {
   wsConn = new WSConnection("host", handleMessage, updateStatus);
   wsConn.connect();
+
+  // Generate QR codes for joining
+  generateJoinQRCodes();
 }
 
 function handleMessage(message) {
@@ -293,6 +296,32 @@ function clearLog() {
   document.getElementById("messageLog").innerHTML = "";
 }
 
+/**
+ * Generate QR codes for joining the game
+ */
+function generateJoinQRCodes() {
+  // Generate QR code for audience join
+  const audienceUrl = QRCodeManager.generateAudienceQR("audienceQRCode", {
+    width: 200,
+    height: 200,
+  });
+
+  // Update URL display
+  const urlEl = document.getElementById("audienceJoinUrl");
+  if (urlEl) {
+    urlEl.textContent = audienceUrl;
+  }
+}
+
+/**
+ * Copy audience join URL to clipboard
+ */
+function copyAudienceUrl() {
+  const url = QRCodeManager.getAudienceJoinUrl();
+  copyToClipboard(url);
+  showAlert("URL in Zwischenablage kopiert!", "success");
+}
+
 // Initialize on page load
 init();
 
@@ -310,5 +339,6 @@ if (typeof window !== "undefined") {
     resetGame,
     closeWriting,
     clearLog,
+    copyAudienceUrl,
   });
 }

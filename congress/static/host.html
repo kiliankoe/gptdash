@@ -8,6 +8,7 @@
     <!-- TODO: Add HTTP Basic Auth protection for this page -->
     <link rel="stylesheet" href="/css/common.css">
     <link rel="stylesheet" href="/css/host.css">
+    <script src="/js/qrcode.min.js"></script>
 </head>
 
 
@@ -79,6 +80,15 @@
                         <button onclick="transitionPhase('WRITING')">→ Schreiben</button>
                         <button onclick="transitionPhase('VOTING')">→ Abstimmen</button>
                         <button onclick="transitionPhase('RESULTS')">→ Auflösung</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Publikum beitreten lassen</div>
+                    <div style="text-align: center; padding: 20px;">
+                        <div id="audienceQRCode" style="display: inline-block; margin-bottom: 15px;"></div>
+                        <div style="font-size: 18px; font-weight: bold;" id="audienceJoinUrl">Laden...</div>
+                        <button onclick="copyAudienceUrl()" style="margin-top: 10px;">URL kopieren</button>
                     </div>
                 </div>
 

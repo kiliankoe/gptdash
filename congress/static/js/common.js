@@ -289,6 +289,97 @@ class CountdownTimer {
 }
 
 /**
+ * QR Code generation utility
+ */
+const QRCodeManager = {
+  /**
+   * Generate a QR code for a URL
+   * @param {string} containerId - ID of the element to render QR code in
+   * @param {string} url - URL to encode in QR code
+   * @param {object} options - QR code options (width, height, colorDark, colorLight)
+   */
+  generate(containerId, url, options = {}) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+      console.error("QR code container not found:", containerId);
+      return;
+    }
+
+    // Clear existing QR code
+    container.innerHTML = "";
+
+    // Check if QRCode library is loaded
+    if (typeof QRCode === "undefined") {
+      console.error("QRCode library not loaded");
+      container.innerHTML =
+        '<p style="color: red;">QR code library not loaded</p>';
+      return;
+    }
+
+    const defaultOptions = {
+      width: 256,
+      height: 256,
+      colorDark: "#000000",
+      colorLight: "#ffffff",
+    };
+
+    const qrOptions = { ...defaultOptions, ...options };
+
+    try {
+      new QRCode(container, {
+        text: url,
+        width: qrOptions.width,
+        height: qrOptions.height,
+        colorDark: qrOptions.colorDark,
+        colorLight: qrOptions.colorLight,
+        correctLevel: QRCode.CorrectLevel.H, // High error correction
+      });
+    } catch (error) {
+      console.error("Failed to generate QR code:", error);
+      container.innerHTML =
+        '<p style="color: red;">Failed to generate QR code</p>';
+    }
+  },
+
+  /**
+   * Get the full URL for the audience join page
+   */
+  getAudienceJoinUrl() {
+    const protocol = window.location.protocol;
+    const host = window.location.host || window.location.hostname;
+    return `${protocol}//${host}/audience.html`;
+  },
+
+  /**
+   * Get the full URL for the player join page (with optional token)
+   */
+  getPlayerJoinUrl(token = null) {
+    const protocol = window.location.protocol;
+    const host = window.location.host || window.location.hostname;
+    const baseUrl = `${protocol}//${host}/player.html`;
+    return token ? `${baseUrl}?token=${token}` : baseUrl;
+  },
+
+  /**
+   * Generate QR code for audience join
+   */
+  generateAudienceQR(containerId, options = {}) {
+    const url = this.getAudienceJoinUrl();
+    this.generate(containerId, url, options);
+    return url;
+  },
+
+  /**
+   * Generate QR code for player join
+   */
+  generatePlayerQR(containerId, token = null, options = {}) {
+    const url = this.getPlayerJoinUrl(token);
+    this.generate(containerId, url, options);
+    return url;
+  },
+};
+
+/**
  * Text-to-Speech manager using browser API
  */
 class TTSManager {
@@ -360,6 +451,7 @@ if (typeof window !== "undefined") {
     copyToClipboard,
     formatTime,
     CountdownTimer,
+    QRCodeManager,
     TTSManager,
   });
 }

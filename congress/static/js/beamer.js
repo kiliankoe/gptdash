@@ -27,6 +27,9 @@ function init() {
   writingTimer = new CountdownTimer("writingTimer");
   votingTimer = new CountdownTimer("votingTimer");
   ttsManager = new TTSManager();
+
+  // Generate QR codes
+  generateJoinQRCodes();
 }
 
 function handleMessage(message) {
@@ -395,6 +398,31 @@ function updatePodium() {
       `Spieler ${players[2].ref_id.substring(0, 8)}`;
     document.getElementById("podium3Score").textContent =
       `${players[2].total} Pkt`;
+  }
+}
+
+/**
+ * Generate QR codes for joining the game
+ */
+function generateJoinQRCodes() {
+  // Generate big QR code for Lobby scene
+  const audienceUrl = QRCodeManager.generateAudienceQR("lobbyQRCode", {
+    width: 400,
+    height: 400,
+  });
+
+  // Generate small QR code for banner (persistent across scenes)
+  QRCodeManager.generateAudienceQR("bannerQRCode", {
+    width: 100,
+    height: 100,
+  });
+
+  // Update join URL text in banner
+  const joinUrlEl = document.getElementById("joinUrl");
+  if (joinUrlEl) {
+    // Extract just the hostname and path for display
+    const url = new URL(audienceUrl);
+    joinUrlEl.textContent = `Mach mit: ${url.host}`;
   }
 }
 
