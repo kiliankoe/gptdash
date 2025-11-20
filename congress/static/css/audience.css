@@ -1,0 +1,202 @@
+/* Audience-specific styles */
+
+body {
+  padding: 20px;
+}
+
+.container {
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.header h1 {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  margin-bottom: 10px;
+  text-shadow: 2px 2px 20px rgba(0, 0, 0, 0.3);
+}
+
+.header .subtitle {
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.card {
+  padding: 25px;
+}
+
+.card p {
+  opacity: 0.9;
+  margin-bottom: 15px;
+  line-height: 1.5;
+}
+
+.screen {
+  flex: 1;
+}
+
+/* Answer options for voting */
+.answer-option {
+  background: rgba(255, 255, 255, 0.1);
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.answer-option:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+.answer-option.selected {
+  background: rgba(251, 191, 36, 0.3);
+  border-color: #fbbf24;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+}
+
+.answer-option .number {
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
+
+.answer-option .text {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.answer-option .checkmark {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  font-size: 24px;
+  display: none;
+}
+
+.answer-option.selected .checkmark {
+  display: block;
+}
+
+/* Vote sections */
+.vote-section {
+  margin-bottom: 30px;
+}
+
+.vote-section h3 {
+  font-size: 18px;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+/* Vote summary */
+.vote-summary {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
+
+.vote-summary-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.vote-summary-item:last-child {
+  margin-bottom: 0;
+}
+
+.vote-summary-item .label {
+  opacity: 0.8;
+}
+
+.vote-summary-item .value {
+  font-weight: 600;
+}
+
+/* Success/Waiting messages */
+.success-message,
+.waiting-message {
+  text-align: center;
+  padding: 30px 20px;
+}
+
+.success-message .icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.waiting-message .icon {
+  font-size: 56px;
+  margin-bottom: 20px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.success-message h3,
+.waiting-message h3 {
+  font-size: 22px;
+  margin-bottom: 10px;
+}
+
+.success-message p,
+.waiting-message p {
+  opacity: 0.9;
+  font-size: 15px;
+}
+
+/* Winner badge */
+.winner-badge {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #1a1a1a;
+  padding: 30px;
+  border-radius: 15px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(251, 191, 36, 0.4);
+}
+
+.winner-badge .icon {
+  font-size: 72px;
+  margin-bottom: 15px;
+}
+
+.winner-badge h3 {
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.winner-badge p {
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+/* Full-width buttons for mobile */
+button {
+  width: 100%;
+  padding: 16px;
+  font-size: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(251, 191, 36, 0.4);
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(251, 191, 36, 0.5);
+}

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPTDash - Player</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/player.css">
+</head>
+
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>GPTDash</h1>
+            <div class="subtitle">Player Portal</div>
+        </div>
+
+        <div class="status-indicator">
+            <div class="status-dot" id="statusDot"></div>
+            <div class="status-text" id="statusText">Connecting...</div>
+        </div>
+
+        <!-- Join Screen -->
+        <div class="screen active" id="joinScreen">
+            <div class="card">
+                <h2>Join the Game</h2>
+                <p style="margin-bottom: 20px; opacity: 0.9;">Enter the player token provided by your host.</p>
+
+                <input type="text" id="tokenInput" placeholder="Enter your player token"
+                    style="text-transform: uppercase; font-family: monospace;">
+
+                <button onclick="joinGame()" id="joinButton">Join Game</button>
+
+                <div id="joinError" class="error-message" style="display: none;"></div>
+
+                <div class="help-text">
+                    Token format: player_XXXX
+                </div>
+            </div>
+        </div>
+
+        <!-- Register Name Screen -->
+        <div class="screen" id="registerScreen">
+            <div class="card">
+                <h2>Choose Your Name</h2>
+                <p style="margin-bottom: 20px; opacity: 0.9;">This is how you'll appear on the leaderboard.</p>
+
+                <input type="text" id="nameInput" placeholder="Enter your display name" maxlength="30">
+
+                <button onclick="registerName()" id="registerButton">Continue</button>
+
+                <div id="registerError" class="error-message" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Waiting Screen -->
+        <div class="screen" id="waitingScreen">
+            <div class="card">
+                <div class="waiting-message">
+                    <div class="icon">⏳</div>
+                    <h3>Waiting for the game to start...</h3>
+                    <p style="margin-top: 10px;">The host will begin the round shortly.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Writing Screen -->
+        <div class="screen" id="writingScreen">
+            <div class="card">
+                <h2>Submit Your Answer</h2>
+
+                <div class="prompt-display">
+                    <div class="label">Prompt</div>
+                    <div id="promptText">Loading...</div>
+                </div>
+
+                <textarea id="answerInput" placeholder="Type your answer here... Make it convincing!"
+                    maxlength="500"></textarea>
+
+                <div class="char-counter" id="charCounter">0 / 500</div>
+
+                <button onclick="submitAnswer()" id="submitButton">Submit Answer</button>
+
+                <div id="submitError" class="error-message" style="display: none;"></div>
+
+                <div class="help-text">
+                    You can resubmit until the timer runs out!
+                </div>
+            </div>
+        </div>
+
+        <!-- Submitted Screen -->
+        <div class="screen" id="submittedScreen">
+            <div class="card">
+                <div class="success-message">
+                    <div class="icon">✅</div>
+                    <h3>Answer Submitted!</h3>
+                    <p>Your answer has been recorded. You can resubmit if you want to change it.</p>
+
+                    <button onclick="editAnswer()" style="margin-top: 20px;">Edit Answer</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Locked Screen (after writing phase ends) -->
+        <div class="screen" id="lockedScreen">
+            <div class="card">
+                <div class="waiting-message">
+                    <div class="icon">🔒</div>
+                    <h3>Answers Locked!</h3>
+                    <p style="margin-top: 10px;">Watch the big screen to see the results!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="/js/common.js"></script>
+    <script src="/js/player.js"></script>
+</body>
+
+</html>

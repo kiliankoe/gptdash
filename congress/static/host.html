@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPTDash - Host Control Panel</title>
+    <!-- TODO: Add HTTP Basic Auth protection for this page -->
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/host.css">
+</head>
+
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>GPTDash Host Control Panel</h1>
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div class="status-item">
+                <span id="phaseDisplay">Phase: LOBBY</span>
+            </div>
+            <div class="status-item">
+                <span id="roundDisplay">Round: 0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
+            <div class="sidebar-item active" onclick="showPanel('overview')">Overview</div>
+            <div class="sidebar-item" onclick="showPanel('game')">Game Control</div>
+            <div class="sidebar-item" onclick="showPanel('players')">Players</div>
+            <div class="sidebar-item" onclick="showPanel('prompts')">Prompts</div>
+            <div class="sidebar-item" onclick="showPanel('submissions')">Submissions</div>
+            <div class="sidebar-item" onclick="showPanel('scores')">Scores</div>
+            <div class="sidebar-item" onclick="showPanel('logs')">Message Log</div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main">
+            <!-- Overview Panel -->
+            <div class="panel active" id="overview">
+                <h2>Overview</h2>
+
+                <div class="card">
+                    <div class="card-header">Game State</div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="label">Current Phase</div>
+                            <div class="value" id="overviewPhase">LOBBY</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">Round Number</div>
+                            <div class="value" id="overviewRound">0</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">Players</div>
+                            <div class="value" id="overviewPlayers">0</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">Submissions</div>
+                            <div class="value" id="overviewSubmissions">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Quick Actions</div>
+                    <div class="button-group">
+                        <button onclick="createGame()">Create New Game</button>
+                        <button onclick="hostCreatePlayers(3)">Create 3 Players</button>
+                        <button onclick="hostStartRound()">Start Round</button>
+                        <button onclick="transitionPhase('WRITING')">→ Writing</button>
+                        <button onclick="transitionPhase('VOTING')">→ Voting</button>
+                        <button onclick="transitionPhase('RESULTS')">→ Results</button>
+                    </div>
+                </div>
+
+                <div id="overviewAlert"></div>
+            </div>
+
+            <!-- Game Control Panel -->
+            <div class="panel" id="game">
+                <h2>Game Control</h2>
+
+                <div class="card">
+                    <div class="card-header">Phase Transitions</div>
+                    <div class="phase-selector">
+                        <button onclick="transitionPhase('LOBBY')">Lobby</button>
+                        <button onclick="transitionPhase('PROMPT_SELECTION')">Prompt Selection</button>
+                        <button onclick="transitionPhase('WRITING')">Writing</button>
+                        <button onclick="transitionPhase('REVEAL')">Reveal</button>
+                        <button onclick="transitionPhase('VOTING')">Voting</button>
+                        <button onclick="transitionPhase('RESULTS')">Results</button>
+                        <button onclick="transitionPhase('PODIUM')">Podium</button>
+                        <button onclick="transitionPhase('INTERMISSION')">Intermission</button>
+                        <button onclick="transitionPhase('ENDED')" class="danger">End Game</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Round Management</div>
+                    <div class="button-group">
+                        <button onclick="hostStartRound()">Start New Round</button>
+                        <button onclick="selectPrompt()">Select Prompt</button>
+                        <button onclick="closeWriting()">Close Writing Phase</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Emergency Controls</div>
+                    <div class="button-group">
+                        <button class="secondary" onclick="transitionPhase('INTERMISSION')">Pause
+                            (Intermission)</button>
+                        <button class="danger" onclick="resetGame()">Reset Game</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Players Panel -->
+            <div class="panel" id="players">
+                <h2>Player Management</h2>
+
+                <div class="card">
+                    <div class="card-header">Create Players</div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                        <input type="number" id="playerCount" value="3" min="1" max="10"
+                            style="max-width: 100px; margin-bottom: 0;">
+                        <button onclick="hostCreatePlayersCustom()">Create Players</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Player Tokens</div>
+                    <div id="playerTokensList">
+                        <p style="opacity: 0.6;">No players created yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prompts Panel -->
+            <div class="panel" id="prompts">
+                <h2>Prompt Management</h2>
+
+                <div class="card">
+                    <div class="card-header">Add Prompt</div>
+                    <textarea id="promptText" placeholder="Enter your prompt here..."></textarea>
+                    <button onclick="addPrompt()">Add Prompt</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Available Prompts</div>
+                    <div id="promptsList">
+                        <p style="opacity: 0.6;">No prompts available</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submissions Panel -->
+            <div class="panel" id="submissions">
+                <h2>Submissions</h2>
+
+                <div class="card">
+                    <div class="card-header">Manage Submissions</div>
+                    <div id="submissionsList">
+                        <p style="opacity: 0.6;">No submissions yet</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Reveal Order</div>
+                    <p style="opacity: 0.8; margin-bottom: 10px;">Set the order in which answers will be revealed. Enter
+                        submission IDs separated by commas.</p>
+                    <textarea id="revealOrderInput" placeholder="sub_123, sub_456, sub_789"></textarea>
+                    <button onclick="setRevealOrder()">Set Reveal Order</button>
+                </div>
+            </div>
+
+            <!-- Scores Panel -->
+            <div class="panel" id="scores">
+                <h2>Scores & Leaderboards</h2>
+
+                <div class="card">
+                    <div class="card-header">Player Scores</div>
+                    <div id="playerScores">
+                        <p style="opacity: 0.6;">No scores yet</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Top Audience Members</div>
+                    <div id="audienceScores">
+                        <p style="opacity: 0.6;">No audience scores yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs Panel -->
+            <div class="panel" id="logs">
+                <h2>Message Log</h2>
+
+                <div class="card">
+                    <button onclick="clearLog()" class="secondary">Clear Log</button>
+                    <div id="messageLog" class="log" style="margin-top: 15px;">
+                        <!-- Log entries will appear here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="/js/common.js"></script>
+    <script src="/js/host.js"></script>
+</body>
+
+</html>
