@@ -347,7 +347,7 @@ const QRCodeManager = {
   getAudienceJoinUrl() {
     const protocol = window.location.protocol;
     const host = window.location.host || window.location.hostname;
-    return `${protocol}//${host}/audience.html`;
+    return `${protocol}//${host}/`;
   },
 
   /**

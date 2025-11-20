@@ -1,419 +1,136 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPTDash - Test Client</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #1a1a1a;
-            color: #e0e0e0;
-            padding: 20px;
-            line-height: 1.6;
-        }
-
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            margin-bottom: 20px;
-            color: #fff;
-        }
-
-        .section {
-            background: #2a2a2a;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .section h2 {
-            margin-bottom: 15px;
-            font-size: 18px;
-            color: #4a9eff;
-        }
-
-        .buttons {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 15px;
-        }
-
-        button {
-            padding: 10px 20px;
-            background: #4a9eff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.2s;
-        }
-
-        button:hover {
-            background: #357abd;
-        }
-
-        button:disabled {
-            background: #555;
-            cursor: not-allowed;
-        }
-
-        .status {
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            font-weight: 500;
-        }
-
-        .status.connected {
-            background: #1e4d2b;
-            color: #4ade80;
-        }
-
-        .status.disconnected {
-            background: #4d1e1e;
-            color: #f87171;
-        }
-
-        .log {
-            background: #1a1a1a;
-            border: 1px solid #3a3a3a;
-            border-radius: 4px;
-            padding: 10px;
-            max-height: 300px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-        }
-
-        .log-entry {
-            margin-bottom: 5px;
-            padding: 5px;
-            border-left: 3px solid #4a9eff;
-            padding-left: 10px;
-        }
-
-        .log-entry.received {
-            border-left-color: #4ade80;
-        }
-
-        .log-entry.sent {
-            border-left-color: #fbbf24;
-        }
-
-        .log-entry.error {
-            border-left-color: #f87171;
-        }
-
-        .timestamp {
-            color: #888;
-            font-size: 10px;
-        }
-
-        input,
-        textarea {
-            width: 100%;
-            padding: 10px;
-            background: #1a1a1a;
-            border: 1px solid #3a3a3a;
-            border-radius: 4px;
-            color: #e0e0e0;
-            margin-bottom: 10px;
-            font-family: inherit;
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-    </style>
+    <title>GPTDash - Audience</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/audience.css">
 </head>
+
 
 <body>
     <div class="container">
-        <h1>GPTDash Test Client</h1>
+        <div class="header">
+            <h1>GPTDash</h1>
+            <div class="subtitle">Publikums-Portal</div>
+        </div>
 
-        <div class="section">
-            <h2>Connection</h2>
-            <div id="status" class="status disconnected">Disconnected</div>
-            <div class="buttons">
-                <button onclick="connect('host')">Connect as Host</button>
-                <button onclick="connect('beamer')">Connect as Beamer</button>
-                <button onclick="connect('player')">Connect as Player</button>
-                <button onclick="connect('audience')">Connect as Audience</button>
-                <button onclick="disconnect()">Disconnect</button>
+        <div class="status-indicator">
+            <div class="status-dot" id="statusDot"></div>
+            <div class="status-text" id="statusText">Verbinden...</div>
+        </div>
+
+        <!-- Welcome Screen -->
+        <div class="screen active" id="welcomeScreen">
+            <div class="card">
+                <h2>Willkommen!</h2>
+                <p>Du bist gleich bei GPTDash dabei, dem Spiel, bei dem Spieler versuchen, eine KI zu imitieren.</p>
+                <p>Deine Aufgabe: Finde heraus, welche Antwort die echte KI ist!</p>
+
+                <button onclick="joinAudience()" id="joinButton">Als Publikum mitmachen</button>
+
+                <div id="welcomeError" class="error-message" style="display: none;"></div>
+
+                <div class="help-text">
+                    Du kannst bei jeder Runde abstimmen und um den besten Publikums-Score kämpfen!
+                </div>
             </div>
         </div>
 
-        <div class="section">
-            <h2>Actions</h2>
-            <div class="buttons">
-                <button onclick="sendJoin()" id="joinBtn">Join Room</button>
-                <button onclick="sendVote()" id="voteBtn">Send Test Vote</button>
-            </div>
-            <input type="text" id="answerInput" placeholder="Type your answer here...">
-            <button onclick="sendAnswer()" id="answerBtn">Submit Answer</button>
-        </div>
-
-        <div class="section" id="hostControls" style="display: none;">
-            <h2>Host Controls</h2>
-            <div class="buttons">
-                <button onclick="hostCreatePlayers()">Create 3 Players</button>
-                <button onclick="hostStartRound()">Start Round</button>
-                <button onclick="hostTransitionPhase('PROMPT_SELECTION')">→ Prompt Selection</button>
-                <button onclick="hostTransitionPhase('WRITING')">→ Writing Phase</button>
-                <button onclick="hostTransitionPhase('REVEAL')">→ Reveal Phase</button>
-                <button onclick="hostTransitionPhase('VOTING')">→ Voting Phase</button>
-                <button onclick="hostTransitionPhase('RESULTS')">→ Results Phase</button>
+        <!-- Waiting Screen -->
+        <div class="screen" id="waitingScreen">
+            <div class="card">
+                <div class="waiting-message">
+                    <div class="icon">⏳</div>
+                    <h3>Warte auf die nächste Runde...</h3>
+                    <p>Schau auf die große Leinwand, während wir vorbereiten!</p>
+                </div>
             </div>
         </div>
 
-        <div class="section" id="beamerDisplay" style="display: none;">
-            <h2>Beamer: Live Vote Counts</h2>
-            <div id="voteCounts" style="font-family: monospace;">
-                <p>Waiting for votes...</p>
+        <!-- Voting Screen -->
+        <div class="screen" id="votingScreen">
+            <div class="card">
+                <h2>Gib deine Stimme ab</h2>
+                <p style="text-align: center; margin-bottom: 20px;">Wähle eine Antwort pro Kategorie</p>
+
+                <div class="vote-section">
+                    <h3>👤 Welche Antwort ist die KI?</h3>
+                    <div id="aiAnswerOptions">
+                        <!-- Answer options will be inserted here -->
+                    </div>
+                </div>
+
+                <div class="vote-section">
+                    <h3>😂 Welche ist am lustigsten?</h3>
+                    <div id="funnyAnswerOptions">
+                        <!-- Answer options will be inserted here -->
+                    </div>
+                </div>
+
+                <button onclick="submitVote()" id="voteButton" disabled>Abstimmen</button>
+
+                <div id="voteError" class="error-message" style="display: none;"></div>
+
+                <div class="help-text">
+                    Du kannst deine Stimme ändern, bis die Zeit abläuft!
+                </div>
             </div>
         </div>
 
-        <div class="section" id="scoresDisplay" style="display: none;">
-            <h2>Scores</h2>
-            <div id="scores" style="font-family: monospace;">
-                <p>No scores yet</p>
+        <!-- Vote Confirmed Screen -->
+        <div class="screen" id="confirmedScreen">
+            <div class="card">
+                <div class="success-message">
+                    <div class="icon">✅</div>
+                    <h3>Stimme abgegeben!</h3>
+                    <p>Deine Stimmen wurden gespeichert.</p>
+
+                    <div class="vote-summary">
+                        <div class="vote-summary-item">
+                            <span class="label">KI-Wahl:</span>
+                            <span class="value" id="summaryAiPick">Antwort ?</span>
+                        </div>
+                        <div class="vote-summary-item">
+                            <span class="label">Lustigste:</span>
+                            <span class="value" id="summaryFunnyPick">Antwort ?</span>
+                        </div>
+                    </div>
+
+                    <button onclick="changeVote()" style="margin-top: 15px;">Stimme ändern</button>
+
+                    <div class="help-text" style="margin-top: 15px;">
+                        Du kannst deine Stimme ändern, bis die Abstimmung endet.
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="section">
-            <h2>Message Log</h2>
-            <button onclick="clearLog()">Clear Log</button>
-            <div id="log" class="log"></div>
+        <!-- Results Screen (for winners) -->
+        <div class="screen" id="resultsScreen">
+            <div class="card">
+                <div class="waiting-message">
+                    <div class="icon">📊</div>
+                    <h3>Auflösung kommt gleich</h3>
+                    <p>Schau auf die große Leinwand für die Auflösung!</p>
+                </div>
+
+                <div id="winnerBadge" style="display: none; margin-top: 20px;">
+                    <div class="winner-badge">
+                        <div class="icon">🏆</div>
+                        <h3>Top-Detektiv!</h3>
+                        <p>Du hast die KI richtig erkannt!</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <script>
-        let ws = null;
-        let currentRole = null;
 
-        function log(message, type = 'info') {
-            const logDiv = document.getElementById('log');
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-
-            const timestamp = new Date().toLocaleTimeString();
-            entry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
-
-            logDiv.appendChild(entry);
-            logDiv.scrollTop = logDiv.scrollHeight;
-        }
-
-        function updateStatus(connected) {
-            const statusDiv = document.getElementById('status');
-            const hostControls = document.getElementById('hostControls');
-            const beamerDisplay = document.getElementById('beamerDisplay');
-
-            if (connected) {
-                statusDiv.className = 'status connected';
-                statusDiv.textContent = `Connected as ${currentRole}`;
-
-                // Show host controls only for host role
-                if (currentRole === 'host') {
-                    hostControls.style.display = 'block';
-                }
-
-                // Show vote counts for beamer
-                if (currentRole === 'beamer') {
-                    beamerDisplay.style.display = 'block';
-                }
-            } else {
-                statusDiv.className = 'status disconnected';
-                statusDiv.textContent = 'Disconnected';
-                hostControls.style.display = 'none';
-                beamerDisplay.style.display = 'none';
-            }
-        }
-
-        function connect(role) {
-            if (ws) {
-                log('Already connected. Disconnect first.', 'error');
-                return;
-            }
-
-            currentRole = role;
-            const wsUrl = `ws://${window.location.hostname}:6573/ws?role=${role}`;
-
-            log(`Connecting as ${role}...`, 'info');
-
-            ws = new WebSocket(wsUrl);
-
-            ws.onopen = () => {
-                log('WebSocket connected!', 'info');
-                updateStatus(true);
-            };
-
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-
-                // Handle specific message types
-                if (data.t === 'beamer_vote_counts') {
-                    updateVoteCounts(data);
-                } else if (data.t === 'scores') {
-                    updateScores(data);
-                }
-
-                log(`Received: ${JSON.stringify(data, null, 2)}`, 'received');
-            };
-
-            ws.onerror = (error) => {
-                log(`WebSocket error: ${error}`, 'error');
-            };
-
-            ws.onclose = () => {
-                log('WebSocket closed', 'info');
-                ws = null;
-                updateStatus(false);
-            };
-        }
-
-        function disconnect() {
-            if (ws) {
-                ws.close();
-                ws = null;
-                log('Disconnected', 'info');
-                updateStatus(false);
-            }
-        }
-
-        function send(message) {
-            if (!ws) {
-                log('Not connected!', 'error');
-                return;
-            }
-
-            const json = JSON.stringify(message);
-            ws.send(json);
-            log(`Sent: ${json}`, 'sent');
-        }
-
-        function sendJoin() {
-            send({
-                t: 'join',
-                room_token: `test-token-${Math.random().toString(36).substring(7)}`
-            });
-        }
-
-        function sendAnswer() {
-            const input = document.getElementById('answerInput');
-            const text = input.value.trim();
-
-            if (!text) {
-                log('Please enter an answer first', 'error');
-                return;
-            }
-
-            send({
-                t: 'submit_answer',
-                text: text
-            });
-
-            input.value = '';
-        }
-
-        function sendVote() {
-            send({
-                t: 'vote',
-                voter_token: `voter_${Math.random().toString(36).substring(7)}`,
-                ai: 'sub_test_ai',
-                funny: 'sub_test_funny',
-                msg_id: `msg_${Date.now()}`
-            });
-        }
-
-        function clearLog() {
-            document.getElementById('log').innerHTML = '';
-        }
-
-        // Host control functions
-        function hostCreatePlayers() {
-            send({
-                t: 'host_create_players',
-                count: 3
-            });
-        }
-
-        function hostStartRound() {
-            send({
-                t: 'host_start_round'
-            });
-        }
-
-        function hostTransitionPhase(phase) {
-            send({
-                t: 'host_transition_phase',
-                phase: phase
-            });
-        }
-
-        function updateVoteCounts(data) {
-            const countsDiv = document.getElementById('voteCounts');
-            let html = `<strong>Vote Counts (seq: ${data.seq})</strong><br><br>`;
-
-            html += '<strong>AI Picks:</strong><br>';
-            for (const [subId, count] of Object.entries(data.ai)) {
-                html += `&nbsp;&nbsp;${subId}: ${count} votes<br>`;
-            }
-
-            html += '<br><strong>Funny Picks:</strong><br>';
-            for (const [subId, count] of Object.entries(data.funny)) {
-                html += `&nbsp;&nbsp;${subId}: ${count} votes<br>`;
-            }
-
-            countsDiv.innerHTML = html || '<p>No votes yet</p>';
-        }
-
-        function updateScores(data) {
-            const scoresDiv = document.getElementById('scores');
-            const scoresDisplay = document.getElementById('scoresDisplay');
-
-            scoresDisplay.style.display = 'block';
-
-            let html = '<strong>Players:</strong><br>';
-            data.players.forEach((score, idx) => {
-                html += `${idx + 1}. Player ${score.ref_id.substring(0, 8)}: ${score.total} pts (AI: ${score.ai_detect_points}, Funny: ${score.funny_points})<br>`;
-            });
-
-            html += '<br><strong>Top Audience:</strong><br>';
-            data.audience_top.slice(0, 5).forEach((score, idx) => {
-                html += `${idx + 1}. ${score.ref_id.substring(0, 8)}: ${score.total} pts (AI detect: ${score.ai_detect_points})<br>`;
-            });
-
-            scoresDiv.innerHTML = html;
-        }
-
-        if (typeof window !== 'undefined') {
-            Object.assign(window, {
-                connect,
-                disconnect,
-                sendJoin,
-                sendAnswer,
-                sendVote,
-                clearLog,
-                hostCreatePlayers,
-                hostStartRound,
-                hostTransitionPhase
-            });
-        }
-    </script>
+    <script src="/js/common.js"></script>
+    <script src="/js/audience.js"></script>
 </body>
 
 </html>
