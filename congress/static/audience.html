@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 
 <head>
     <meta charset="UTF-8">
@@ -14,27 +14,27 @@
     <div class="container">
         <div class="header">
             <h1>GPTDash</h1>
-            <div class="subtitle">Audience Portal</div>
+            <div class="subtitle">Publikums-Portal</div>
         </div>
 
         <div class="status-indicator">
             <div class="status-dot" id="statusDot"></div>
-            <div class="status-text" id="statusText">Connecting...</div>
+            <div class="status-text" id="statusText">Verbinden...</div>
         </div>
 
         <!-- Welcome Screen -->
         <div class="screen active" id="welcomeScreen">
             <div class="card">
-                <h2>Welcome!</h2>
-                <p>You're about to join GPTDash, a game where players try to impersonate an AI.</p>
-                <p>Your job: figure out which answer is the real AI!</p>
+                <h2>Willkommen!</h2>
+                <p>Du bist gleich bei GPTDash dabei, dem Spiel, bei dem Spieler versuchen, eine KI zu imitieren.</p>
+                <p>Deine Aufgabe: Finde heraus, welche Antwort die echte KI ist!</p>
 
-                <button onclick="joinAudience()" id="joinButton">Join as Audience</button>
+                <button onclick="joinAudience()" id="joinButton">Als Publikum mitmachen</button>
 
                 <div id="welcomeError" class="error-message" style="display: none;"></div>
 
                 <div class="help-text">
-                    You'll be able to vote on each round and compete for the top audience score!
+                    Du kannst bei jeder Runde abstimmen und um den besten Publikums-Score kämpfen!
                 </div>
             </div>
         </div>
@@ -44,8 +44,8 @@
             <div class="card">
                 <div class="waiting-message">
                     <div class="icon">⏳</div>
-                    <h3>Waiting for the next round...</h3>
-                    <p>Watch the big screen while we prepare!</p>
+                    <h3>Warte auf die nächste Runde...</h3>
+                    <p>Schau auf die große Leinwand, während wir vorbereiten!</p>
                 </div>
             </div>
         </div>
@@ -53,29 +53,29 @@
         <!-- Voting Screen -->
         <div class="screen" id="votingScreen">
             <div class="card">
-                <h2>Cast Your Votes</h2>
-                <p style="text-align: center; margin-bottom: 20px;">Select one answer for each category</p>
+                <h2>Gib deine Stimme ab</h2>
+                <p style="text-align: center; margin-bottom: 20px;">Wähle eine Antwort pro Kategorie</p>
 
                 <div class="vote-section">
-                    <h3>👤 Which one is the AI?</h3>
+                    <h3>👤 Welche Antwort ist die KI?</h3>
                     <div id="aiAnswerOptions">
                         <!-- Answer options will be inserted here -->
                     </div>
                 </div>
 
                 <div class="vote-section">
-                    <h3>😂 Which one is the funniest?</h3>
+                    <h3>😂 Welche ist am lustigsten?</h3>
                     <div id="funnyAnswerOptions">
                         <!-- Answer options will be inserted here -->
                     </div>
                 </div>
 
-                <button onclick="submitVote()" id="voteButton" disabled>Submit Votes</button>
+                <button onclick="submitVote()" id="voteButton" disabled>Abstimmen</button>
 
                 <div id="voteError" class="error-message" style="display: none;"></div>
 
                 <div class="help-text">
-                    You can change your votes until time runs out!
+                    Du kannst deine Stimme ändern, bis die Zeit abläuft!
                 </div>
             </div>
         </div>
@@ -85,24 +85,24 @@
             <div class="card">
                 <div class="success-message">
                     <div class="icon">✅</div>
-                    <h3>Vote Submitted!</h3>
-                    <p>Your votes have been recorded.</p>
+                    <h3>Stimme abgegeben!</h3>
+                    <p>Deine Stimmen wurden gespeichert.</p>
 
                     <div class="vote-summary">
                         <div class="vote-summary-item">
-                            <span class="label">AI Pick:</span>
-                            <span class="value" id="summaryAiPick">Answer ?</span>
+                            <span class="label">KI-Wahl:</span>
+                            <span class="value" id="summaryAiPick">Antwort ?</span>
                         </div>
                         <div class="vote-summary-item">
-                            <span class="label">Funny Pick:</span>
-                            <span class="value" id="summaryFunnyPick">Answer ?</span>
+                            <span class="label">Lustigste:</span>
+                            <span class="value" id="summaryFunnyPick">Antwort ?</span>
                         </div>
                     </div>
 
-                    <button onclick="changeVote()" style="margin-top: 15px;">Change Votes</button>
+                    <button onclick="changeVote()" style="margin-top: 15px;">Stimme ändern</button>
 
                     <div class="help-text" style="margin-top: 15px;">
-                        You can change your votes until the voting period ends.
+                        Du kannst deine Stimme ändern, bis die Abstimmung endet.
                     </div>
                 </div>
             </div>
@@ -113,15 +113,15 @@
             <div class="card">
                 <div class="waiting-message">
                     <div class="icon">📊</div>
-                    <h3>Results Coming Soon</h3>
-                    <p>Watch the big screen for the reveal!</p>
+                    <h3>Auflösung kommt gleich</h3>
+                    <p>Schau auf die große Leinwand für die Auflösung!</p>
                 </div>
 
                 <div id="winnerBadge" style="display: none; margin-top: 20px;">
                     <div class="winner-badge">
                         <div class="icon">🏆</div>
-                        <h3>Top Detector!</h3>
-                        <p>You correctly identified the AI!</p>
+                        <h3>Top-Detektiv!</h3>
+                        <p>Du hast die KI richtig erkannt!</p>
                     </div>
                 </div>
             </div>

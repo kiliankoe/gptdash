@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 
 <head>
     <meta charset="UTF-8">
@@ -14,17 +14,17 @@
 <body>
     <!-- Header -->
     <div class="header">
-        <h1>GPTDash Host Control Panel</h1>
+        <h1>GPTDash Host-Kontrollzentrum</h1>
         <div class="status-bar">
             <div class="status-item">
                 <div class="status-dot" id="statusDot"></div>
-                <span id="statusText">Disconnected</span>
+                <span id="statusText">Nicht verbunden</span>
             </div>
             <div class="status-item">
                 <span id="phaseDisplay">Phase: LOBBY</span>
             </div>
             <div class="status-item">
-                <span id="roundDisplay">Round: 0</span>
+                <span id="roundDisplay">Runde: 0</span>
             </div>
         </div>
     </div>
@@ -33,52 +33,52 @@
     <div class="container">
         <!-- Sidebar Navigation -->
         <div class="sidebar">
-            <div class="sidebar-item active" onclick="showPanel('overview')">Overview</div>
-            <div class="sidebar-item" onclick="showPanel('game')">Game Control</div>
-            <div class="sidebar-item" onclick="showPanel('players')">Players</div>
-            <div class="sidebar-item" onclick="showPanel('prompts')">Prompts</div>
-            <div class="sidebar-item" onclick="showPanel('submissions')">Submissions</div>
-            <div class="sidebar-item" onclick="showPanel('scores')">Scores</div>
-            <div class="sidebar-item" onclick="showPanel('logs')">Message Log</div>
+            <div class="sidebar-item active" onclick="showPanel('overview')">Übersicht</div>
+            <div class="sidebar-item" onclick="showPanel('game')">Spiel-Steuerung</div>
+            <div class="sidebar-item" onclick="showPanel('players')">Spieler</div>
+            <div class="sidebar-item" onclick="showPanel('prompts')">Fragen</div>
+            <div class="sidebar-item" onclick="showPanel('submissions')">Antworten</div>
+            <div class="sidebar-item" onclick="showPanel('scores')">Punkte</div>
+            <div class="sidebar-item" onclick="showPanel('logs')">Nachrichten-Log</div>
         </div>
 
         <!-- Main Content -->
         <div class="main">
             <!-- Overview Panel -->
             <div class="panel active" id="overview">
-                <h2>Overview</h2>
+                <h2>Übersicht</h2>
 
                 <div class="card">
-                    <div class="card-header">Game State</div>
+                    <div class="card-header">Spiel-Status</div>
                     <div class="info-grid">
                         <div class="info-item">
-                            <div class="label">Current Phase</div>
+                            <div class="label">Aktuelle Phase</div>
                             <div class="value" id="overviewPhase">LOBBY</div>
                         </div>
                         <div class="info-item">
-                            <div class="label">Round Number</div>
+                            <div class="label">Runden-Nummer</div>
                             <div class="value" id="overviewRound">0</div>
                         </div>
                         <div class="info-item">
-                            <div class="label">Players</div>
+                            <div class="label">Spieler</div>
                             <div class="value" id="overviewPlayers">0</div>
                         </div>
                         <div class="info-item">
-                            <div class="label">Submissions</div>
+                            <div class="label">Antworten</div>
                             <div class="value" id="overviewSubmissions">0</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-header">Quick Actions</div>
+                    <div class="card-header">Schnellzugriff</div>
                     <div class="button-group">
-                        <button onclick="createGame()">Create New Game</button>
-                        <button onclick="hostCreatePlayers(3)">Create 3 Players</button>
-                        <button onclick="hostStartRound()">Start Round</button>
-                        <button onclick="transitionPhase('WRITING')">→ Writing</button>
-                        <button onclick="transitionPhase('VOTING')">→ Voting</button>
-                        <button onclick="transitionPhase('RESULTS')">→ Results</button>
+                        <button onclick="createGame()">Neues Spiel erstellen</button>
+                        <button onclick="hostCreatePlayers(3)">3 Spieler erstellen</button>
+                        <button onclick="hostStartRound()">Runde starten</button>
+                        <button onclick="transitionPhase('WRITING')">→ Schreiben</button>
+                        <button onclick="transitionPhase('VOTING')">→ Abstimmen</button>
+                        <button onclick="transitionPhase('RESULTS')">→ Auflösung</button>
                     </div>
                 </div>
 
@@ -87,135 +87,133 @@
 
             <!-- Game Control Panel -->
             <div class="panel" id="game">
-                <h2>Game Control</h2>
+                <h2>Spiel-Steuerung</h2>
 
                 <div class="card">
-                    <div class="card-header">Phase Transitions</div>
+                    <div class="card-header">Phasen-Übergänge</div>
                     <div class="phase-selector">
                         <button onclick="transitionPhase('LOBBY')">Lobby</button>
-                        <button onclick="transitionPhase('PROMPT_SELECTION')">Prompt Selection</button>
-                        <button onclick="transitionPhase('WRITING')">Writing</button>
-                        <button onclick="transitionPhase('REVEAL')">Reveal</button>
-                        <button onclick="transitionPhase('VOTING')">Voting</button>
-                        <button onclick="transitionPhase('RESULTS')">Results</button>
-                        <button onclick="transitionPhase('PODIUM')">Podium</button>
-                        <button onclick="transitionPhase('INTERMISSION')">Intermission</button>
-                        <button onclick="transitionPhase('ENDED')" class="danger">End Game</button>
+                        <button onclick="transitionPhase('PROMPT_SELECTION')">Frage auswählen</button>
+                        <button onclick="transitionPhase('WRITING')">Schreiben</button>
+                        <button onclick="transitionPhase('REVEAL')">Antworten zeigen</button>
+                        <button onclick="transitionPhase('VOTING')">Abstimmen</button>
+                        <button onclick="transitionPhase('RESULTS')">Auflösung</button>
+                        <button onclick="transitionPhase('PODIUM')">Siegerehrung</button>
+                        <button onclick="transitionPhase('INTERMISSION')">Pause</button>
+                        <button onclick="transitionPhase('ENDED')" class="danger">Spiel beenden</button>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-header">Round Management</div>
+                    <div class="card-header">Runden-Verwaltung</div>
                     <div class="button-group">
-                        <button onclick="hostStartRound()">Start New Round</button>
-                        <button onclick="selectPrompt()">Select Prompt</button>
-                        <button onclick="closeWriting()">Close Writing Phase</button>
+                        <button onclick="hostStartRound()">Neue Runde starten</button>
+                        <button onclick="selectPrompt()">Frage auswählen</button>
+                        <button onclick="closeWriting()">Schreib-Phase beenden</button>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-header">Emergency Controls</div>
+                    <div class="card-header">Notfall-Steuerung</div>
                     <div class="button-group">
-                        <button class="secondary" onclick="transitionPhase('INTERMISSION')">Pause
-                            (Intermission)</button>
-                        <button class="danger" onclick="resetGame()">Reset Game</button>
+                        <button class="secondary" onclick="transitionPhase('INTERMISSION')">Pause</button>
+                        <button class="danger" onclick="resetGame()">Spiel zurücksetzen</button>
                     </div>
                 </div>
             </div>
 
             <!-- Players Panel -->
             <div class="panel" id="players">
-                <h2>Player Management</h2>
+                <h2>Spieler-Verwaltung</h2>
 
                 <div class="card">
-                    <div class="card-header">Create Players</div>
+                    <div class="card-header">Spieler erstellen</div>
                     <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
                         <input type="number" id="playerCount" value="3" min="1" max="10"
                             style="max-width: 100px; margin-bottom: 0;">
-                        <button onclick="hostCreatePlayersCustom()">Create Players</button>
+                        <button onclick="hostCreatePlayersCustom()">Spieler erstellen</button>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-header">Player Tokens</div>
+                    <div class="card-header">Spieler-Tokens</div>
                     <div id="playerTokensList">
-                        <p style="opacity: 0.6;">No players created yet</p>
+                        <p style="opacity: 0.6;">Noch keine Spieler erstellt</p>
                     </div>
                 </div>
             </div>
 
             <!-- Prompts Panel -->
             <div class="panel" id="prompts">
-                <h2>Prompt Management</h2>
+                <h2>Fragen-Verwaltung</h2>
 
                 <div class="card">
-                    <div class="card-header">Add Prompt</div>
-                    <textarea id="promptText" placeholder="Enter your prompt here..."></textarea>
-                    <button onclick="addPrompt()">Add Prompt</button>
+                    <div class="card-header">Frage hinzufügen</div>
+                    <textarea id="promptText" placeholder="Gib hier deine Frage ein..."></textarea>
+                    <button onclick="addPrompt()">Frage hinzufügen</button>
                 </div>
 
                 <div class="card">
-                    <div class="card-header">Available Prompts</div>
+                    <div class="card-header">Verfügbare Fragen</div>
                     <div id="promptsList">
-                        <p style="opacity: 0.6;">No prompts available</p>
+                        <p style="opacity: 0.6;">Keine Fragen verfügbar</p>
                     </div>
                 </div>
             </div>
 
             <!-- Submissions Panel -->
             <div class="panel" id="submissions">
-                <h2>Submissions</h2>
+                <h2>Antworten</h2>
 
                 <div class="card">
-                    <div class="card-header">Manage Submissions</div>
+                    <div class="card-header">Antworten verwalten</div>
                     <div id="submissionsList">
-                        <p style="opacity: 0.6;">No submissions yet</p>
+                        <p style="opacity: 0.6;">Noch keine Antworten</p>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-header">Reveal Order</div>
-                    <p style="opacity: 0.8; margin-bottom: 10px;">Set the order in which answers will be revealed. Enter
-                        submission IDs separated by commas.</p>
+                    <div class="card-header">Reihenfolge der Antworten</div>
+                    <p style="opacity: 0.8; margin-bottom: 10px;">Lege die Reihenfolge fest, in der die Antworten gezeigt werden. Gib Antwort-IDs getrennt durch Kommas ein.</p>
                     <textarea id="revealOrderInput" placeholder="sub_123, sub_456, sub_789"></textarea>
-                    <button onclick="setRevealOrder()">Set Reveal Order</button>
+                    <button onclick="setRevealOrder()">Reihenfolge festlegen</button>
                 </div>
 
                 <div class="card">
-                    <div class="card-header">Reveal Navigation</div>
-                    <p style="opacity: 0.8; margin-bottom: 10px;">Control the reveal carousel during the REVEAL phase.</p>
+                    <div class="card-header">Antworten-Navigation</div>
+                    <p style="opacity: 0.8; margin-bottom: 10px;">Steuere das Anzeigen der Antworten während der REVEAL-Phase.</p>
                     <div class="button-group">
-                        <button onclick="revealPrev()" class="secondary">← Previous</button>
-                        <button onclick="revealNext()">Next →</button>
+                        <button onclick="revealPrev()" class="secondary">← Zurück</button>
+                        <button onclick="revealNext()">Weiter →</button>
                     </div>
                 </div>
             </div>
 
             <!-- Scores Panel -->
             <div class="panel" id="scores">
-                <h2>Scores & Leaderboards</h2>
+                <h2>Punkte & Bestenlisten</h2>
 
                 <div class="card">
-                    <div class="card-header">Player Scores</div>
+                    <div class="card-header">Spieler-Punkte</div>
                     <div id="playerScores">
-                        <p style="opacity: 0.6;">No scores yet</p>
+                        <p style="opacity: 0.6;">Noch keine Punkte</p>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-header">Top Audience Members</div>
+                    <div class="card-header">Top Publikum</div>
                     <div id="audienceScores">
-                        <p style="opacity: 0.6;">No audience scores yet</p>
+                        <p style="opacity: 0.6;">Noch keine Publikums-Punkte</p>
                     </div>
                 </div>
             </div>
 
             <!-- Logs Panel -->
             <div class="panel" id="logs">
-                <h2>Message Log</h2>
+                <h2>Nachrichten-Log</h2>
 
                 <div class="card">
-                    <button onclick="clearLog()" class="secondary">Clear Log</button>
+                    <button onclick="clearLog()" class="secondary">Log leeren</button>
                     <div id="messageLog" class="log" style="margin-top: 15px;">
                         <!-- Log entries will appear here -->
                     </div>

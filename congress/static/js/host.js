@@ -30,13 +30,13 @@ function handleMessage(message) {
     case "phase":
       gameState.phase = message.phase;
       updateUI();
-      showAlert(`Phase changed to: ${message.phase}`, "success");
+      showAlert(`Phase gewechselt zu: ${message.phase}`, "success");
       break;
 
     case "players_created":
       gameState.players = message.tokens || [];
       updatePlayersList();
-      showAlert(`Created ${message.tokens.length} players`, "success");
+      showAlert(`${message.tokens.length} Spieler erstellt`, "success");
       break;
 
     case "submissions":
@@ -53,7 +53,7 @@ function handleMessage(message) {
       break;
 
     case "error":
-      showAlert(`Error: ${message.msg}`, "error");
+      showAlert(`Fehler: ${message.msg}`, "error");
       break;
   }
 }
@@ -64,12 +64,12 @@ function updateStatus(connected) {
 
   if (connected) {
     dot.classList.add("connected");
-    text.textContent = "Connected";
-    log("Connected to game server", "info");
+    text.textContent = "Verbunden";
+    log("Mit Spiel-Server verbunden", "info");
   } else {
     dot.classList.remove("connected");
-    text.textContent = "Disconnected";
-    log("Disconnected", "info");
+    text.textContent = "Nicht verbunden";
+    log("Verbindung getrennt", "info");
   }
 }
 
@@ -116,7 +116,7 @@ function hostStartRound() {
 function addPrompt() {
   const text = document.getElementById("promptText").value.trim();
   if (!text) {
-    alert("Please enter a prompt");
+    alert("Bitte gib eine Frage ein");
     return;
   }
 
@@ -129,7 +129,7 @@ function addPrompt() {
 }
 
 function selectPrompt() {
-  const promptId = prompt("Enter prompt ID to select:");
+  const promptId = prompt("Gib die Fragen-ID ein:");
   if (promptId) {
     wsConn.send({
       t: "host_select_prompt",
@@ -148,7 +148,7 @@ function setAiSubmission(submissionId) {
 function setRevealOrder() {
   const input = document.getElementById("revealOrderInput").value.trim();
   if (!input) {
-    alert("Please enter submission IDs");
+    alert("Bitte gib Antwort-IDs ein");
     return;
   }
 
@@ -163,18 +163,20 @@ function setRevealOrder() {
 // biome-ignore lint/correctness/noUnusedVariables: Called from HTML onclick
 function revealNext() {
   wsConn.send({ t: "host_reveal_next" });
-  log("Advanced to next reveal", "info");
+  log("Zur nächsten Antwort gewechselt", "info");
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: Called from HTML onclick
 function revealPrev() {
   wsConn.send({ t: "host_reveal_prev" });
-  log("Went back to previous reveal", "info");
+  log("Zur vorherigen Antwort gewechselt", "info");
 }
 
 function resetGame() {
   if (
-    confirm("Are you sure you want to reset the game? This cannot be undone.")
+    confirm(
+      "Willst du das Spiel wirklich zurücksetzen? Das kann nicht rückgängig gemacht werden.",
+    )
   ) {
     wsConn.send({ t: "host_reset_game" });
   }
@@ -193,8 +195,8 @@ function updatePlayersList() {
     const div = document.createElement("div");
     div.className = "token-display";
     div.innerHTML = `
-            <span>Player ${idx + 1}: <span class="token">${token}</span></span>
-            <button onclick="copyToClipboard('${token}')">Copy</button>
+            <span>Spieler ${idx + 1}: <span class="token">${token}</span></span>
+            <button onclick="copyToClipboard('${token}')">Kopieren</button>
         `;
     container.appendChild(div);
   });
@@ -205,7 +207,7 @@ function updateSubmissionsList() {
   container.innerHTML = "";
 
   if (gameState.submissions.length === 0) {
-    container.innerHTML = '<p style="opacity: 0.6;">No submissions yet</p>';
+    container.innerHTML = '<p style="opacity: 0.6;">Noch keine Antworten</p>';
     return;
   }
 
@@ -219,8 +221,8 @@ function updateSubmissionsList() {
             </div>
             <div class="text">${escapeHtml(sub.display_text)}</div>
             <div class="actions">
-                ${sub.author_kind === "player" ? `<button onclick="setAiSubmission('${sub.id}')">Mark as AI</button>` : ""}
-                <button class="secondary">Edit</button>
+                ${sub.author_kind === "player" ? `<button onclick="setAiSubmission('${sub.id}')">Als KI markieren</button>` : ""}
+                <button class="secondary">Bearbeiten</button>
             </div>
         `;
     container.appendChild(div);
@@ -233,13 +235,14 @@ function updateScores() {
   playerContainer.innerHTML = "";
 
   if (gameState.scores.players.length === 0) {
-    playerContainer.innerHTML = '<p style="opacity: 0.6;">No scores yet</p>';
+    playerContainer.innerHTML =
+      '<p style="opacity: 0.6;">Noch keine Punkte</p>';
   } else {
     gameState.scores.players.forEach((score, idx) => {
       playerContainer.innerHTML += `
                 <div class="info-item">
                     <div class="label">${idx + 1}. ${score.ref_id.substring(0, 12)}</div>
-                    <div class="value">${score.total} pts</div>
+                    <div class="value">${score.total} Pkt</div>
                 </div>
             `;
     });
@@ -251,13 +254,13 @@ function updateScores() {
 
   if (gameState.scores.audience_top.length === 0) {
     audienceContainer.innerHTML =
-      '<p style="opacity: 0.6;">No audience scores yet</p>';
+      '<p style="opacity: 0.6;">Noch keine Publikums-Punkte</p>';
   } else {
     gameState.scores.audience_top.slice(0, 10).forEach((score, idx) => {
       audienceContainer.innerHTML += `
                 <div class="info-item">
                     <div class="label">${idx + 1}. ${score.ref_id.substring(0, 12)}</div>
-                    <div class="value">${score.total} pts</div>
+                    <div class="value">${score.total} Pkt</div>
                 </div>
             `;
     });

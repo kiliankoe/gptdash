@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 
 <head>
     <meta charset="UTF-8">
@@ -14,29 +14,29 @@
     <div class="container">
         <div class="header">
             <h1>GPTDash</h1>
-            <div class="subtitle">Player Portal</div>
+            <div class="subtitle">Spieler-Portal</div>
         </div>
 
         <div class="status-indicator">
             <div class="status-dot" id="statusDot"></div>
-            <div class="status-text" id="statusText">Connecting...</div>
+            <div class="status-text" id="statusText">Verbinden...</div>
         </div>
 
         <!-- Join Screen -->
         <div class="screen active" id="joinScreen">
             <div class="card">
-                <h2>Join the Game</h2>
-                <p style="margin-bottom: 20px; opacity: 0.9;">Enter the player token provided by your host.</p>
+                <h2>Ab ins Spiel</h2>
+                <p style="margin-bottom: 20px; opacity: 0.9;">Gib den Spieler-Token ein, den du vom Host bekommen hast.</p>
 
-                <input type="text" id="tokenInput" placeholder="Enter your player token"
+                <input type="text" id="tokenInput" placeholder="Spieler-Token eingeben"
                     style="text-transform: uppercase; font-family: monospace;">
 
-                <button onclick="joinGame()" id="joinButton">Join Game</button>
+                <button onclick="joinGame()" id="joinButton">Los geht's</button>
 
                 <div id="joinError" class="error-message" style="display: none;"></div>
 
                 <div class="help-text">
-                    Token format: player_XXXX
+                    Token-Format: player_XXXX
                 </div>
             </div>
         </div>
@@ -44,12 +44,12 @@
         <!-- Register Name Screen -->
         <div class="screen" id="registerScreen">
             <div class="card">
-                <h2>Choose Your Name</h2>
-                <p style="margin-bottom: 20px; opacity: 0.9;">This is how you'll appear on the leaderboard.</p>
+                <h2>Wähle deinen Namen</h2>
+                <p style="margin-bottom: 20px; opacity: 0.9;">So wirst du auf der Bestenliste angezeigt.</p>
 
-                <input type="text" id="nameInput" placeholder="Enter your display name" maxlength="30">
+                <input type="text" id="nameInput" placeholder="Deinen Namen eingeben" maxlength="30">
 
-                <button onclick="registerName()" id="registerButton">Continue</button>
+                <button onclick="registerName()" id="registerButton">Weiter</button>
 
                 <div id="registerError" class="error-message" style="display: none;"></div>
             </div>
@@ -60,8 +60,8 @@
             <div class="card">
                 <div class="waiting-message">
                     <div class="icon">⏳</div>
-                    <h3>Waiting for the game to start...</h3>
-                    <p style="margin-top: 10px;">The host will begin the round shortly.</p>
+                    <h3>Warte auf Spielstart...</h3>
+                    <p style="margin-top: 10px;">Der Host startet gleich die nächste Runde.</p>
                 </div>
             </div>
         </div>
@@ -69,24 +69,24 @@
         <!-- Writing Screen -->
         <div class="screen" id="writingScreen">
             <div class="card">
-                <h2>Submit Your Answer</h2>
+                <h2>Deine Antwort</h2>
 
                 <div class="prompt-display">
-                    <div class="label">Prompt</div>
-                    <div id="promptText">Loading...</div>
+                    <div class="label">Frage</div>
+                    <div id="promptText">Laden...</div>
                 </div>
 
-                <textarea id="answerInput" placeholder="Type your answer here... Make it convincing!"
+                <textarea id="answerInput" placeholder="Schreib deine Antwort hier... Mach's überzeugend!"
                     maxlength="500"></textarea>
 
                 <div class="char-counter" id="charCounter">0 / 500</div>
 
-                <button onclick="submitAnswer()" id="submitButton">Submit Answer</button>
+                <button onclick="submitAnswer()" id="submitButton">Absenden</button>
 
                 <div id="submitError" class="error-message" style="display: none;"></div>
 
                 <div class="help-text">
-                    You can resubmit until the timer runs out!
+                    Du kannst deine Antwort ändern, bis die Zeit um ist!
                 </div>
             </div>
         </div>
@@ -96,10 +96,10 @@
             <div class="card">
                 <div class="success-message">
                     <div class="icon">✅</div>
-                    <h3>Answer Submitted!</h3>
-                    <p>Your answer has been recorded. You can resubmit if you want to change it.</p>
+                    <h3>Antwort abgeschickt!</h3>
+                    <p>Deine Antwort wurde gespeichert. Du kannst sie noch ändern, wenn du möchtest.</p>
 
-                    <button onclick="editAnswer()" style="margin-top: 20px;">Edit Answer</button>
+                    <button onclick="editAnswer()" style="margin-top: 20px;">Antwort ändern</button>
                 </div>
             </div>
         </div>
@@ -109,8 +109,8 @@
             <div class="card">
                 <div class="waiting-message">
                     <div class="icon">🔒</div>
-                    <h3>Answers Locked!</h3>
-                    <p style="margin-top: 10px;">Watch the big screen to see the results!</p>
+                    <h3>Zeit abgelaufen!</h3>
+                    <p style="margin-top: 10px;">Schau auf die große Leinwand für die Auflösung!</p>
                 </div>
             </div>
         </div>

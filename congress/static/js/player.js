@@ -33,7 +33,7 @@ function init() {
 function requireConnection(errorElementId) {
   if (!wsConn || !wsConn.isConnected()) {
     if (errorElementId) {
-      showError(errorElementId, "Still connecting to the game server...");
+      showError(errorElementId, "Verbinde noch mit dem Spiel-Server...");
     }
     return false;
   }
@@ -73,7 +73,7 @@ function joinGame() {
   const token = tokenInput.value.trim();
 
   if (!token) {
-    showError("joinError", "Please enter a player token");
+    showError("joinError", "Bitte gib einen Spieler-Token ein");
     return;
   }
 
@@ -92,7 +92,7 @@ function joinGame() {
   if (!sent) {
     showError(
       "joinError",
-      "Failed to reach the server. Please try again in a moment.",
+      "Server nicht erreichbar. Versuch's gleich nochmal.",
     );
     return;
   }
@@ -108,12 +108,12 @@ function registerName() {
   const name = nameInput.value.trim();
 
   if (!name) {
-    showError("registerError", "Please enter a display name");
+    showError("registerError", "Bitte gib einen Namen ein");
     return;
   }
 
   if (name.length < 2) {
-    showError("registerError", "Name must be at least 2 characters");
+    showError("registerError", "Name muss mindestens 2 Zeichen haben");
     return;
   }
 
@@ -131,12 +131,12 @@ function registerName() {
   });
 
   if (!sent) {
-    showError("registerError", "Connection lost. Please try again.");
+    showError("registerError", "Verbindung verloren. Versuch's nochmal.");
     return;
   }
 
   // Update status
-  updateConnectionStatus(true, `Joined as ${name}`);
+  updateConnectionStatus(true, `Beigetreten als ${name}`);
   hideError("registerError");
 
   // Show waiting screen
@@ -148,12 +148,12 @@ function submitAnswer() {
   const answer = answerInput.value.trim();
 
   if (!answer) {
-    showError("submitError", "Please enter an answer");
+    showError("submitError", "Bitte gib eine Antwort ein");
     return;
   }
 
   if (answer.length < 10) {
-    showError("submitError", "Answer must be at least 10 characters");
+    showError("submitError", "Antwort muss mindestens 10 Zeichen haben");
     return;
   }
 
@@ -169,7 +169,7 @@ function submitAnswer() {
   });
 
   if (!sent) {
-    showError("submitError", "Connection lost. Please try again.");
+    showError("submitError", "Verbindung verloren. Versuch's nochmal.");
     return;
   }
 

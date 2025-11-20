@@ -179,7 +179,7 @@ function updatePromptSelection() {
     round.prompt_candidates.length === 0
   ) {
     grid.innerHTML =
-      '<p class="help-text" style="grid-column: 1 / -1; text-align: center;">Waiting for prompts...</p>';
+      '<p class="help-text" style="grid-column: 1 / -1; text-align: center;">Warte auf Fragen...</p>';
     return;
   }
 
@@ -190,8 +190,8 @@ function updatePromptSelection() {
       const isSelected = prompt.id === selectedId;
       return `
                 <div class="prompt-card ${isSelected ? "selected" : ""}">
-                    <div class="number">Prompt ${String.fromCharCode(65 + idx)}</div>
-                    <div class="text">${escapeHtml(prompt.text || "Pending prompt...")}</div>
+                    <div class="number">Frage ${String.fromCharCode(65 + idx)}</div>
+                    <div class="text">${escapeHtml(prompt.text || "Frage wird vorbereitet...")}</div>
                 </div>
             `;
     })
@@ -202,7 +202,7 @@ function updateWritingScene() {
   const promptEl = document.getElementById("writingPrompt");
   if (gameState.round?.selected_prompt) {
     promptEl.textContent =
-      gameState.round.selected_prompt.text || "Loading prompt...";
+      gameState.round.selected_prompt.text || "Frage wird geladen...";
   }
 }
 
@@ -214,12 +214,12 @@ function updateRevealScene() {
 
   // Only show submission from reveal_update messages, not from arbitrary submissions array
   if (gameState.currentRevealSubmission) {
-    numberEl.textContent = `Answer ${gameState.revealIndex + 1}`;
+    numberEl.textContent = `Antwort ${gameState.revealIndex + 1}`;
     textEl.textContent = gameState.currentRevealSubmission.display_text;
   } else {
-    numberEl.textContent = "Awaiting answers";
+    numberEl.textContent = "Warte auf Antworten";
     textEl.textContent =
-      "Submissions will appear here once the host begins the reveal.";
+      "Die Antworten erscheinen hier, sobald der Host die Präsentation startet.";
   }
 }
 
@@ -229,7 +229,7 @@ function updateRevealWithSubmission(submission, index) {
 
   if (!numberEl || !textEl) return;
 
-  numberEl.textContent = `Answer ${index + 1}`;
+  numberEl.textContent = `Antwort ${index + 1}`;
   textEl.textContent = submission.display_text;
 
   // Add fade-in animation
@@ -261,14 +261,14 @@ function initializeVoteBars() {
 
   if (gameState.submissions.length === 0) {
     const placeholder =
-      '<p class="help-text" style="text-align: center; width: 100%;">Waiting for submissions...</p>';
+      '<p class="help-text" style="text-align: center; width: 100%;">Warte auf Antworten...</p>';
     aiContainer.innerHTML = placeholder;
     funnyContainer.innerHTML = placeholder;
     return;
   }
 
   gameState.submissions.forEach((sub, idx) => {
-    const label = `Answer ${idx + 1}`;
+    const label = `Antwort ${idx + 1}`;
     aiContainer.innerHTML += createVoteBar(sub.id, label, "ai");
     funnyContainer.innerHTML += createVoteBar(sub.id, label, "funny");
   });
@@ -329,9 +329,9 @@ function updateResults() {
       const aiSub = findSubmissionById(aiId);
       aiRevealEl.textContent = aiSub
         ? aiSub.display_text
-        : "AI answer will be revealed shortly…";
+        : "KI-Antwort wird gleich enthüllt…";
     } else {
-      aiRevealEl.textContent = "AI answer will be revealed shortly…";
+      aiRevealEl.textContent = "KI-Antwort wird gleich enthüllt…";
     }
   }
 
@@ -352,9 +352,9 @@ function updateResults() {
       const funniestSub = findSubmissionById(funniestId);
       funniestEl.textContent = funniestSub
         ? funniestSub.display_text
-        : "Funniest answer incoming…";
+        : "Lustigste Antwort kommt gleich…";
     } else {
-      funniestEl.textContent = "Funniest answer incoming…";
+      funniestEl.textContent = "Lustigste Antwort kommt gleich…";
     }
   }
 
@@ -366,8 +366,8 @@ function updateResults() {
     const isTop3 = idx < 3;
     container.innerHTML += `
             <div class="leaderboard-entry ${isTop3 ? "top-3" : ""}">
-                <span>${idx + 1}. Player ${score.ref_id.substring(0, 8)}</span>
-                <span>${score.total} pts</span>
+                <span>${idx + 1}. Spieler ${score.ref_id.substring(0, 8)}</span>
+                <span>${score.total} Pkt</span>
             </div>
         `;
   });
@@ -378,23 +378,23 @@ function updatePodium() {
 
   if (players[0]) {
     document.getElementById("podium1Name").textContent =
-      `Player ${players[0].ref_id.substring(0, 8)}`;
+      `Spieler ${players[0].ref_id.substring(0, 8)}`;
     document.getElementById("podium1Score").textContent =
-      `${players[0].total} pts`;
+      `${players[0].total} Pkt`;
   }
 
   if (players[1]) {
     document.getElementById("podium2Name").textContent =
-      `Player ${players[1].ref_id.substring(0, 8)}`;
+      `Spieler ${players[1].ref_id.substring(0, 8)}`;
     document.getElementById("podium2Score").textContent =
-      `${players[1].total} pts`;
+      `${players[1].total} Pkt`;
   }
 
   if (players[2]) {
     document.getElementById("podium3Name").textContent =
-      `Player ${players[2].ref_id.substring(0, 8)}`;
+      `Spieler ${players[2].ref_id.substring(0, 8)}`;
     document.getElementById("podium3Score").textContent =
-      `${players[2].total} pts`;
+      `${players[2].total} Pkt`;
   }
 }
 

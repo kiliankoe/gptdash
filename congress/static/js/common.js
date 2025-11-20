@@ -77,7 +77,8 @@ function updateConnectionStatus(connected, text) {
   const statusEl = document.getElementById("connectionStatus");
   if (statusEl) {
     statusEl.className = `connection-status ${connected ? "connected" : "disconnected"}`;
-    statusEl.textContent = text || (connected ? "Connected" : "Disconnected");
+    statusEl.textContent =
+      text || (connected ? "Verbunden" : "Nicht verbunden");
   }
 
   const dotEl = document.getElementById("statusDot");
@@ -91,7 +92,7 @@ function updateConnectionStatus(connected, text) {
 
   const textEl = document.getElementById("statusText");
   if (textEl) {
-    textEl.textContent = text || (connected ? "Connected" : "Disconnected");
+    textEl.textContent = text || (connected ? "Verbunden" : "Nicht verbunden");
   }
 }
 

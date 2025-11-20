@@ -23,7 +23,7 @@ function init() {
 function requireConnection(errorElementId) {
   if (!wsConn || !wsConn.isConnected()) {
     if (errorElementId) {
-      showError(errorElementId, "Still connecting to the game server...");
+      showError(errorElementId, "Verbinde noch mit dem Spiel-Server...");
     }
     return false;
   }
@@ -83,11 +83,11 @@ function joinAudience() {
   });
 
   if (!sent) {
-    showError("welcomeError", "Failed to reach the server. Please try again.");
+    showError("welcomeError", "Server nicht erreichbar. Versuch's nochmal.");
     return;
   }
 
-  updateConnectionStatus(true, "Joined as audience");
+  updateConnectionStatus(true, "Als Publikum beigetreten");
   hideError("welcomeError");
   showScreen("waitingScreen");
 }
@@ -144,7 +144,7 @@ function renderAnswerOptions() {
 
   if (submissions.length === 0) {
     const placeholder =
-      '<p class="help-text" style="width: 100%; text-align: center;">Waiting for submissions...</p>';
+      '<p class="help-text" style="width: 100%; text-align: center;">Warte auf Antworten...</p>';
     aiContainer.innerHTML = placeholder;
     funnyContainer.innerHTML = placeholder;
     return;
@@ -162,7 +162,7 @@ function createAnswerOption(category, sub, index) {
   option.dataset.answerId = sub.id;
   option.innerHTML = `
         <div class="checkmark">✓</div>
-        <div class="number">Answer ${index + 1}</div>
+        <div class="number">Antwort ${index + 1}</div>
         <div class="text">${escapeHtml(sub.display_text)}</div>
     `;
 
@@ -207,12 +207,12 @@ function updateVoteButtonState() {
 
 function submitVote() {
   if (hasVoted) {
-    showError("voteError", "You've already submitted votes this round");
+    showError("voteError", "Du hast in dieser Runde schon abgestimmt");
     return;
   }
 
   if (!selectedAiAnswer || !selectedFunnyAnswer) {
-    showError("voteError", "Please select an answer for both categories");
+    showError("voteError", "Bitte wähle eine Antwort für beide Kategorien");
     return;
   }
 
@@ -233,7 +233,7 @@ function submitVote() {
   });
 
   if (!sent) {
-    showError("voteError", "Connection lost. Please try again.");
+    showError("voteError", "Verbindung verloren. Versuch's nochmal.");
     return;
   }
 
@@ -251,8 +251,8 @@ function updateVoteSummary() {
   const aiIndex = submissions.findIndex((s) => s.id === selectedAiAnswer);
   const funnyIndex = submissions.findIndex((s) => s.id === selectedFunnyAnswer);
 
-  const aiLabel = aiIndex >= 0 ? `Answer ${aiIndex + 1}` : "—";
-  const funnyLabel = funnyIndex >= 0 ? `Answer ${funnyIndex + 1}` : "—";
+  const aiLabel = aiIndex >= 0 ? `Antwort ${aiIndex + 1}` : "—";
+  const funnyLabel = funnyIndex >= 0 ? `Antwort ${funnyIndex + 1}` : "—";
 
   document.getElementById("summaryAiPick").textContent = aiLabel;
   document.getElementById("summaryFunnyPick").textContent = funnyLabel;

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 
 <head>
     <meta charset="UTF-8">
@@ -11,30 +11,30 @@
 
 <body>
     <!-- Connection Status Indicator -->
-    <div id="connectionStatus" class="connection-status disconnected">Disconnected</div>
+    <div id="connectionStatus" class="connection-status disconnected">Nicht verbunden</div>
 
     <!-- Banner (visible on most scenes) -->
     <div class="banner" id="banner">
         <h1>GPTDash</h1>
         <div class="join-info">
-            <div class="join-url" id="joinUrl">Join at: gptdash.local</div>
+            <div class="join-url" id="joinUrl">Mach mit: gptdash.local</div>
         </div>
     </div>
 
     <!-- Lobby Scene -->
     <div class="scene active" id="scene-LOBBY">
         <div class="lobby-content">
-            <h2>Welcome to GPTDash!</h2>
-            <div class="subtitle">Can you spot the AI?</div>
+            <h2>Willkommen bei GPTDash!</h2>
+            <div class="subtitle">Kannst du die KI entlarven?</div>
             <div class="big-qr"></div>
-            <div style="margin-top: 40px; font-size: 32px;">Scan to join</div>
+            <div style="margin-top: 40px; font-size: 32px;">Scannen & Mitmachen</div>
         </div>
     </div>
 
     <!-- Prompt Selection Scene -->
     <div class="scene" id="scene-PROMPT_SELECTION">
         <div class="prompt-selection-content">
-            <h2>Choose Your Prompt</h2>
+            <h2>Wähl deine Frage</h2>
             <div class="prompts-grid" id="promptsGrid">
                 <!-- Prompts will be inserted here -->
             </div>
@@ -44,20 +44,20 @@
     <!-- Writing Scene -->
     <div class="scene" id="scene-WRITING">
         <div class="writing-content">
-            <h2>Players are writing...</h2>
-            <div class="current-prompt" id="writingPrompt">Loading prompt...</div>
+            <h2>Die Spieler schreiben fleißig...</h2>
+            <div class="current-prompt" id="writingPrompt">Frage wird geladen...</div>
             <div class="timer" id="writingTimer">--:--</div>
-            <div class="timer-label">Time remaining</div>
+            <div class="timer-label">Noch Zeit</div>
         </div>
     </div>
 
     <!-- Reveal Scene -->
     <div class="scene" id="scene-REVEAL">
         <div class="reveal-content">
-            <h2>The Answers</h2>
+            <h2>Die Antworten</h2>
             <div class="answer-card">
-                <div class="answer-number" id="revealNumber">Answer 1</div>
-                <div class="answer-text" id="revealText">Loading...</div>
+                <div class="answer-number" id="revealNumber">Antwort 1</div>
+                <div class="answer-text" id="revealText">Laden...</div>
             </div>
         </div>
     </div>
@@ -65,16 +65,16 @@
     <!-- Voting Scene -->
     <div class="scene" id="scene-VOTING">
         <div class="voting-content">
-            <h2>Cast Your Votes!</h2>
+            <h2>Jetzt wird abgestimmt!</h2>
             <div class="timer" id="votingTimer" style="display: none;">--:--</div>
             <div class="vote-section">
-                <h3>Which one is the AI?</h3>
+                <h3>Welche Antwort ist die KI?</h3>
                 <div class="vote-bars" id="aiVoteBars">
                     <!-- Vote bars will be inserted here -->
                 </div>
             </div>
             <div class="vote-section">
-                <h3>Which one is the funniest?</h3>
+                <h3>Welche Antwort ist am lustigsten?</h3>
                 <div class="vote-bars" id="funnyVoteBars">
                     <!-- Vote bars will be inserted here -->
                 </div>
@@ -85,19 +85,19 @@
     <!-- Results Scene -->
     <div class="scene" id="scene-RESULTS">
         <div class="results-content">
-            <h2>Results</h2>
+            <h2>Die Auflösung</h2>
             <div class="results-grid">
                 <div class="result-card">
-                    <h3>The AI Was...</h3>
-                    <div class="winner" id="aiReveal">Loading...</div>
+                    <h3>Die KI war...</h3>
+                    <div class="winner" id="aiReveal">Laden...</div>
                 </div>
                 <div class="result-card">
-                    <h3>Funniest Answer</h3>
-                    <div class="winner" id="funniestReveal">Loading...</div>
+                    <h3>Lustigste Antwort</h3>
+                    <div class="winner" id="funniestReveal">Laden...</div>
                 </div>
             </div>
             <div class="leaderboard">
-                <h3>Leaderboard</h3>
+                <h3>Bestenliste</h3>
                 <div id="leaderboardEntries">
                     <!-- Leaderboard entries will be inserted here -->
                 </div>
@@ -108,27 +108,27 @@
     <!-- Podium Scene -->
     <div class="scene" id="scene-PODIUM">
         <div class="podium-content">
-            <h2>Winners!</h2>
+            <h2>Die Gewinner!</h2>
             <div class="podium-display">
                 <div class="podium-place second">
                     <div class="podium-platform">
                         <div class="podium-rank">2</div>
                         <div class="podium-name" id="podium2Name">&mdash;</div>
-                        <div class="podium-score" id="podium2Score">0 pts</div>
+                        <div class="podium-score" id="podium2Score">0 Pkt</div>
                     </div>
                 </div>
                 <div class="podium-place first">
                     <div class="podium-platform">
                         <div class="podium-rank">1</div>
                         <div class="podium-name" id="podium1Name">&mdash;</div>
-                        <div class="podium-score" id="podium1Score">0 pts</div>
+                        <div class="podium-score" id="podium1Score">0 Pkt</div>
                     </div>
                 </div>
                 <div class="podium-place third">
                     <div class="podium-platform">
                         <div class="podium-rank">3</div>
                         <div class="podium-name" id="podium3Name">&mdash;</div>
-                        <div class="podium-score" id="podium3Score">0 pts</div>
+                        <div class="podium-score" id="podium3Score">0 Pkt</div>
                     </div>
                 </div>
             </div>
@@ -138,8 +138,8 @@
     <!-- Intermission Scene -->
     <div class="scene" id="scene-INTERMISSION">
         <div class="intermission-content">
-            <h2>Intermission</h2>
-            <div style="font-size: 36px; opacity: 0.8;">We'll be right back...</div>
+            <h2>Kurze Pause</h2>
+            <div style="font-size: 36px; opacity: 0.8;">Wir sind gleich zurück...</div>
         </div>
     </div>
 
