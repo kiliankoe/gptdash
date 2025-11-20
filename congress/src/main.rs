@@ -1,17 +1,10 @@
-mod broadcast;
-mod llm;
-mod protocol;
-mod state;
-mod types;
-mod ws;
-
 use axum::{routing::get, Router};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::state::AppState;
+use gptdash::{broadcast, llm, state::AppState, ws};
 
 #[tokio::main]
 async fn main() {
