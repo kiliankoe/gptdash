@@ -130,6 +130,19 @@ function showPanel(panelId) {
   } else {
     console.warn("Panel not found:", panelId);
   }
+
+  // Update sidebar navigation if it exists
+  document.querySelectorAll(".sidebar-item").forEach((item) => {
+    item.classList.remove("active");
+  });
+
+  // Find and activate the corresponding sidebar item
+  document.querySelectorAll(".sidebar-item").forEach((item) => {
+    const onclick = item.getAttribute("onclick");
+    if (onclick?.includes(`showPanel('${panelId}')`)) {
+      item.classList.add("active");
+    }
+  });
 }
 
 /**
