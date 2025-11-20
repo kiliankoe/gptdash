@@ -92,6 +92,20 @@ pub async fn handle_message(
             }
             handle_host_set_ai_submission(state, submission_id).await
         }
+
+        ClientMessage::HostRevealNext => {
+            if *role != Role::Host {
+                return unauthorized("Only host can control reveal");
+            }
+            handle_host_reveal_next(state).await
+        }
+
+        ClientMessage::HostRevealPrev => {
+            if *role != Role::Host {
+                return unauthorized("Only host can control reveal");
+            }
+            handle_host_reveal_prev(state).await
+        }
     }
 }
 
@@ -296,6 +310,62 @@ async fn handle_host_set_ai_submission(
         Ok(_) => None,
         Err(e) => Some(ServerMessage::Error {
             code: "SET_AI_SUBMISSION_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+async fn handle_host_reveal_next(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host advancing reveal");
+    let round = state.get_current_round().await?;
+
+    match state.reveal_next(&round.id).await {
+        Ok(reveal_index) => {
+            // Get the submission at the current reveal index
+            let submission = state.get_current_reveal_submission(&round.id).await;
+            let submission_info = submission.map(|s| crate::protocol::SubmissionInfo::from(&s));
+
+            // Broadcast to all clients
+            state.broadcast_to_all(ServerMessage::RevealUpdate {
+                reveal_index,
+                submission: submission_info.clone(),
+            });
+
+            Some(ServerMessage::RevealUpdate {
+                reveal_index,
+                submission: submission_info,
+            })
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "REVEAL_NEXT_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+async fn handle_host_reveal_prev(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host going back in reveal");
+    let round = state.get_current_round().await?;
+
+    match state.reveal_prev(&round.id).await {
+        Ok(reveal_index) => {
+            // Get the submission at the current reveal index
+            let submission = state.get_current_reveal_submission(&round.id).await;
+            let submission_info = submission.map(|s| crate::protocol::SubmissionInfo::from(&s));
+
+            // Broadcast to all clients
+            state.broadcast_to_all(ServerMessage::RevealUpdate {
+                reveal_index,
+                submission: submission_info.clone(),
+            });
+
+            Some(ServerMessage::RevealUpdate {
+                reveal_index,
+                submission: submission_info,
+            })
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "REVEAL_PREV_FAILED".to_string(),
             msg: e,
         }),
     }

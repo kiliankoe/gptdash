@@ -160,6 +160,18 @@ function setRevealOrder() {
   });
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: Called from HTML onclick
+function revealNext() {
+  wsConn.send({ t: "host_reveal_next" });
+  log("Advanced to next reveal", "info");
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: Called from HTML onclick
+function revealPrev() {
+  wsConn.send({ t: "host_reveal_prev" });
+  log("Went back to previous reveal", "info");
+}
+
 function resetGame() {
   if (
     confirm("Are you sure you want to reset the game? This cannot be undone.")

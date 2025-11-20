@@ -59,6 +59,7 @@ pub struct Game {
     pub round_no: u32,
     pub config: GameConfig,
     pub current_round_id: Option<RoundId>,
+    pub phase_deadline: Option<String>, // ISO timestamp for phase timer (Writing, Voting, etc.)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,6 +87,7 @@ pub struct Round {
     pub selected_prompt: Option<Prompt>,
     pub submission_deadline: Option<String>,
     pub reveal_order: Vec<SubmissionId>,
+    pub reveal_index: usize, // Current position in reveal carousel (0-based)
     pub ai_submission_id: Option<SubmissionId>,
     pub scored_at: Option<String>, // Timestamp when scores were computed (for idempotency)
 }

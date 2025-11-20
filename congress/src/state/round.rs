@@ -17,6 +17,7 @@ impl AppState {
             selected_prompt: None,
             submission_deadline: None,
             reveal_order: Vec::new(),
+            reveal_index: 0,
             ai_submission_id: None,
             scored_at: None,
         };
@@ -379,5 +380,62 @@ impl AppState {
         } else {
             Err("Round not found".to_string())
         }
+    }
+
+    /// Advance to next submission in reveal carousel
+    pub async fn reveal_next(&self, round_id: &str) -> Result<usize, String> {
+        let mut rounds = self.rounds.write().await;
+        if let Some(round) = rounds.get_mut(round_id) {
+            if round.reveal_order.is_empty() {
+                return Err("No reveal order set".to_string());
+            }
+
+            let max_index = round.reveal_order.len() - 1;
+            if round.reveal_index < max_index {
+                round.reveal_index += 1;
+            }
+            Ok(round.reveal_index)
+        } else {
+            Err("Round not found".to_string())
+        }
+    }
+
+    /// Go back to previous submission in reveal carousel
+    pub async fn reveal_prev(&self, round_id: &str) -> Result<usize, String> {
+        let mut rounds = self.rounds.write().await;
+        if let Some(round) = rounds.get_mut(round_id) {
+            if round.reveal_order.is_empty() {
+                return Err("No reveal order set".to_string());
+            }
+
+            if round.reveal_index > 0 {
+                round.reveal_index -= 1;
+            }
+            Ok(round.reveal_index)
+        } else {
+            Err("Round not found".to_string())
+        }
+    }
+
+    /// Get current submission in reveal carousel
+    pub async fn get_current_reveal_submission(
+        &self,
+        round_id: &str,
+    ) -> Option<crate::types::Submission> {
+        let submission_id = {
+            let rounds = self.rounds.read().await;
+            if let Some(round) = rounds.get(round_id) {
+                if round.reveal_index < round.reveal_order.len() {
+                    Some(round.reveal_order[round.reveal_index].clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }?;
+
+        let submissions = self.submissions.read().await;
+        submissions.get(&submission_id).cloned()
     }
 }

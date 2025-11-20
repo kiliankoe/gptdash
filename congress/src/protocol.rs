@@ -49,6 +49,8 @@ pub enum ClientMessage {
     HostSetAiSubmission {
         submission_id: SubmissionId,
     },
+    HostRevealNext,
+    HostRevealPrev,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +60,7 @@ pub enum ServerMessage {
         protocol: String,
         role: Role,
         game: Game,
+        server_now: String,
     },
     Phase {
         phase: GamePhase,
@@ -98,6 +101,10 @@ pub enum ServerMessage {
     },
     GameState {
         game: Game,
+    },
+    RevealUpdate {
+        reveal_index: usize,
+        submission: Option<SubmissionInfo>,
     },
     Error {
         code: String,

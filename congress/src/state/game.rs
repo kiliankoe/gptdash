@@ -11,6 +11,7 @@ impl AppState {
             round_no: 0,
             config: GameConfig::default(),
             current_round_id: None,
+            phase_deadline: None,
         };
 
         *self.game.write().await = Some(game.clone());
@@ -156,11 +157,43 @@ impl AppState {
                 g.phase = new_phase.clone();
                 g.version += 1;
 
+                // Set deadline for timed phases
+                g.phase_deadline = match new_phase {
+                    GamePhase::Writing => {
+                        let seconds = g.config.writing_seconds as i64;
+                        Some((chrono::Utc::now() + chrono::Duration::seconds(seconds)).to_rfc3339())
+                    }
+                    GamePhase::Voting => {
+                        let seconds = g.config.voting_seconds as i64;
+                        Some((chrono::Utc::now() + chrono::Duration::seconds(seconds)).to_rfc3339())
+                    }
+                    _ => None, // Clear deadline for other phases
+                };
+
                 let round_id = g.current_round_id.clone();
                 drop(game);
 
                 // Handle phase-specific actions
-                if new_phase == GamePhase::Results {
+                if new_phase == GamePhase::Reveal {
+                    // Reset reveal to first submission and broadcast it
+                    if let Some(rid) = &round_id {
+                        let mut rounds = self.rounds.write().await;
+                        if let Some(round) = rounds.get_mut(rid) {
+                            round.reveal_index = 0; // Reset to first submission
+                        }
+                        drop(rounds);
+
+                        // Broadcast first submission
+                        if let Some(submission) = self.get_current_reveal_submission(rid).await {
+                            self.broadcast_to_all(crate::protocol::ServerMessage::RevealUpdate {
+                                reveal_index: 0,
+                                submission: Some(crate::protocol::SubmissionInfo::from(
+                                    &submission,
+                                )),
+                            });
+                        }
+                    }
+                } else if new_phase == GamePhase::Results {
                     // Compute scores when entering RESULTS phase (idempotent)
                     if let Some(rid) = round_id {
                         // Check if already scored
@@ -220,14 +253,11 @@ impl AppState {
     /// Broadcast current phase to all clients
     async fn broadcast_phase_change(&self) {
         if let Some(game) = self.get_game().await {
-            let round = self.get_current_round().await;
-            let deadline = round.and_then(|r| r.submission_deadline);
-
             self.broadcast_to_all(crate::protocol::ServerMessage::Phase {
-                phase: game.phase,
+                phase: game.phase.clone(),
                 round_no: game.round_no,
                 server_now: chrono::Utc::now().to_rfc3339(),
-                deadline,
+                deadline: game.phase_deadline.clone(),
             });
         }
     }

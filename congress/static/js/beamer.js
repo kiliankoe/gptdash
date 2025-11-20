@@ -9,12 +9,24 @@ const gameState = {
   submissions: [],
   voteCounts: { ai: {}, funny: {} },
   scores: { players: [], audience_top: [] },
+  revealIndex: 0,
+  currentRevealSubmission: null, // Current submission being shown in reveal
 };
+
+// Timer and TTS managers
+let writingTimer = null;
+let votingTimer = null;
+let ttsManager = null;
 
 // Initialize on page load
 function init() {
   wsConn = new WSConnection("beamer", handleMessage, updateConnectionStatus);
   wsConn.connect();
+
+  // Initialize timers and TTS
+  writingTimer = new CountdownTimer("writingTimer");
+  votingTimer = new CountdownTimer("votingTimer");
+  ttsManager = new TTSManager();
 }
 
 function handleMessage(message) {
@@ -22,12 +34,17 @@ function handleMessage(message) {
     case "welcome":
       console.log("Welcome message:", message);
       if (message.game) {
-        updatePhase(message.game.phase);
+        // Pass deadline and server_now for timer synchronization
+        updatePhase(
+          message.game.phase,
+          message.game.phase_deadline,
+          message.server_now,
+        );
       }
       break;
 
     case "phase":
-      updatePhase(message.phase);
+      updatePhase(message.phase, message.deadline, message.server_now);
       break;
 
     case "round_started":
@@ -48,6 +65,16 @@ function handleMessage(message) {
       updateSubmissions();
       break;
 
+    case "reveal_update":
+      gameState.revealIndex = message.reveal_index;
+      gameState.currentRevealSubmission = message.submission;
+      if (message.submission) {
+        updateRevealWithSubmission(message.submission, message.reveal_index);
+        // Auto-read with TTS
+        ttsManager.speak(message.submission.display_text, { rate: 0.9 });
+      }
+      break;
+
     case "beamer_vote_counts":
       gameState.voteCounts = {
         ai: message.ai || {},
@@ -66,28 +93,54 @@ function handleMessage(message) {
   }
 }
 
-function updatePhase(phase) {
-  if (currentPhase === phase) return;
+function updatePhase(phase, deadline, serverNow) {
+  console.log(
+    "Phase transition:",
+    currentPhase,
+    "->",
+    phase,
+    "deadline:",
+    deadline,
+  );
 
-  console.log("Phase transition:", currentPhase, "->", phase);
+  const phaseChanged = currentPhase !== phase;
   currentPhase = phase;
 
-  // Hide all scenes
-  document.querySelectorAll(".scene").forEach((scene) => {
-    scene.classList.remove("active");
-  });
+  if (phaseChanged) {
+    // Clear reveal state when leaving REVEAL phase
+    if (phase !== "REVEAL") {
+      gameState.currentRevealSubmission = null;
+    }
 
-  // Show current scene
-  const sceneId = `scene-${phase}`;
-  const sceneEl = document.getElementById(sceneId);
-  if (sceneEl) {
-    sceneEl.classList.add("active");
-  } else {
-    console.warn("Unknown phase:", phase);
+    // Hide all scenes
+    document.querySelectorAll(".scene").forEach((scene) => {
+      scene.classList.remove("active");
+    });
+
+    // Show current scene
+    const sceneId = `scene-${phase}`;
+    const sceneEl = document.getElementById(sceneId);
+    if (sceneEl) {
+      sceneEl.classList.add("active");
+    } else {
+      console.warn("Unknown phase:", phase);
+    }
+
+    // Update scene-specific content
+    updateSceneContent(phase);
   }
 
-  // Update scene-specific content
-  updateSceneContent(phase);
+  // Start timer for timed phases
+  if (phase === "WRITING") {
+    writingTimer.start(deadline, serverNow);
+    votingTimer.stop();
+  } else if (phase === "VOTING") {
+    votingTimer.start(deadline, serverNow);
+    writingTimer.stop();
+  } else {
+    writingTimer.stop();
+    votingTimer.stop();
+  }
 }
 
 function updateSceneContent(phase) {
@@ -151,7 +204,6 @@ function updateWritingScene() {
     promptEl.textContent =
       gameState.round.selected_prompt.text || "Loading prompt...";
   }
-  // TODO: implement actual timer countdown
 }
 
 function updateRevealScene() {
@@ -160,13 +212,33 @@ function updateRevealScene() {
 
   if (!numberEl || !textEl) return;
 
-  if (gameState.submissions.length > 0) {
-    numberEl.textContent = "Answer 1";
-    textEl.textContent = gameState.submissions[0].display_text;
+  // Only show submission from reveal_update messages, not from arbitrary submissions array
+  if (gameState.currentRevealSubmission) {
+    numberEl.textContent = `Answer ${gameState.revealIndex + 1}`;
+    textEl.textContent = gameState.currentRevealSubmission.display_text;
   } else {
     numberEl.textContent = "Awaiting answers";
     textEl.textContent =
       "Submissions will appear here once the host begins the reveal.";
+  }
+}
+
+function updateRevealWithSubmission(submission, index) {
+  const numberEl = document.getElementById("revealNumber");
+  const textEl = document.getElementById("revealText");
+
+  if (!numberEl || !textEl) return;
+
+  numberEl.textContent = `Answer ${index + 1}`;
+  textEl.textContent = submission.display_text;
+
+  // Add fade-in animation
+  const card = document.querySelector("#scene-REVEAL .answer-card");
+  if (card) {
+    card.classList.remove("fadeIn");
+    // Trigger reflow to restart animation
+    void card.offsetWidth;
+    card.classList.add("fadeIn");
   }
 }
 

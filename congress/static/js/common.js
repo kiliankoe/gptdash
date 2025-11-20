@@ -210,6 +210,142 @@ function formatTime(date = new Date()) {
   return date.toLocaleTimeString();
 }
 
+/**
+ * Timer countdown manager
+ */
+class CountdownTimer {
+  constructor(elementId, onComplete) {
+    this.elementId = elementId;
+    this.onComplete = onComplete;
+    this.interval = null;
+    this.deadline = null;
+    this.serverTimeOffset = 0; // Difference between server time and local time
+  }
+
+  /**
+   * Start countdown to a deadline
+   * @param {string} deadlineISO - ISO8601 timestamp
+   * @param {string} serverNowISO - Server's current time (for clock sync)
+   */
+  start(deadlineISO, serverNowISO) {
+    this.stop(); // Clear any existing timer
+
+    if (!deadlineISO) {
+      this.hide();
+      return;
+    }
+
+    // Calculate server time offset
+    const serverNow = new Date(serverNowISO);
+    const localNow = new Date();
+    this.serverTimeOffset = serverNow.getTime() - localNow.getTime();
+
+    this.deadline = new Date(deadlineISO);
+    this.update();
+    this.interval = setInterval(() => this.update(), 100); // Update 10x per second
+  }
+
+  stop() {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+  }
+
+  hide() {
+    const el = document.getElementById(this.elementId);
+    if (el) {
+      el.textContent = "";
+      el.style.display = "none";
+    }
+  }
+
+  update() {
+    const el = document.getElementById(this.elementId);
+    if (!el || !this.deadline) return;
+
+    // Use server-synchronized time
+    const now = new Date(Date.now() + this.serverTimeOffset);
+    const remaining = this.deadline.getTime() - now.getTime();
+
+    if (remaining <= 0) {
+      el.textContent = "00:00";
+      el.style.display = "block";
+      this.stop();
+      if (this.onComplete) {
+        this.onComplete();
+      }
+      return;
+    }
+
+    const totalSeconds = Math.ceil(remaining / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    el.textContent = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    el.style.display = "block";
+  }
+}
+
+/**
+ * Text-to-Speech manager using browser API
+ */
+class TTSManager {
+  constructor() {
+    this.synthesis = window.speechSynthesis;
+    this.currentUtterance = null;
+  }
+
+  /**
+   * Speak text using browser TTS
+   * @param {string} text - Text to speak
+   * @param {object} options - TTS options (rate, pitch, volume, voice)
+   */
+  speak(text, options = {}) {
+    if (!this.synthesis) {
+      console.warn("Speech synthesis not supported in this browser");
+      return;
+    }
+
+    // Cancel any ongoing speech
+    this.stop();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = options.rate || 1.0;
+    utterance.pitch = options.pitch || 1.0;
+    utterance.volume = options.volume || 1.0;
+
+    // Select voice if specified
+    if (options.voiceName) {
+      const voices = this.synthesis.getVoices();
+      const voice = voices.find((v) => v.name === options.voiceName);
+      if (voice) {
+        utterance.voice = voice;
+      }
+    }
+
+    this.currentUtterance = utterance;
+    this.synthesis.speak(utterance);
+  }
+
+  /**
+   * Stop any ongoing speech
+   */
+  stop() {
+    if (this.synthesis) {
+      this.synthesis.cancel();
+    }
+    this.currentUtterance = null;
+  }
+
+  /**
+   * Check if currently speaking
+   */
+  isSpeaking() {
+    return this.synthesis?.speaking;
+  }
+}
+
 if (typeof window !== "undefined") {
   Object.assign(window, {
     WSConnection,
@@ -222,5 +358,7 @@ if (typeof window !== "undefined") {
     generateId,
     copyToClipboard,
     formatTime,
+    CountdownTimer,
+    TTSManager,
   });
 }

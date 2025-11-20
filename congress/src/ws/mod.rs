@@ -63,6 +63,7 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
         protocol: "1.0".to_string(),
         role: role.clone(),
         game,
+        server_now: chrono::Utc::now().to_rfc3339(),
     };
 
     if let Ok(msg) = serde_json::to_string(&welcome) {
