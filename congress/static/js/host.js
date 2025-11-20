@@ -93,10 +93,6 @@ function updateUI() {
 }
 
 // Host Commands
-function createGame() {
-  wsConn.send({ t: "host_create_game" });
-}
-
 function transitionPhase(phase) {
   wsConn.send({ t: "host_transition_phase", phase: phase });
 }
@@ -327,7 +323,6 @@ init();
 
 if (typeof window !== "undefined") {
   Object.assign(window, {
-    createGame,
     transitionPhase,
     hostCreatePlayers,
     hostCreatePlayersCustom,
