@@ -56,6 +56,21 @@ function handleMessage(message) {
       updateScores();
       break;
 
+    case "game_state":
+      if (message.game) {
+        gameState.phase = message.game.phase;
+        gameState.roundNo = message.game.round_no;
+        gameState.players = [];
+        gameState.submissions = [];
+        gameState.scores = { players: [], audience_top: [] };
+        updateUI();
+        updatePlayersList();
+        updateSubmissionsList();
+        updateScores();
+        showAlert("Spiel wurde zurückgesetzt", "success");
+      }
+      break;
+
     case "error":
       showAlert(`Fehler: ${message.msg}`, "error");
       break;

@@ -51,6 +51,7 @@ pub enum ClientMessage {
     },
     HostRevealNext,
     HostRevealPrev,
+    HostResetGame,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

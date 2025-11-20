@@ -106,6 +106,13 @@ pub async fn handle_message(
             }
             handle_host_reveal_prev(state).await
         }
+
+        ClientMessage::HostResetGame => {
+            if *role != Role::Host {
+                return unauthorized("Only host can reset game");
+            }
+            handle_host_reset_game(state).await
+        }
     }
 }
 
@@ -371,6 +378,15 @@ async fn handle_host_reveal_prev(state: &Arc<AppState>) -> Option<ServerMessage>
     }
 }
 
+async fn handle_host_reset_game(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host resetting game");
+    state.reset_game().await;
+
+    // Return game state after reset
+    let game = state.get_game().await?;
+    Some(ServerMessage::GameState { game })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -427,6 +443,79 @@ mod tests {
             assert_eq!(game.phase, GamePhase::PromptSelection);
         } else {
             panic!("Expected GameState message");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reset_game() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let role = Role::Host;
+
+        // Create some players
+        handle_message(ClientMessage::HostCreatePlayers { count: 3 }, &role, &state).await;
+
+        // Transition to a different phase
+        state
+            .transition_phase(GamePhase::PromptSelection)
+            .await
+            .ok();
+
+        // Verify state is not empty
+        let players = state.players.read().await;
+        assert_eq!(players.len(), 3);
+        drop(players);
+
+        let game_before = state.get_game().await.unwrap();
+        assert_eq!(game_before.phase, GamePhase::PromptSelection);
+
+        // Reset the game
+        let result = handle_message(ClientMessage::HostResetGame, &role, &state).await;
+
+        // Verify response
+        assert!(result.is_some());
+        if let Some(ServerMessage::GameState { game }) = result {
+            assert_eq!(game.phase, GamePhase::Lobby);
+            assert_eq!(game.round_no, 0);
+            assert_eq!(game.current_round_id, None);
+        } else {
+            panic!("Expected GameState message");
+        }
+
+        // Verify all state is cleared
+        let players = state.players.read().await;
+        assert_eq!(players.len(), 0);
+        drop(players);
+
+        let rounds = state.rounds.read().await;
+        assert_eq!(rounds.len(), 0);
+        drop(rounds);
+
+        let submissions = state.submissions.read().await;
+        assert_eq!(submissions.len(), 0);
+        drop(submissions);
+
+        let votes = state.votes.read().await;
+        assert_eq!(votes.len(), 0);
+        drop(votes);
+
+        let scores = state.scores.read().await;
+        assert_eq!(scores.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_reset_game_requires_host() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let role = Role::Audience;
+
+        let result = handle_message(ClientMessage::HostResetGame, &role, &state).await;
+
+        assert!(result.is_some());
+        if let Some(ServerMessage::Error { code, .. }) = result {
+            assert_eq!(code, "UNAUTHORIZED");
+        } else {
+            panic!("Expected Error message");
         }
     }
 }

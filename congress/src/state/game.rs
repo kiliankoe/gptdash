@@ -261,4 +261,30 @@ impl AppState {
             });
         }
     }
+
+    /// Reset game to initial state for a fresh show
+    pub async fn reset_game(&self) {
+        // Clear all state
+        self.players.write().await.clear();
+        self.rounds.write().await.clear();
+        self.submissions.write().await.clear();
+        self.votes.write().await.clear();
+        self.scores.write().await.clear();
+
+        // Reset game to initial state
+        let mut game = self.game.write().await;
+        if let Some(ref mut g) = *game {
+            g.phase = GamePhase::Lobby;
+            g.round_no = 0;
+            g.current_round_id = None;
+            g.phase_deadline = None;
+            g.version += 1;
+        }
+        drop(game);
+
+        // Broadcast reset state to all clients
+        self.broadcast_phase_change().await;
+
+        tracing::info!("Game reset to initial state");
+    }
 }
