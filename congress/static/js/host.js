@@ -37,9 +37,10 @@ function handleMessage(message) {
       break;
 
     case "players_created":
-      gameState.players = message.tokens || [];
+      // Extract tokens from PlayerToken objects
+      gameState.players = (message.players || []).map((p) => p.token);
       updatePlayersList();
-      showAlert(`${message.tokens.length} Spieler erstellt`, "success");
+      showAlert(`${gameState.players.length} Spieler erstellt`, "success");
       break;
 
     case "submissions":
