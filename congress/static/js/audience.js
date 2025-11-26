@@ -9,14 +9,20 @@ let submissions = [];
 let selectedAiAnswer = null;
 let selectedFunnyAnswer = null;
 let hasVoted = false;
+const STORAGE_KEY = "gptdash_voter_token";
 
 // Initialize
 function init() {
   // Check if voter token is in localStorage
-  voterToken = localStorage.getItem("gptdash_voter_token");
+  voterToken = localStorage.getItem(STORAGE_KEY);
 
-  // Connect to WebSocket
-  wsConn = new WSConnection("audience", handleMessage, updateConnectionStatus);
+  // Connect to WebSocket with token for state recovery
+  wsConn = new WSConnection(
+    "audience",
+    handleMessage,
+    updateConnectionStatus,
+    voterToken,
+  );
   wsConn.connect();
 }
 
@@ -36,6 +42,29 @@ function handleMessage(message) {
       console.log("Welcome message:", message);
       if (message.game) {
         updatePhase(message.game.phase);
+      }
+      break;
+
+    case "audience_state":
+      // State recovery on reconnect
+      console.log("Audience state recovery:", message);
+      if (message.has_voted && message.current_vote) {
+        hasVoted = true;
+        selectedAiAnswer = message.current_vote.ai_pick;
+        selectedFunnyAnswer = message.current_vote.funny_pick;
+
+        // If we're in voting phase, show confirmed screen
+        if (currentPhase === "VOTING") {
+          showScreen("confirmedScreen");
+          updateVoteSummary();
+        }
+      }
+      // Auto-join if we have a token
+      if (voterToken) {
+        updateConnectionStatus(true, "Als Publikum beigetreten");
+        if (currentPhase !== "VOTING" || !hasVoted) {
+          showScreen("waitingScreen");
+        }
       }
       break;
 
@@ -69,7 +98,9 @@ function joinAudience() {
   // Generate voter token if we don't have one
   if (!voterToken) {
     voterToken = generateId("voter");
-    localStorage.setItem("gptdash_voter_token", voterToken);
+    localStorage.setItem(STORAGE_KEY, voterToken);
+    // Update connection with token for future reconnects
+    wsConn.setToken(voterToken);
   }
 
   if (!requireConnection("welcomeError")) {

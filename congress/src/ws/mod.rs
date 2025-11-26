@@ -11,7 +11,7 @@ use futures::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
 use std::sync::Arc;
 
-use crate::protocol::{ClientMessage, ServerMessage};
+use crate::protocol::{AudienceVoteInfo, ClientMessage, ServerMessage, SubmissionInfo};
 use crate::state::AppState;
 use crate::types::Role;
 
@@ -70,6 +70,46 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
         if sender.send(Message::Text(msg.into())).await.is_err() {
             tracing::error!("Failed to send welcome message");
             return;
+        }
+    }
+
+    // Send state recovery message for players/audience with tokens
+    if let Some(token) = &params.token {
+        match role {
+            Role::Player => {
+                // Try to recover player state
+                if let Some(player) = state.get_player_by_token(token).await {
+                    let submission = state
+                        .get_player_submission_for_current_round(&player.id)
+                        .await;
+                    let player_state = ServerMessage::PlayerState {
+                        player_id: player.id,
+                        display_name: player.display_name,
+                        has_submitted: submission.is_some(),
+                        current_submission: submission.map(|s| SubmissionInfo::from(&s)),
+                    };
+                    if let Ok(msg) = serde_json::to_string(&player_state) {
+                        let _ = sender.send(Message::Text(msg.into())).await;
+                    }
+                    tracing::info!("Sent player state recovery for token");
+                }
+            }
+            Role::Audience => {
+                // Try to recover audience vote state
+                let vote = state.get_audience_vote_for_current_round(token).await;
+                let audience_state = ServerMessage::AudienceState {
+                    has_voted: vote.is_some(),
+                    current_vote: vote.map(|v| AudienceVoteInfo {
+                        ai_pick: v.ai_pick_submission_id,
+                        funny_pick: v.funny_pick_submission_id,
+                    }),
+                };
+                if let Ok(msg) = serde_json::to_string(&audience_state) {
+                    let _ = sender.send(Message::Text(msg.into())).await;
+                }
+                tracing::info!("Sent audience state recovery for token");
+            }
+            _ => {}
         }
     }
 

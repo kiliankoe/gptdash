@@ -42,4 +42,33 @@ impl AppState {
             .find(|p| p.token == token)
             .cloned()
     }
+
+    /// Get a player's submission for the current round
+    pub async fn get_player_submission_for_current_round(
+        &self,
+        player_id: &PlayerId,
+    ) -> Option<Submission> {
+        let round = self.get_current_round().await?;
+        let submissions = self.submissions.read().await;
+
+        submissions
+            .values()
+            .find(|s| {
+                s.round_id == round.id
+                    && s.author_kind == AuthorKind::Player
+                    && s.author_ref.as_ref() == Some(player_id)
+            })
+            .cloned()
+    }
+
+    /// Get an audience member's vote for the current round
+    pub async fn get_audience_vote_for_current_round(&self, voter_id: &VoterId) -> Option<Vote> {
+        let round = self.get_current_round().await?;
+        let votes = self.votes.read().await;
+
+        votes
+            .values()
+            .find(|v| v.round_id == round.id && v.voter_id == *voter_id)
+            .cloned()
+    }
 }

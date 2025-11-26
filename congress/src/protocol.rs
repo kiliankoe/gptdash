@@ -107,10 +107,29 @@ pub enum ServerMessage {
         reveal_index: usize,
         submission: Option<SubmissionInfo>,
     },
+    /// Sent to players on reconnect with their current state
+    PlayerState {
+        player_id: PlayerId,
+        display_name: Option<String>,
+        has_submitted: bool,
+        current_submission: Option<SubmissionInfo>,
+    },
+    /// Sent to audience on reconnect with their current vote
+    AudienceState {
+        has_voted: bool,
+        current_vote: Option<AudienceVoteInfo>,
+    },
     Error {
         code: String,
         msg: String,
     },
+}
+
+/// Audience vote info for state recovery
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudienceVoteInfo {
+    pub ai_pick: SubmissionId,
+    pub funny_pick: SubmissionId,
 }
 
 /// Public submission info (no author_kind to prevent spoilers)

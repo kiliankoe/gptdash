@@ -2,7 +2,78 @@ use crate::state::AppState;
 use crate::types::*;
 use std::collections::HashMap;
 
+/// Result of submitting a vote
+#[derive(Debug, PartialEq)]
+pub enum VoteResult {
+    /// Vote was recorded (new vote or updated existing)
+    Recorded,
+    /// Vote was a duplicate (same msg_id already processed)
+    Duplicate,
+    /// No active round to vote in
+    NoActiveRound,
+}
+
 impl AppState {
+    /// Submit a vote with idempotency support
+    /// Returns whether the vote was recorded, was a duplicate, or failed
+    pub async fn submit_vote(
+        &self,
+        voter_id: VoterId,
+        ai_pick: SubmissionId,
+        funny_pick: SubmissionId,
+        msg_id: String,
+    ) -> VoteResult {
+        // Get current round
+        let round = match self.get_current_round().await {
+            Some(r) => r,
+            None => return VoteResult::NoActiveRound,
+        };
+
+        // Check for duplicate msg_id (idempotency)
+        {
+            let processed = self.processed_vote_msg_ids.read().await;
+            if let Some(last_msg_id) = processed.get(&voter_id) {
+                if *last_msg_id == msg_id {
+                    tracing::debug!("Duplicate vote msg_id {} from voter {}", msg_id, voter_id);
+                    return VoteResult::Duplicate;
+                }
+            }
+        }
+
+        // Find and remove any existing vote from this voter for this round
+        {
+            let mut votes = self.votes.write().await;
+            let existing_vote_id = votes
+                .iter()
+                .find(|(_, v)| v.voter_id == voter_id && v.round_id == round.id)
+                .map(|(id, _)| id.clone());
+
+            if let Some(vote_id) = existing_vote_id {
+                votes.remove(&vote_id);
+            }
+        }
+
+        // Create and store new vote
+        let vote = Vote {
+            id: ulid::Ulid::new().to_string(),
+            round_id: round.id,
+            voter_id: voter_id.clone(),
+            ai_pick_submission_id: ai_pick,
+            funny_pick_submission_id: funny_pick,
+            ts: chrono::Utc::now().to_rfc3339(),
+        };
+
+        self.votes.write().await.insert(vote.id.clone(), vote);
+
+        // Record the msg_id as processed
+        self.processed_vote_msg_ids
+            .write()
+            .await
+            .insert(voter_id, msg_id);
+
+        VoteResult::Recorded
+    }
+
     /// Aggregate votes for a round, returning counts for AI picks and funny picks
     pub async fn aggregate_votes(
         &self,
@@ -160,5 +231,110 @@ mod tests {
         assert_eq!(funny_counts.len(), 1);
         assert_eq!(funny_counts.get("sub2"), Some(&1));
         assert_eq!(ai_counts.get("sub1"), None);
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_records_new_vote() {
+        let state = AppState::new();
+        state.create_game().await;
+        state.start_round().await.unwrap();
+
+        let result = state
+            .submit_vote(
+                "voter1".to_string(),
+                "sub1".to_string(),
+                "sub2".to_string(),
+                "msg1".to_string(),
+            )
+            .await;
+
+        assert_eq!(result, VoteResult::Recorded);
+        assert_eq!(state.votes.read().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_duplicate_msg_id() {
+        let state = AppState::new();
+        state.create_game().await;
+        state.start_round().await.unwrap();
+
+        // First vote
+        let result1 = state
+            .submit_vote(
+                "voter1".to_string(),
+                "sub1".to_string(),
+                "sub2".to_string(),
+                "msg1".to_string(),
+            )
+            .await;
+        assert_eq!(result1, VoteResult::Recorded);
+
+        // Same msg_id - should be duplicate
+        let result2 = state
+            .submit_vote(
+                "voter1".to_string(),
+                "sub3".to_string(),
+                "sub4".to_string(),
+                "msg1".to_string(),
+            )
+            .await;
+        assert_eq!(result2, VoteResult::Duplicate);
+
+        // Vote should not have changed
+        assert_eq!(state.votes.read().await.len(), 1);
+        let vote = state.votes.read().await.values().next().unwrap().clone();
+        assert_eq!(vote.ai_pick_submission_id, "sub1");
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_new_msg_id_replaces_vote() {
+        let state = AppState::new();
+        state.create_game().await;
+        state.start_round().await.unwrap();
+
+        // First vote
+        state
+            .submit_vote(
+                "voter1".to_string(),
+                "sub1".to_string(),
+                "sub2".to_string(),
+                "msg1".to_string(),
+            )
+            .await;
+
+        // New msg_id - should replace
+        let result = state
+            .submit_vote(
+                "voter1".to_string(),
+                "sub3".to_string(),
+                "sub4".to_string(),
+                "msg2".to_string(),
+            )
+            .await;
+        assert_eq!(result, VoteResult::Recorded);
+
+        // Should still only have 1 vote, but updated
+        assert_eq!(state.votes.read().await.len(), 1);
+        let vote = state.votes.read().await.values().next().unwrap().clone();
+        assert_eq!(vote.ai_pick_submission_id, "sub3");
+        assert_eq!(vote.funny_pick_submission_id, "sub4");
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_no_active_round() {
+        let state = AppState::new();
+        state.create_game().await;
+        // Don't start a round
+
+        let result = state
+            .submit_vote(
+                "voter1".to_string(),
+                "sub1".to_string(),
+                "sub2".to_string(),
+                "msg1".to_string(),
+            )
+            .await;
+
+        assert_eq!(result, VoteResult::NoActiveRound);
     }
 }

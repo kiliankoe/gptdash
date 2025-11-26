@@ -3,7 +3,7 @@ mod player;
 mod round;
 mod score;
 mod submission;
-mod vote;
+pub mod vote;
 
 use crate::llm::{LlmConfig, LlmManager};
 use crate::protocol::ServerMessage;
@@ -21,6 +21,8 @@ pub struct AppState {
     pub votes: Arc<RwLock<HashMap<VoteId, Vote>>>,
     pub players: Arc<RwLock<HashMap<PlayerId, Player>>>,
     pub scores: Arc<RwLock<Vec<Score>>>,
+    /// Processed vote msg_ids per voter for idempotency (voter_id -> msg_id)
+    pub processed_vote_msg_ids: Arc<RwLock<HashMap<VoterId, String>>>,
     /// LLM manager for generating AI answers
     pub llm: Option<Arc<LlmManager>>,
     /// LLM configuration (timeout, max tokens, etc.)
@@ -49,6 +51,7 @@ impl AppState {
             votes: Arc::new(RwLock::new(HashMap::new())),
             players: Arc::new(RwLock::new(HashMap::new())),
             scores: Arc::new(RwLock::new(Vec::new())),
+            processed_vote_msg_ids: Arc::new(RwLock::new(HashMap::new())),
             llm: llm.map(Arc::new),
             llm_config,
             broadcast: broadcast_tx,

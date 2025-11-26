@@ -1,10 +1,10 @@
-use axum::{routing::get, Router};
+use axum::{middleware, routing::get, Router};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use gptdash::{broadcast, llm, state::AppState, ws};
+use gptdash::{auth, broadcast, llm, state::AppState, ws};
 
 #[tokio::main]
 async fn main() {
@@ -18,6 +18,9 @@ async fn main() {
         .init();
 
     tracing::info!("Starting GPTDash...");
+
+    // Initialize authentication config
+    let auth_config = Arc::new(auth::AuthConfig::from_env());
 
     // Initialize LLM providers
     let llm_config = llm::LlmConfig::from_env();
@@ -42,8 +45,17 @@ async fn main() {
     // Spawn background task for broadcasting vote counts to Beamer
     broadcast::spawn_vote_broadcaster(state.clone());
 
+    // Protected host routes (with HTTP Basic Auth)
+    let host_routes = Router::new()
+        .route("/host.html", get(auth::serve_host_html))
+        .layer(middleware::from_fn_with_state(
+            auth_config.clone(),
+            auth::host_auth_middleware,
+        ));
+
     let app = Router::new()
         .route("/ws", get(ws::ws_handler))
+        .merge(host_routes)
         .fallback_service(ServeDir::new("static"))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())

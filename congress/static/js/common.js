@@ -6,18 +6,26 @@
  * WebSocket connection manager
  */
 class WSConnection {
-  constructor(role, onMessage, onStatusChange) {
+  constructor(role, onMessage, onStatusChange, token = null) {
     this.role = role;
     this.onMessage = onMessage;
     this.onStatusChange = onStatusChange;
+    this.token = token;
     this.ws = null;
     this.reconnectDelay = 2000;
+  }
+
+  setToken(token) {
+    this.token = token;
   }
 
   connect() {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const host = window.location.host || window.location.hostname;
-    const wsUrl = `${protocol}://${host}/ws?role=${this.role}`;
+    let wsUrl = `${protocol}://${host}/ws?role=${this.role}`;
+    if (this.token) {
+      wsUrl += `&token=${encodeURIComponent(this.token)}`;
+    }
     console.log("Connecting to:", wsUrl);
 
     this.ws = new WebSocket(wsUrl);

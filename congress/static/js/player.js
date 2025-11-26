@@ -7,16 +7,24 @@ let playerToken = null;
 let playerName = null;
 let currentPhase = null;
 let currentPrompt = null;
+let hasSubmitted = false;
 const MAX_CHARS = 500;
 const WARN_THRESHOLD = 450;
+const STORAGE_KEY = "gptdash_player_token";
 
 // Initialize
 function init() {
-  // Check if player token is in URL
+  // Check if player token is in URL or localStorage
   const params = new URLSearchParams(window.location.search);
   const urlToken = params.get("token");
+  const storedToken = localStorage.getItem(STORAGE_KEY);
+
   if (urlToken) {
     document.getElementById("tokenInput").value = urlToken;
+    playerToken = urlToken;
+  } else if (storedToken) {
+    document.getElementById("tokenInput").value = storedToken;
+    playerToken = storedToken;
   }
 
   // Setup char counter
@@ -25,8 +33,13 @@ function init() {
     answerInput.addEventListener("input", updateCharCounter);
   }
 
-  // Connect to WebSocket
-  wsConn = new WSConnection("player", handleMessage, updateConnectionStatus);
+  // Connect to WebSocket with token for state recovery
+  wsConn = new WSConnection(
+    "player",
+    handleMessage,
+    updateConnectionStatus,
+    playerToken,
+  );
   wsConn.connect();
 }
 
@@ -44,6 +57,31 @@ function handleMessage(message) {
   switch (message.t) {
     case "welcome":
       console.log("Welcome message:", message);
+      if (message.game) {
+        currentPhase = message.game.phase;
+      }
+      break;
+
+    case "player_state":
+      // State recovery on reconnect
+      console.log("Player state recovery:", message);
+      playerName = message.display_name;
+      hasSubmitted = message.has_submitted;
+
+      if (playerName) {
+        // Player is registered, go to appropriate screen
+        updateConnectionStatus(true, `Beigetreten als ${playerName}`);
+        if (hasSubmitted) {
+          showScreen("submittedScreen");
+        } else if (currentPhase === "WRITING") {
+          showWritingScreen();
+        } else {
+          showScreen("waitingScreen");
+        }
+      } else if (playerToken) {
+        // Token valid but not registered yet
+        showScreen("registerScreen");
+      }
       break;
 
     case "phase":
@@ -51,14 +89,20 @@ function handleMessage(message) {
       updateScreen(message.phase);
       break;
 
-    case "round_started":
+    case "prompt_selected":
       currentPrompt = message.prompt;
-      if (currentPhase === "WRITING") {
-        showWritingScreen();
+      break;
+
+    case "round_started":
+      // Reset submission state for new round
+      hasSubmitted = false;
+      if (message.round?.selected_prompt) {
+        currentPrompt = message.round.selected_prompt;
       }
       break;
 
     case "submission_confirmed":
+      hasSubmitted = true;
       showScreen("submittedScreen");
       break;
 
@@ -78,6 +122,10 @@ function joinGame() {
   }
 
   playerToken = token;
+  // Store token for reconnection
+  localStorage.setItem(STORAGE_KEY, token);
+  // Update connection with token for future reconnects
+  wsConn.setToken(token);
 
   if (!requireConnection("joinError")) {
     return;

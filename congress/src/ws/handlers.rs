@@ -183,17 +183,24 @@ async fn handle_vote(
     msg_id: String,
 ) -> Option<ServerMessage> {
     tracing::info!("Vote: AI={}, Funny={}, MsgID={}", ai, funny, msg_id);
-    if let Some(round) = state.get_current_round().await {
-        let vote = crate::types::Vote {
-            id: ulid::Ulid::new().to_string(),
-            round_id: round.id,
-            voter_id: voter_token,
-            ai_pick_submission_id: ai,
-            funny_pick_submission_id: funny,
-            ts: chrono::Utc::now().to_rfc3339(),
-        };
-        state.votes.write().await.insert(vote.id.clone(), vote);
+
+    use crate::state::vote::VoteResult;
+    match state
+        .submit_vote(voter_token, ai, funny, msg_id.clone())
+        .await
+    {
+        VoteResult::Recorded => {
+            tracing::debug!("Vote recorded");
+        }
+        VoteResult::Duplicate => {
+            tracing::debug!("Duplicate vote msg_id, returning ack");
+        }
+        VoteResult::NoActiveRound => {
+            tracing::warn!("Vote received but no active round");
+        }
     }
+
+    // Always return VoteAck for idempotency
     Some(ServerMessage::VoteAck { msg_id })
 }
 
