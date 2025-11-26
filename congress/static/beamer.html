@@ -4,147 +4,232 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPTDash - Beamer</title>
-    <link rel="stylesheet" href="/css/common.css">
+    <title>GPTDash - 39C3 Power Cycles</title>
     <link rel="stylesheet" href="/css/beamer.css">
     <script src="/js/qrcode.min.js"></script>
 </head>
 
 <body>
-    <!-- Connection Status Indicator -->
-    <div id="connectionStatus" class="connection-status disconnected">Nicht verbunden</div>
-
-    <!-- Banner (visible on most scenes) -->
-    <div class="banner" id="banner">
-        <h1>GPTDash</h1>
-        <div class="join-info">
-            <div id="bannerQRCode" style="display: inline-block; margin-right: 20px;"></div>
-            <div class="join-url" id="joinUrl">Mach mit: gptdash.local</div>
-        </div>
-    </div>
-
-    <!-- Lobby Scene -->
-    <div class="scene active" id="scene-LOBBY">
-        <div class="lobby-content">
-            <h2>Willkommen bei GPTDash!</h2>
-            <div class="subtitle">Kannst du die KI entlarven?</div>
-            <div class="big-qr" id="lobbyQRCode"></div>
-            <div style="margin-top: 40px; font-size: 32px;">Scannen & Mitmachen</div>
-        </div>
-    </div>
-
-    <!-- Prompt Selection Scene -->
-    <div class="scene" id="scene-PROMPT_SELECTION">
-        <div class="prompt-selection-content">
-            <h2>Wähl deine Frage</h2>
-            <div class="prompts-grid" id="promptsGrid">
-                <!-- Prompts will be inserted here -->
+    <div class="beamer-container">
+        <!-- Header Bar -->
+        <header class="header-bar">
+            <div class="header-left">
+                <img src="/img/manekineko.gif" alt="" class="header-mascot">
+                <div class="header-logo">39C3</div>
             </div>
-        </div>
-    </div>
-
-    <!-- Writing Scene -->
-    <div class="scene" id="scene-WRITING">
-        <div class="writing-content">
-            <h2>Die Spieler schreiben fleißig...</h2>
-            <div class="current-prompt" id="writingPrompt">Frage wird geladen...</div>
-            <div class="timer" id="writingTimer">--:--</div>
-            <div class="timer-label">Noch Zeit</div>
-        </div>
-    </div>
-
-    <!-- Reveal Scene -->
-    <div class="scene" id="scene-REVEAL">
-        <div class="reveal-content">
-            <h2>Die Antworten</h2>
-            <div class="answer-card">
-                <div class="answer-number" id="revealNumber">Antwort 1</div>
-                <div class="answer-text" id="revealText">Laden...</div>
+            <div class="header-status">
+                <div class="status-badge">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Verbinde...</span>
+                </div>
+                <div class="round-badge" id="roundBadge">Runde 0</div>
             </div>
-        </div>
-    </div>
+        </header>
 
-    <!-- Voting Scene -->
-    <div class="scene" id="scene-VOTING">
-        <div class="voting-content">
-            <h2>Jetzt wird abgestimmt!</h2>
-            <div class="timer" id="votingTimer" style="display: none;">--:--</div>
-            <div class="vote-section">
-                <h3>Welche Antwort ist die KI?</h3>
-                <div class="vote-bars" id="aiVoteBars">
-                    <!-- Vote bars will be inserted here -->
+        <!-- ========================
+             SCENE: LOBBY
+             ======================== -->
+        <section class="scene scene-lobby active" id="sceneLobby">
+            <div class="lobby-title headline headline-xl">
+                <span class="power text-primary">GPT</span>
+                <span class="cycles text-neutral">Dash</span>
+            </div>
+            <div class="lobby-qr-section">
+                <div class="lobby-qr" id="lobbyQR"></div>
+                <div class="lobby-url" id="lobbyUrl">Lade...</div>
+                <div class="lobby-instruction body-text">
+                    Scanne den QR-Code, um mitzumachen!
+                </div>
+                <div class="player-count" id="playerCount"></div>
+            </div>
+        </section>
+
+        <!-- ========================
+             SCENE: PROMPT SELECTION
+             ======================== -->
+        <section class="scene scene-prompt-selection" id="scenePromptSelection">
+            <h2 class="headline headline-lg text-center mb-40">Welche Frage?</h2>
+            <div class="prompt-grid" id="promptGrid">
+                <div class="prompt-card" data-prompt-index="0">
+                    <div class="prompt-number">1</div>
+                    <div class="prompt-text" id="promptText0">Frage wird geladen...</div>
+                </div>
+                <div class="prompt-card" data-prompt-index="1">
+                    <div class="prompt-number">2</div>
+                    <div class="prompt-text" id="promptText1">Frage wird geladen...</div>
+                </div>
+                <div class="prompt-card" data-prompt-index="2">
+                    <div class="prompt-number">3</div>
+                    <div class="prompt-text" id="promptText2">Frage wird geladen...</div>
                 </div>
             </div>
-            <div class="vote-section">
-                <h3>Welche Antwort ist am lustigsten?</h3>
-                <div class="vote-bars" id="funnyVoteBars">
-                    <!-- Vote bars will be inserted here -->
+        </section>
+
+        <!-- ========================
+             SCENE: WRITING
+             ======================== -->
+        <section class="scene scene-writing" id="sceneWriting">
+            <div class="writing-prompt">
+                <div class="label">Aktuelle Frage</div>
+                <div class="writing-prompt-text headline headline-md" id="writingPromptText">
+                    Frage wird geladen...
                 </div>
             </div>
-        </div>
-    </div>
+            <div class="writing-status">
+                <div class="writing-timer" id="writingTimer">01:00</div>
+                <div class="submission-counter" id="submissionCounter">0 Antworten eingereicht</div>
+            </div>
+        </section>
 
-    <!-- Results Scene -->
-    <div class="scene" id="scene-RESULTS">
-        <div class="results-content">
-            <h2>Die Auflösung</h2>
+        <!-- ========================
+             SCENE: REVEAL
+             ======================== -->
+        <section class="scene scene-reveal" id="sceneReveal">
+            <div class="reveal-card" id="revealCard">
+                <div class="reveal-number" id="revealNumber">Antwort 1 von 4</div>
+                <div class="reveal-text" id="revealText">
+                    Antwort wird geladen...
+                </div>
+            </div>
+            <div class="reveal-indicator" id="revealIndicator">
+                <!-- Dots will be generated dynamically -->
+            </div>
+        </section>
+
+        <!-- ========================
+             SCENE: VOTING
+             ======================== -->
+        <section class="scene scene-voting" id="sceneVoting">
+            <div class="voting-header">
+                <h2 class="headline headline-lg">Jetzt abstimmen!</h2>
+            </div>
+            <div class="voting-categories">
+                <!-- AI Category -->
+                <div class="voting-category">
+                    <div class="category-title">
+                        <span class="category-icon">🤖</span>
+                        <span class="headline headline-md text-primary">Wer ist die KI?</span>
+                    </div>
+                    <div class="vote-bars" id="aiVoteBars">
+                        <!-- Vote bars will be generated dynamically -->
+                    </div>
+                </div>
+                <!-- Funny Category -->
+                <div class="voting-category">
+                    <div class="category-title">
+                        <span class="category-icon">😂</span>
+                        <span class="headline headline-md text-secondary">Wer ist am lustigsten?</span>
+                    </div>
+                    <div class="vote-bars" id="funnyVoteBars">
+                        <!-- Vote bars will be generated dynamically -->
+                    </div>
+                </div>
+            </div>
+            <div class="voting-timer">
+                <div class="headline headline-lg text-primary" id="votingTimer">00:30</div>
+            </div>
+        </section>
+
+        <!-- ========================
+             SCENE: RESULTS
+             ======================== -->
+        <section class="scene scene-results" id="sceneResults">
+            <h2 class="headline headline-lg text-center">Ergebnisse</h2>
             <div class="results-grid">
-                <div class="result-card">
-                    <h3>Die KI war...</h3>
-                    <div class="winner" id="aiReveal">Laden...</div>
-                </div>
-                <div class="result-card">
-                    <h3>Lustigste Antwort</h3>
-                    <div class="winner" id="funniestReveal">Laden...</div>
-                </div>
-            </div>
-            <div class="leaderboard">
-                <h3>Bestenliste</h3>
-                <div id="leaderboardEntries">
-                    <!-- Leaderboard entries will be inserted here -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Podium Scene -->
-    <div class="scene" id="scene-PODIUM">
-        <div class="podium-content">
-            <h2>Die Gewinner!</h2>
-            <div class="podium-display">
-                <div class="podium-place second">
-                    <div class="podium-platform">
-                        <div class="podium-rank">2</div>
-                        <div class="podium-name" id="podium2Name">&mdash;</div>
-                        <div class="podium-score" id="podium2Score">0 Pkt</div>
+                <!-- AI Reveal -->
+                <div class="result-card ai-reveal">
+                    <div class="result-label">
+                        <span class="result-icon">🤖</span>
+                        <span class="headline headline-sm text-primary">Das war die KI!</span>
                     </div>
-                </div>
-                <div class="podium-place first">
-                    <div class="podium-platform">
-                        <div class="podium-rank">1</div>
-                        <div class="podium-name" id="podium1Name">&mdash;</div>
-                        <div class="podium-score" id="podium1Score">0 Pkt</div>
+                    <div class="result-answer" id="aiRevealAnswer">
+                        Antwort der KI wird geladen...
                     </div>
+                    <div class="result-meta" id="aiRevealMeta"></div>
                 </div>
-                <div class="podium-place third">
-                    <div class="podium-platform">
-                        <div class="podium-rank">3</div>
-                        <div class="podium-name" id="podium3Name">&mdash;</div>
-                        <div class="podium-score" id="podium3Score">0 Pkt</div>
+                <!-- Funniest -->
+                <div class="result-card funny-reveal">
+                    <div class="result-label">
+                        <span class="result-icon">😂</span>
+                        <span class="headline headline-sm text-secondary">Am lustigsten!</span>
+                    </div>
+                    <div class="result-answer" id="funnyRevealAnswer">
+                        Lustigste Antwort wird geladen...
+                    </div>
+                    <div class="result-meta" id="funnyRevealMeta"></div>
+                </div>
+                <!-- Leaderboard -->
+                <div class="result-card leaderboard">
+                    <div class="result-label">
+                        <span class="result-icon">🏆</span>
+                        <span class="headline headline-sm">Bestenliste</span>
+                    </div>
+                    <div class="leaderboard-list" id="leaderboardList">
+                        <!-- Leaderboard rows will be generated dynamically -->
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+        </section>
 
-    <!-- Intermission Scene -->
-    <div class="scene" id="scene-INTERMISSION">
-        <div class="intermission-content">
-            <h2>Kurze Pause</h2>
-            <div style="font-size: 36px; opacity: 0.8;">Wir sind gleich zurück...</div>
-        </div>
-    </div>
+        <!-- ========================
+             SCENE: PODIUM
+             ======================== -->
+        <section class="scene scene-podium" id="scenePodium">
+            <h2 class="headline headline-xl text-primary">Siegerehrung</h2>
+            <div class="podium-container">
+                <!-- 2nd Place -->
+                <div class="podium-place" id="podiumSecond">
+                    <div class="podium-avatar">2</div>
+                    <div class="podium-name" id="podiumSecondName">---</div>
+                    <div class="podium-score" id="podiumSecondScore">0 Punkte</div>
+                    <div class="podium-block second">2</div>
+                </div>
+                <!-- 1st Place -->
+                <div class="podium-place" id="podiumFirst">
+                    <div class="podium-avatar">1</div>
+                    <div class="podium-name" id="podiumFirstName">---</div>
+                    <div class="podium-score" id="podiumFirstScore">0 Punkte</div>
+                    <div class="podium-block first">1</div>
+                </div>
+                <!-- 3rd Place -->
+                <div class="podium-place" id="podiumThird">
+                    <div class="podium-avatar">3</div>
+                    <div class="podium-name" id="podiumThirdName">---</div>
+                    <div class="podium-score" id="podiumThirdScore">0 Punkte</div>
+                    <div class="podium-block third">3</div>
+                </div>
+            </div>
+        </section>
 
+        <!-- ========================
+             SCENE: INTERMISSION
+             ======================== -->
+        <section class="scene scene-intermission" id="sceneIntermission">
+            <div class="intermission-visual">PAUSE</div>
+            <div class="intermission-message body-text">
+                Gleich geht es weiter...
+            </div>
+        </section>
+
+        <!-- ========================
+             SCENE: ENDED
+             ======================== -->
+        <section class="scene scene-ended" id="sceneEnded">
+            <div class="ended-thanks">
+                <h2 class="headline headline-xl text-primary mb-40">Danke!</h2>
+                <p class="body-text">Das Spiel ist beendet.</p>
+            </div>
+        </section>
+
+        <!-- Footer Bar -->
+        <footer class="footer-bar">
+            <div class="footer-qr">
+                <div class="qr-code" id="footerQR"></div>
+                <div class="footer-url" id="footerUrl">Lade...</div>
+            </div>
+            <div class="footer-timer" id="footerTimer"></div>
+        </footer>
+    </div>
 
     <script src="/js/common.js"></script>
     <script src="/js/beamer.js"></script>

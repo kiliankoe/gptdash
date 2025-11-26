@@ -1,211 +1,431 @@
 /**
- * Beamer-specific JavaScript
+ * GPTDash Beamer Display - 39C3 Edition
+ * Full-screen stage display for projector/TV
  */
 
-let wsConn = null;
-let currentPhase = "LOBBY";
+// Game state
 const gameState = {
-  round: null,
+  phase: "LOBBY",
+  roundNo: 0,
+  currentRound: null,
   submissions: [],
-  voteCounts: { ai: {}, funny: {} },
-  scores: { players: [], audience_top: [] },
   revealIndex: 0,
-  currentRevealSubmission: null, // Current submission being shown in reveal
+  currentRevealSubmission: null,
+  scores: { players: [], audienceTop: [] },
+  voteCounts: { ai: {}, funny: {} },
 };
 
-// Timer and TTS managers
-let writingTimer = null;
-let votingTimer = null;
-let ttsManager = null;
+// Connections and utilities
+let ws = null;
+let timer = null;
+let tts = null;
+let lastSpokenSubmissionId = null;
 
 // Initialize on page load
-function init() {
-  wsConn = new WSConnection("beamer", handleMessage, updateConnectionStatus);
-  wsConn.connect();
+document.addEventListener("DOMContentLoaded", () => {
+  initializeBeamer();
+});
 
-  // Initialize timers and TTS
-  writingTimer = new CountdownTimer("writingTimer");
-  votingTimer = new CountdownTimer("votingTimer");
-  ttsManager = new TTSManager();
+function initializeBeamer() {
+  // Initialize TTS
+  tts = new TTSManager();
+
+  // Initialize timer
+  timer = new CountdownTimer("footerTimer", onTimerComplete);
 
   // Generate QR codes
-  generateJoinQRCodes();
+  generateQRCodes();
+
+  // Connect to WebSocket
+  connectWebSocket();
 }
 
-function handleMessage(message) {
-  switch (message.t) {
-    case "welcome":
-      console.log("Welcome message:", message);
-      if (message.game) {
-        // Pass deadline and server_now for timer synchronization
-        updatePhase(
-          message.game.phase,
-          message.game.phase_deadline,
-          message.server_now,
-        );
-      }
-      break;
+function generateQRCodes() {
+  const url = QRCodeManager.getAudienceJoinUrl();
 
-    case "phase":
-      updatePhase(message.phase, message.deadline, message.server_now);
-      break;
+  // Lobby QR (large)
+  QRCodeManager.generate("lobbyQR", url, {
+    width: 250,
+    height: 250,
+    colorDark: "#141414",
+    colorLight: "#faf5f5",
+  });
 
-    case "round_started":
-      gameState.round = message.round;
-      updateSceneContent(currentPhase);
-      break;
+  // Footer QR (small)
+  QRCodeManager.generate("footerQR", url, {
+    width: 60,
+    height: 60,
+    colorDark: "#141414",
+    colorLight: "#faf5f5",
+  });
 
-    case "prompt_selected":
-      if (!gameState.round) {
-        gameState.round = { selected_prompt: null, prompt_candidates: [] };
-      }
-      gameState.round.selected_prompt = message.prompt;
-      updateSceneContent(currentPhase);
-      break;
-
-    case "submissions":
-      gameState.submissions = message.list || [];
-      updateSubmissions();
-      break;
-
-    case "reveal_update":
-      gameState.revealIndex = message.reveal_index;
-      gameState.currentRevealSubmission = message.submission;
-      if (message.submission) {
-        updateRevealWithSubmission(message.submission, message.reveal_index);
-        // Auto-read with TTS
-        ttsManager.speak(message.submission.display_text, { rate: 0.9 });
-      }
-      break;
-
-    case "beamer_vote_counts":
-      gameState.voteCounts = {
-        ai: message.ai || {},
-        funny: message.funny || {},
-      };
-      updateVoteBars();
-      break;
-
-    case "scores":
-      gameState.scores = {
-        players: message.players || [],
-        audience_top: message.audience_top || [],
-      };
-      updateResults();
-      break;
-  }
+  // Set URL text
+  const displayUrl = url.replace(/^https?:\/\//, "");
+  const lobbyUrlEl = document.getElementById("lobbyUrl");
+  const footerUrlEl = document.getElementById("footerUrl");
+  if (lobbyUrlEl) lobbyUrlEl.textContent = displayUrl;
+  if (footerUrlEl) footerUrlEl.textContent = displayUrl;
 }
 
-function updatePhase(phase, deadline, serverNow) {
-  console.log(
-    "Phase transition:",
-    currentPhase,
-    "->",
-    phase,
-    "deadline:",
-    deadline,
-  );
+function connectWebSocket() {
+  ws = new WSConnection("beamer", handleMessage, handleStatusChange);
+  ws.connect();
+}
 
-  const phaseChanged = currentPhase !== phase;
-  currentPhase = phase;
+function handleStatusChange(connected, text) {
+  const dot = document.getElementById("statusDot");
+  const statusText = document.getElementById("statusText");
 
-  if (phaseChanged) {
-    // Clear reveal state when leaving REVEAL phase
-    if (phase !== "REVEAL") {
-      gameState.currentRevealSubmission = null;
-    }
-
-    // Hide all scenes
-    document.querySelectorAll(".scene").forEach((scene) => {
-      scene.classList.remove("active");
-    });
-
-    // Show current scene
-    const sceneId = `scene-${phase}`;
-    const sceneEl = document.getElementById(sceneId);
-    if (sceneEl) {
-      sceneEl.classList.add("active");
+  if (dot) {
+    if (connected) {
+      dot.classList.add("connected");
     } else {
-      console.warn("Unknown phase:", phase);
+      dot.classList.remove("connected");
+    }
+  }
+
+  if (statusText) {
+    statusText.textContent =
+      text || (connected ? "Verbunden" : "Nicht verbunden");
+  }
+}
+
+function handleMessage(msg) {
+  console.log("[Beamer] Received:", msg.t, msg);
+
+  switch (msg.t) {
+    case "welcome":
+      handleWelcome(msg);
+      break;
+    case "phase":
+      handlePhaseChange(msg);
+      break;
+    case "round_started":
+      handleRoundStarted(msg);
+      break;
+    case "prompt_selected":
+      handlePromptSelected(msg);
+      break;
+    case "submissions":
+      handleSubmissions(msg);
+      break;
+    case "reveal_update":
+      handleRevealUpdate(msg);
+      break;
+    case "beamer_vote_counts":
+      handleVoteCounts(msg);
+      break;
+    case "scores":
+      handleScores(msg);
+      break;
+    case "game_state":
+      handleGameState(msg);
+      break;
+    case "error":
+      console.error("[Beamer] Error:", msg.code, msg.msg);
+      break;
+  }
+}
+
+// ========================
+// Message Handlers
+// ========================
+
+function handleWelcome(msg) {
+  console.log("[Beamer] Welcome! Role:", msg.role);
+  if (msg.game) {
+    gameState.phase = msg.game.phase;
+    gameState.roundNo = msg.game.round_no;
+    updateRoundBadge();
+    showScene(phaseToScene(msg.game.phase));
+
+    // Start timer if deadline exists
+    if (msg.game.phase_deadline) {
+      timer.start(msg.game.phase_deadline, msg.server_now);
+    }
+  }
+}
+
+function handlePhaseChange(msg) {
+  const previousPhase = gameState.phase;
+  gameState.phase = msg.phase;
+  gameState.roundNo = msg.round_no;
+  updateRoundBadge();
+
+  // Handle timer
+  if (msg.deadline) {
+    timer.start(msg.deadline, msg.server_now);
+  } else {
+    timer.stop();
+    timer.hide();
+  }
+
+  // Clear reveal state when leaving REVEAL phase
+  if (previousPhase === "REVEAL" && msg.phase !== "REVEAL") {
+    gameState.currentRevealSubmission = null;
+    lastSpokenSubmissionId = null;
+  }
+
+  showScene(phaseToScene(msg.phase));
+}
+
+function handleRoundStarted(msg) {
+  gameState.currentRound = msg.round;
+  gameState.roundNo = msg.round.number;
+  updateRoundBadge();
+
+  // Update prompt candidates for selection
+  if (msg.round.prompt_candidates && msg.round.prompt_candidates.length > 0) {
+    updatePromptCandidates(msg.round.prompt_candidates);
+  }
+}
+
+function handlePromptSelected(msg) {
+  if (msg.prompt) {
+    const writingPrompt = document.getElementById("writingPromptText");
+    if (writingPrompt) {
+      writingPrompt.textContent = msg.prompt.text || "(Bildfrage)";
     }
 
-    // Update scene-specific content
-    updateSceneContent(phase);
-  }
-
-  // Start timer for timed phases
-  if (phase === "WRITING") {
-    writingTimer.start(deadline, serverNow);
-    votingTimer.stop();
-  } else if (phase === "VOTING") {
-    votingTimer.start(deadline, serverNow);
-    writingTimer.stop();
-  } else {
-    writingTimer.stop();
-    votingTimer.stop();
+    // Also update the round state
+    if (gameState.currentRound) {
+      gameState.currentRound.selected_prompt = msg.prompt;
+    }
   }
 }
 
-function updateSceneContent(phase) {
-  switch (phase) {
-    case "PROMPT_SELECTION":
-      updatePromptSelection();
-      break;
-    case "WRITING":
-      updateWritingScene();
-      break;
-    case "REVEAL":
-      updateRevealScene();
-      break;
-    case "VOTING":
-      initializeVoteBars();
-      break;
-    case "RESULTS":
-      updateResults();
-      break;
-    case "PODIUM":
-      updatePodium();
-      break;
+function handleSubmissions(msg) {
+  gameState.submissions = msg.list || [];
+  updateSubmissionCounter();
+
+  // Reinitialize vote bars if we're in voting phase
+  if (gameState.phase === "VOTING") {
+    initVotingBars();
+    updateVoteBarsAnimated();
+  }
+
+  updateRevealIndicator();
+}
+
+function handleRevealUpdate(msg) {
+  gameState.revealIndex = msg.reveal_index;
+  gameState.currentRevealSubmission = msg.submission;
+
+  if (msg.submission) {
+    showRevealCard(msg.submission, msg.reveal_index);
+  }
+
+  updateRevealIndicator();
+}
+
+function handleVoteCounts(msg) {
+  gameState.voteCounts = {
+    ai: msg.ai || {},
+    funny: msg.funny || {},
+  };
+  updateVoteBarsAnimated();
+}
+
+function handleScores(msg) {
+  gameState.scores = {
+    players: msg.players || [],
+    audienceTop: msg.audience_top || [],
+  };
+  updateLeaderboard();
+  updatePodium();
+  updateResultReveals();
+}
+
+function handleGameState(msg) {
+  if (msg.game) {
+    gameState.phase = msg.game.phase;
+    gameState.roundNo = msg.game.round_no;
+    updateRoundBadge();
+    showScene(phaseToScene(msg.game.phase));
   }
 }
 
-function updatePromptSelection() {
-  const grid = document.getElementById("promptsGrid");
-  if (!grid) {
-    return;
+// ========================
+// Scene Management
+// ========================
+
+function phaseToScene(phase) {
+  const mapping = {
+    LOBBY: "sceneLobby",
+    PROMPT_SELECTION: "scenePromptSelection",
+    WRITING: "sceneWriting",
+    REVEAL: "sceneReveal",
+    VOTING: "sceneVoting",
+    RESULTS: "sceneResults",
+    PODIUM: "scenePodium",
+    INTERMISSION: "sceneIntermission",
+    ENDED: "sceneEnded",
+  };
+  return mapping[phase] || "sceneLobby";
+}
+
+function showScene(sceneId) {
+  // Hide all scenes
+  document.querySelectorAll(".scene").forEach((scene) => {
+    scene.classList.remove("active");
+  });
+
+  // Show target scene
+  const scene = document.getElementById(sceneId);
+  if (scene) {
+    scene.classList.add("active");
   }
 
-  const round = gameState.round;
-  if (
-    !round ||
-    !round.prompt_candidates ||
-    round.prompt_candidates.length === 0
-  ) {
-    grid.innerHTML =
-      '<p class="help-text" style="grid-column: 1 / -1; text-align: center;">Warte auf Fragen...</p>';
-    return;
+  // Phase-specific initialization
+  if (sceneId === "sceneVoting") {
+    initVotingBars();
+  } else if (sceneId === "sceneWriting") {
+    updateWritingScene();
+  } else if (sceneId === "sceneReveal") {
+    updateRevealScene();
+  } else if (sceneId === "sceneResults") {
+    updateResultReveals();
   }
+}
 
-  const selectedId = round.selected_prompt ? round.selected_prompt.id : null;
+// ========================
+// UI Updates
+// ========================
 
-  grid.innerHTML = round.prompt_candidates
-    .map((prompt, idx) => {
-      const isSelected = prompt.id === selectedId;
-      return `
-                <div class="prompt-card ${isSelected ? "selected" : ""}">
-                    <div class="number">Frage ${String.fromCharCode(65 + idx)}</div>
-                    <div class="text">${escapeHtml(prompt.text || "Frage wird vorbereitet...")}</div>
-                </div>
-            `;
-    })
-    .join("");
+function updateRoundBadge() {
+  const badge = document.getElementById("roundBadge");
+  if (badge) {
+    badge.textContent = `Runde ${gameState.roundNo}`;
+  }
+}
+
+function updatePromptCandidates(candidates) {
+  candidates.forEach((prompt, index) => {
+    const textEl = document.getElementById(`promptText${index}`);
+    if (textEl) {
+      textEl.textContent = prompt.text || "(Bildfrage)";
+    }
+
+    const card = document.querySelector(`[data-prompt-index="${index}"]`);
+    if (card) {
+      card.classList.remove("selected", "highlighted");
+      card.style.display = "flex";
+    }
+  });
+
+  // Hide empty slots
+  for (let i = candidates.length; i < 3; i++) {
+    const card = document.querySelector(`[data-prompt-index="${i}"]`);
+    if (card) {
+      card.style.display = "none";
+    }
+  }
 }
 
 function updateWritingScene() {
-  const promptEl = document.getElementById("writingPrompt");
-  if (gameState.round?.selected_prompt) {
-    promptEl.textContent =
-      gameState.round.selected_prompt.text || "Frage wird geladen...";
+  if (gameState.currentRound?.selected_prompt) {
+    const promptText = document.getElementById("writingPromptText");
+    if (promptText) {
+      promptText.textContent =
+        gameState.currentRound.selected_prompt.text || "(Bildfrage)";
+    }
+  }
+}
+
+function updateSubmissionCounter() {
+  const counter = document.getElementById("submissionCounter");
+  if (counter) {
+    const count = gameState.submissions.length;
+    const text =
+      count === 1 ? "1 Antwort eingereicht" : `${count} Antworten eingereicht`;
+    counter.textContent = text;
+  }
+}
+
+function initVotingBars() {
+  const submissions = gameState.submissions;
+  if (submissions.length === 0) return;
+
+  const aiContainer = document.getElementById("aiVoteBars");
+  const funnyContainer = document.getElementById("funnyVoteBars");
+
+  if (!aiContainer || !funnyContainer) return;
+
+  aiContainer.innerHTML = "";
+  funnyContainer.innerHTML = "";
+
+  submissions.forEach((sub, index) => {
+    const label = String.fromCharCode(65 + index); // A, B, C, ...
+
+    // AI vote bar
+    aiContainer.appendChild(createVoteBar(sub.id, label, "ai"));
+    // Funny vote bar
+    funnyContainer.appendChild(createVoteBar(sub.id, label, "funny"));
+  });
+}
+
+function createVoteBar(id, label, type) {
+  const bar = document.createElement("div");
+  bar.className = "vote-bar";
+  bar.dataset.submissionId = id;
+  bar.innerHTML = `
+        <div class="vote-bar-label">${escapeHtml(label)}</div>
+        <div class="vote-bar-track">
+            <div class="vote-bar-fill ${type}" style="width: 0%"></div>
+            <div class="vote-bar-count">0</div>
+        </div>
+    `;
+  return bar;
+}
+
+function updateVoteBarsAnimated() {
+  const aiCounts = gameState.voteCounts.ai;
+  const funnyCounts = gameState.voteCounts.funny;
+
+  // Calculate totals for percentage
+  const aiTotal = Object.values(aiCounts).reduce((a, b) => a + b, 0) || 1;
+  const funnyTotal = Object.values(funnyCounts).reduce((a, b) => a + b, 0) || 1;
+
+  // Update AI bars
+  document.querySelectorAll("#aiVoteBars .vote-bar").forEach((bar) => {
+    const id = bar.dataset.submissionId;
+    const count = aiCounts[id] || 0;
+    const percent = Math.min((count / aiTotal) * 100, 100);
+    const fill = bar.querySelector(".vote-bar-fill");
+    const countEl = bar.querySelector(".vote-bar-count");
+    if (fill) fill.style.width = `${percent}%`;
+    if (countEl) countEl.textContent = count;
+  });
+
+  // Update Funny bars
+  document.querySelectorAll("#funnyVoteBars .vote-bar").forEach((bar) => {
+    const id = bar.dataset.submissionId;
+    const count = funnyCounts[id] || 0;
+    const percent = Math.min((count / funnyTotal) * 100, 100);
+    const fill = bar.querySelector(".vote-bar-fill");
+    const countEl = bar.querySelector(".vote-bar-count");
+    if (fill) fill.style.width = `${percent}%`;
+    if (countEl) countEl.textContent = count;
+  });
+}
+
+function updateRevealIndicator() {
+  const container = document.getElementById("revealIndicator");
+  if (!container) return;
+
+  const count = gameState.submissions.length;
+  const current = gameState.revealIndex;
+
+  container.innerHTML = "";
+  for (let i = 0; i < count; i++) {
+    const dot = document.createElement("div");
+    dot.className = "reveal-dot";
+    if (i < current) {
+      dot.classList.add("revealed");
+    } else if (i === current) {
+      dot.classList.add("active");
+    }
+    container.appendChild(dot);
   }
 }
 
@@ -215,216 +435,228 @@ function updateRevealScene() {
 
   if (!numberEl || !textEl) return;
 
-  // Only show submission from reveal_update messages, not from arbitrary submissions array
   if (gameState.currentRevealSubmission) {
-    numberEl.textContent = `Antwort ${gameState.revealIndex + 1}`;
+    const total = gameState.submissions.length;
+    numberEl.textContent = `Antwort ${gameState.revealIndex + 1} von ${total}`;
     textEl.textContent = gameState.currentRevealSubmission.display_text;
   } else {
     numberEl.textContent = "Warte auf Antworten";
     textEl.textContent =
-      "Die Antworten erscheinen hier, sobald der Host die Präsentation startet.";
+      "Die Antworten erscheinen hier, sobald der Host die Praesentation startet.";
   }
 }
 
-function updateRevealWithSubmission(submission, index) {
+function showRevealCard(submission, index) {
+  const total = gameState.submissions.length;
   const numberEl = document.getElementById("revealNumber");
   const textEl = document.getElementById("revealText");
 
-  if (!numberEl || !textEl) return;
+  if (numberEl) numberEl.textContent = `Antwort ${index + 1} von ${total}`;
+  if (textEl) textEl.textContent = submission.display_text;
 
-  numberEl.textContent = `Antwort ${index + 1}`;
-  textEl.textContent = submission.display_text;
-
-  // Add fade-in animation
-  const card = document.querySelector("#scene-REVEAL .answer-card");
+  // Animate card
+  const card = document.getElementById("revealCard");
   if (card) {
-    card.classList.remove("fadeIn");
-    // Trigger reflow to restart animation
-    void card.offsetWidth;
-    card.classList.add("fadeIn");
+    card.style.animation = "none";
+    card.offsetHeight; // Trigger reflow
+    card.style.animation = "slideUp 0.6s ease-out";
   }
+
+  // Speak the answer with TTS (only if we haven't spoken this one yet)
+  if (submission.id !== lastSpokenSubmissionId) {
+    lastSpokenSubmissionId = submission.id;
+    setTimeout(() => {
+      tts.speak(submission.display_text, {
+        rate: 0.9,
+        pitch: 1.0,
+      });
+    }, 600);
+  }
+
+  updateRevealIndicator();
 }
 
-function updateSubmissions() {
-  if (currentPhase === "REVEAL") {
-    updateRevealScene();
-  }
-  if (currentPhase === "VOTING") {
-    initializeVoteBars();
-    updateVoteBars();
-  }
-}
+function updateLeaderboard() {
+  const container = document.getElementById("leaderboardList");
+  if (!container) return;
 
-function initializeVoteBars() {
-  const aiContainer = document.getElementById("aiVoteBars");
-  const funnyContainer = document.getElementById("funnyVoteBars");
+  const players = gameState.scores.players;
 
-  aiContainer.innerHTML = "";
-  funnyContainer.innerHTML = "";
-
-  if (gameState.submissions.length === 0) {
-    const placeholder =
-      '<p class="help-text" style="text-align: center; width: 100%;">Warte auf Antworten...</p>';
-    aiContainer.innerHTML = placeholder;
-    funnyContainer.innerHTML = placeholder;
+  if (players.length === 0) {
+    container.innerHTML =
+      '<div class="body-text" style="opacity: 0.6; text-align: center;">Noch keine Punkte</div>';
     return;
   }
 
-  gameState.submissions.forEach((sub, idx) => {
-    const label = `Antwort ${idx + 1}`;
-    aiContainer.innerHTML += createVoteBar(sub.id, label, "ai");
-    funnyContainer.innerHTML += createVoteBar(sub.id, label, "funny");
-  });
-}
+  // Sort by total score descending
+  const sorted = [...players].sort((a, b) => b.total - a.total);
 
-function createVoteBar(subId, label, category) {
-  return `
-        <div class="vote-bar">
-            <div class="vote-bar-label">${label}</div>
-            <div class="vote-bar-track">
-                <div class="vote-bar-fill" id="bar-${category}-${subId}" style="width: 0%">
-                    <span class="vote-bar-count" id="count-${category}-${subId}">0</span>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function updateVoteBars() {
-  // Calculate max votes for scaling
-  const allVotes = [
-    ...Object.values(gameState.voteCounts.ai),
-    ...Object.values(gameState.voteCounts.funny),
-  ];
-  const maxVotes = Math.max(...allVotes, 1);
-
-  // Update AI bars
-  Object.entries(gameState.voteCounts.ai).forEach(([subId, count]) => {
-    const bar = document.getElementById(`bar-ai-${subId}`);
-    const countEl = document.getElementById(`count-ai-${subId}`);
-    if (bar && countEl) {
-      const percentage = (count / maxVotes) * 100;
-      bar.style.width = `${Math.max(percentage, 10)}%`;
-      countEl.textContent = count;
-    }
-  });
-
-  Object.entries(gameState.voteCounts.funny).forEach(([subId, count]) => {
-    const bar = document.getElementById(`bar-funny-${subId}`);
-    const countEl = document.getElementById(`count-funny-${subId}`);
-    if (bar && countEl) {
-      const percentage = (count / maxVotes) * 100;
-      bar.style.width = `${Math.max(percentage, 10)}%`;
-      countEl.textContent = count;
-    }
-  });
-}
-
-function findSubmissionById(subId) {
-  return gameState.submissions.find((s) => s.id === subId);
-}
-
-function updateResults() {
-  const aiRevealEl = document.getElementById("aiReveal");
-  if (aiRevealEl) {
-    const aiId = gameState.round ? gameState.round.ai_submission_id : null;
-    if (aiId) {
-      const aiSub = findSubmissionById(aiId);
-      aiRevealEl.textContent = aiSub
-        ? aiSub.display_text
-        : "KI-Antwort wird gleich enthüllt…";
-    } else {
-      aiRevealEl.textContent = "KI-Antwort wird gleich enthüllt…";
-    }
-  }
-
-  // Find funniest (most funny votes)
-  const funnyVotes = gameState.voteCounts.funny;
-  let funniestId = null;
-  let maxFunny = 0;
-  Object.entries(funnyVotes).forEach(([subId, count]) => {
-    if (count > maxFunny) {
-      maxFunny = count;
-      funniestId = subId;
-    }
-  });
-
-  const funniestEl = document.getElementById("funniestReveal");
-  if (funniestEl) {
-    if (funniestId) {
-      const funniestSub = findSubmissionById(funniestId);
-      funniestEl.textContent = funniestSub
-        ? funniestSub.display_text
-        : "Lustigste Antwort kommt gleich…";
-    } else {
-      funniestEl.textContent = "Lustigste Antwort kommt gleich…";
-    }
-  }
-
-  // Update leaderboard
-  const container = document.getElementById("leaderboardEntries");
-  container.innerHTML = "";
-
-  gameState.scores.players.forEach((score, idx) => {
-    const isTop3 = idx < 3;
-    container.innerHTML += `
-            <div class="leaderboard-entry ${isTop3 ? "top-3" : ""}">
-                <span>${idx + 1}. Spieler ${score.ref_id.substring(0, 8)}</span>
-                <span>${score.total} Pkt</span>
+  container.innerHTML = sorted
+    .map((player, index) => {
+      const rankClass =
+        index === 0
+          ? "gold"
+          : index === 1
+            ? "silver"
+            : index === 2
+              ? "bronze"
+              : "";
+      const displayName = player.ref_id || `Spieler ${index + 1}`;
+      return `
+            <div class="leaderboard-row" style="animation-delay: ${index * 0.1}s">
+                <div class="leaderboard-rank ${rankClass}">${index + 1}</div>
+                <div class="leaderboard-name">${escapeHtml(displayName)}</div>
+                <div class="leaderboard-score">${player.total}</div>
             </div>
         `;
-  });
+    })
+    .join("");
+}
+
+function updateResultReveals() {
+  const aiCounts = gameState.voteCounts.ai;
+  const funnyCounts = gameState.voteCounts.funny;
+
+  // Find most voted AI
+  let maxAiVotes = 0;
+  let aiWinnerId = null;
+  for (const [id, count] of Object.entries(aiCounts)) {
+    if (count > maxAiVotes) {
+      maxAiVotes = count;
+      aiWinnerId = id;
+    }
+  }
+
+  // Find most voted Funny
+  let maxFunnyVotes = 0;
+  let funnyWinnerId = null;
+  for (const [id, count] of Object.entries(funnyCounts)) {
+    if (count > maxFunnyVotes) {
+      maxFunnyVotes = count;
+      funnyWinnerId = id;
+    }
+  }
+
+  // Update AI reveal (use actual AI submission if marked by host)
+  const aiRevealAnswer = document.getElementById("aiRevealAnswer");
+  const aiRevealMeta = document.getElementById("aiRevealMeta");
+
+  // Check if we have a designated AI submission from the round
+  const actualAiId = gameState.currentRound?.ai_submission_id;
+  const aiDisplayId = actualAiId || aiWinnerId;
+
+  if (aiDisplayId && aiRevealAnswer) {
+    const aiSub = gameState.submissions.find((s) => s.id === aiDisplayId);
+    if (aiSub) {
+      aiRevealAnswer.textContent = aiSub.display_text;
+      if (aiRevealMeta) {
+        const votes = aiCounts[aiDisplayId] || 0;
+        aiRevealMeta.textContent = `${votes} Stimmen`;
+      }
+    }
+  }
+
+  // Update Funny reveal
+  const funnyRevealAnswer = document.getElementById("funnyRevealAnswer");
+  const funnyRevealMeta = document.getElementById("funnyRevealMeta");
+
+  if (funnyWinnerId && funnyRevealAnswer) {
+    const funnySub = gameState.submissions.find((s) => s.id === funnyWinnerId);
+    if (funnySub) {
+      funnyRevealAnswer.textContent = funnySub.display_text;
+      if (funnyRevealMeta) {
+        funnyRevealMeta.textContent = `${maxFunnyVotes} Stimmen`;
+      }
+    }
+  }
 }
 
 function updatePodium() {
-  const players = gameState.scores.players.slice(0, 3);
+  const players = gameState.scores.players;
+  if (players.length === 0) return;
 
-  if (players[0]) {
-    document.getElementById("podium1Name").textContent =
-      `Spieler ${players[0].ref_id.substring(0, 8)}`;
-    document.getElementById("podium1Score").textContent =
-      `${players[0].total} Pkt`;
+  // Sort by total score descending
+  const sorted = [...players].sort((a, b) => b.total - a.total);
+
+  // First place
+  if (sorted[0]) {
+    const name1 = document.getElementById("podiumFirstName");
+    const score1 = document.getElementById("podiumFirstScore");
+    if (name1) name1.textContent = sorted[0].ref_id || "Spieler 1";
+    if (score1) score1.textContent = `${sorted[0].total} Punkte`;
   }
 
-  if (players[1]) {
-    document.getElementById("podium2Name").textContent =
-      `Spieler ${players[1].ref_id.substring(0, 8)}`;
-    document.getElementById("podium2Score").textContent =
-      `${players[1].total} Pkt`;
+  // Second place
+  const podiumSecond = document.getElementById("podiumSecond");
+  if (sorted[1]) {
+    const name2 = document.getElementById("podiumSecondName");
+    const score2 = document.getElementById("podiumSecondScore");
+    if (name2) name2.textContent = sorted[1].ref_id || "Spieler 2";
+    if (score2) score2.textContent = `${sorted[1].total} Punkte`;
+    if (podiumSecond) podiumSecond.style.visibility = "visible";
+  } else if (podiumSecond) {
+    podiumSecond.style.visibility = "hidden";
   }
 
-  if (players[2]) {
-    document.getElementById("podium3Name").textContent =
-      `Spieler ${players[2].ref_id.substring(0, 8)}`;
-    document.getElementById("podium3Score").textContent =
-      `${players[2].total} Pkt`;
-  }
-}
-
-/**
- * Generate QR codes for joining the game
- */
-function generateJoinQRCodes() {
-  // Generate big QR code for Lobby scene
-  const audienceUrl = QRCodeManager.generateAudienceQR("lobbyQRCode", {
-    width: 400,
-    height: 400,
-  });
-
-  // Generate small QR code for banner (persistent across scenes)
-  QRCodeManager.generateAudienceQR("bannerQRCode", {
-    width: 100,
-    height: 100,
-  });
-
-  // Update join URL text in banner
-  const joinUrlEl = document.getElementById("joinUrl");
-  if (joinUrlEl) {
-    // Extract just the hostname and path for display
-    const url = new URL(audienceUrl);
-    joinUrlEl.textContent = `Mach mit: ${url.host}`;
+  // Third place
+  const podiumThird = document.getElementById("podiumThird");
+  if (sorted[2]) {
+    const name3 = document.getElementById("podiumThirdName");
+    const score3 = document.getElementById("podiumThirdScore");
+    if (name3) name3.textContent = sorted[2].ref_id || "Spieler 3";
+    if (score3) score3.textContent = `${sorted[2].total} Punkte`;
+    if (podiumThird) podiumThird.style.visibility = "visible";
+  } else if (podiumThird) {
+    podiumThird.style.visibility = "hidden";
   }
 }
 
-// Start the app
-init();
+function onTimerComplete() {
+  // Timer finished - add warning class to timers
+  const footerTimer = document.getElementById("footerTimer");
+  const writingTimer = document.getElementById("writingTimer");
+  const votingTimer = document.getElementById("votingTimer");
+
+  [footerTimer, writingTimer, votingTimer].forEach((el) => {
+    if (el) {
+      el.classList.add("warning");
+    }
+  });
+}
+
+// Sync phase-specific timers with footer timer
+setInterval(() => {
+  const footerTimer = document.getElementById("footerTimer");
+  if (!footerTimer) return;
+
+  const time = footerTimer.textContent;
+  if (!time || time === "") return;
+
+  // Parse time to check for warning threshold
+  const parts = time.split(":");
+  const minutes = parseInt(parts[0] || "0", 10);
+  const seconds = parseInt(parts[1] || "0", 10);
+  const isWarning = minutes === 0 && seconds <= 10;
+
+  // Update writing timer
+  const writingTimer = document.getElementById("writingTimer");
+  if (writingTimer && gameState.phase === "WRITING") {
+    writingTimer.textContent = time;
+    if (isWarning) {
+      writingTimer.classList.add("warning");
+    } else {
+      writingTimer.classList.remove("warning");
+    }
+  }
+
+  // Update voting timer
+  const votingTimer = document.getElementById("votingTimer");
+  if (votingTimer && gameState.phase === "VOTING") {
+    votingTimer.textContent = time;
+    if (isWarning) {
+      votingTimer.classList.add("warning");
+    } else {
+      votingTimer.classList.remove("warning");
+    }
+  }
+}, 100);
