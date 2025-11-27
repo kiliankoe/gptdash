@@ -1,12 +1,35 @@
 use super::AppState;
 use crate::types::*;
+use rand::Rng;
+
+/// Safe character set for short codes (excludes 0/O, 1/I/L to avoid confusion)
+const CODE_CHARS: &[u8] = b"ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const CODE_LENGTH: usize = 5;
+
+/// Generate a random short code (5 characters)
+fn generate_short_code() -> String {
+    let mut rng = rand::rng();
+    (0..CODE_LENGTH)
+        .map(|_| CODE_CHARS[rng.random_range(0..CODE_CHARS.len())] as char)
+        .collect()
+}
 
 impl AppState {
-    /// Create a new player with a token
+    /// Create a new player with a short join code
     pub async fn create_player(&self) -> Player {
+        // Generate a unique short code (check for collisions)
+        let token = loop {
+            let code = generate_short_code();
+            let players = self.players.read().await;
+            if !players.values().any(|p| p.token == code) {
+                break code;
+            }
+            // Collision - try again (extremely rare with 24M combinations)
+        };
+
         let player = Player {
             id: ulid::Ulid::new().to_string(),
-            token: ulid::Ulid::new().to_string(),
+            token,
             display_name: None,
         };
 
