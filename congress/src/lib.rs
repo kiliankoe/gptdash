@@ -1,5 +1,6 @@
 // Public API for integration tests and potential library usage
 
+pub mod abuse;
 pub mod auth;
 pub mod llm;
 pub mod protocol;

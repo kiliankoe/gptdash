@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use gptdash::{auth, broadcast, llm, state::AppState, ws};
+use gptdash::{abuse, auth, broadcast, llm, state::AppState, ws};
 
 #[tokio::main]
 async fn main() {
@@ -29,6 +29,9 @@ async fn main() {
 
     // Initialize authentication config
     let auth_config = Arc::new(auth::AuthConfig::from_env());
+
+    // Initialize anti-abuse config
+    let abuse_config = Arc::new(abuse::AbuseConfig::from_env());
 
     // Initialize LLM providers
     let llm_config = llm::LlmConfig::from_env();
@@ -61,8 +64,17 @@ async fn main() {
             auth::host_auth_middleware,
         ));
 
+    // WebSocket route with anti-abuse protection
+    let ws_routes =
+        Router::new()
+            .route("/ws", get(ws::ws_handler))
+            .layer(middleware::from_fn_with_state(
+                abuse_config.clone(),
+                abuse::ws_abuse_middleware,
+            ));
+
     let app = Router::new()
-        .route("/ws", get(ws::ws_handler))
+        .merge(ws_routes)
         .merge(host_routes)
         .fallback_service(ServeDir::new("static"))
         .layer(CorsLayer::permissive())
