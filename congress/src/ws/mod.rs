@@ -59,11 +59,13 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
     };
 
     // Send welcome message
+    let valid_transitions = AppState::get_valid_transitions(&game.phase);
     let welcome = ServerMessage::Welcome {
         protocol: "1.0".to_string(),
         role: role.clone(),
         game,
         server_now: chrono::Utc::now().to_rfc3339(),
+        valid_transitions,
     };
 
     if let Ok(msg) = serde_json::to_string(&welcome) {

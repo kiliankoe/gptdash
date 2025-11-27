@@ -87,7 +87,7 @@ async fn test_full_game_flow() {
     .await;
 
     match phase_result {
-        Some(ServerMessage::GameState { game }) => {
+        Some(ServerMessage::GameState { game, .. }) => {
             assert_eq!(game.phase, GamePhase::PromptSelection);
         }
         _ => panic!("Expected GameState message"),
@@ -403,7 +403,7 @@ async fn test_full_game_flow() {
     .await;
 
     match intermission_result {
-        Some(ServerMessage::GameState { game }) => {
+        Some(ServerMessage::GameState { game, .. }) => {
             assert_eq!(
                 game.phase,
                 GamePhase::Intermission,
@@ -423,7 +423,7 @@ async fn test_full_game_flow() {
     .await;
 
     match results_again_result {
-        Some(ServerMessage::GameState { game }) => {
+        Some(ServerMessage::GameState { game, .. }) => {
             assert_eq!(
                 game.phase,
                 GamePhase::Results,

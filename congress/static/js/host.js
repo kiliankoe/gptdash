@@ -9,6 +9,7 @@ const gameState = {
   players: [],
   submissions: [],
   scores: { players: [], audience_top: [] },
+  validTransitions: [], // Populated by server
 };
 
 // Initialize
@@ -26,12 +27,14 @@ function handleMessage(message) {
       if (message.game) {
         gameState.phase = message.game.phase;
         gameState.roundNo = message.game.round_no;
+        gameState.validTransitions = message.valid_transitions || [];
         updateUI();
       }
       break;
 
     case "phase":
       gameState.phase = message.phase;
+      gameState.validTransitions = message.valid_transitions || [];
       updateUI();
       showAlert(`Phase gewechselt zu: ${message.phase}`, "success");
       break;
@@ -60,6 +63,7 @@ function handleMessage(message) {
       if (message.game) {
         gameState.phase = message.game.phase;
         gameState.roundNo = message.game.round_no;
+        gameState.validTransitions = message.valid_transitions || [];
         gameState.players = [];
         gameState.submissions = [];
         gameState.scores = { players: [], audience_top: [] };
@@ -106,6 +110,32 @@ function updateUI() {
     gameState.players.length;
   document.getElementById("overviewSubmissions").textContent =
     gameState.submissions.length;
+
+  // Update phase transition buttons
+  updatePhaseButtons();
+}
+
+/**
+ * Update phase transition buttons based on valid transitions from server
+ */
+function updatePhaseButtons() {
+  const currentPhase = gameState.phase;
+  const validTargets = gameState.validTransitions || [];
+  const container = document.getElementById("phaseButtons");
+
+  if (!container) return;
+
+  const buttons = container.querySelectorAll("button[data-phase]");
+  buttons.forEach((btn) => {
+    const targetPhase = btn.dataset.phase;
+    const isValid = validTargets.includes(targetPhase);
+    const isCurrent = targetPhase === currentPhase;
+
+    btn.disabled = !isValid || isCurrent;
+
+    // Add visual indicator for current phase
+    btn.classList.toggle("current", isCurrent);
+  });
 }
 
 // Host Commands

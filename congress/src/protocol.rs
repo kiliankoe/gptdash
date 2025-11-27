@@ -62,12 +62,14 @@ pub enum ServerMessage {
         role: Role,
         game: Game,
         server_now: String,
+        valid_transitions: Vec<GamePhase>,
     },
     Phase {
         phase: GamePhase,
         round_no: u32,
         server_now: String,
         deadline: Option<String>,
+        valid_transitions: Vec<GamePhase>,
     },
     Submissions {
         list: Vec<SubmissionInfo>,
@@ -102,6 +104,7 @@ pub enum ServerMessage {
     },
     GameState {
         game: Game,
+        valid_transitions: Vec<GamePhase>,
     },
     RevealUpdate {
         reveal_index: usize,

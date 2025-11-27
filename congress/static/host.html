@@ -100,16 +100,16 @@
 
                 <div class="card">
                     <div class="card-header">Phasen-Übergänge</div>
-                    <div class="phase-selector">
-                        <button onclick="transitionPhase('LOBBY')">Lobby</button>
-                        <button onclick="transitionPhase('PROMPT_SELECTION')">Frage auswählen</button>
-                        <button onclick="transitionPhase('WRITING')">Schreiben</button>
-                        <button onclick="transitionPhase('REVEAL')">Antworten zeigen</button>
-                        <button onclick="transitionPhase('VOTING')">Abstimmen</button>
-                        <button onclick="transitionPhase('RESULTS')">Auflösung</button>
-                        <button onclick="transitionPhase('PODIUM')">Siegerehrung</button>
-                        <button onclick="transitionPhase('INTERMISSION')">Pause</button>
-                        <button onclick="transitionPhase('ENDED')" class="danger">Spiel beenden</button>
+                    <div class="phase-selector" id="phaseButtons">
+                        <button data-phase="LOBBY" onclick="transitionPhase('LOBBY')">Lobby</button>
+                        <button data-phase="PROMPT_SELECTION" onclick="transitionPhase('PROMPT_SELECTION')">Frage auswählen</button>
+                        <button data-phase="WRITING" onclick="transitionPhase('WRITING')">Schreiben</button>
+                        <button data-phase="REVEAL" onclick="transitionPhase('REVEAL')">Antworten zeigen</button>
+                        <button data-phase="VOTING" onclick="transitionPhase('VOTING')">Abstimmen</button>
+                        <button data-phase="RESULTS" onclick="transitionPhase('RESULTS')">Auflösung</button>
+                        <button data-phase="PODIUM" onclick="transitionPhase('PODIUM')">Siegerehrung</button>
+                        <button data-phase="INTERMISSION" onclick="transitionPhase('INTERMISSION')">Pause</button>
+                        <button data-phase="ENDED" onclick="transitionPhase('ENDED')" class="danger">Spiel beenden</button>
                     </div>
                 </div>
 

@@ -25,35 +25,32 @@ impl AppState {
 
     /// Check if a phase transition is valid
     fn is_valid_phase_transition(from: &GamePhase, to: &GamePhase) -> bool {
+        Self::get_valid_transitions(from).contains(to)
+    }
+
+    /// Get all valid transitions from a given phase
+    pub fn get_valid_transitions(from: &GamePhase) -> Vec<GamePhase> {
         use GamePhase::*;
 
-        match (from, to) {
-            // Normal forward flow
-            (Lobby, PromptSelection) => true,
-            (PromptSelection, Writing) => true,
-            (Writing, Reveal) => true,
-            (Reveal, Voting) => true,
-            (Voting, Results) => true,
-
-            // From Results can go to multiple places
-            (Results, Podium) => true,
-            (Results, PromptSelection) => true, // Next round
-            (Results, Intermission) => true,
-
-            // From Podium
-            (Podium, PromptSelection) => true, // New round/new volunteers
-            (Podium, Ended) => true,
-
-            // Intermission can return to any phase except Ended
-            (Intermission, Ended) => true,
-            (Intermission, _) => true,
-
-            // Any phase can go to Intermission (panic mode) or Ended (hard stop)
-            (_, Intermission) => true,
-            (_, Ended) => true,
-
-            // All other transitions are invalid
-            _ => false,
+        match from {
+            Lobby => vec![PromptSelection, Intermission, Ended],
+            PromptSelection => vec![Writing, Intermission, Ended],
+            Writing => vec![Reveal, Intermission, Ended],
+            Reveal => vec![Voting, Intermission, Ended],
+            Voting => vec![Results, Intermission, Ended],
+            Results => vec![Podium, PromptSelection, Intermission, Ended],
+            Podium => vec![PromptSelection, Intermission, Ended],
+            Intermission => vec![
+                Lobby,
+                PromptSelection,
+                Writing,
+                Reveal,
+                Voting,
+                Results,
+                Podium,
+                Ended,
+            ],
+            Ended => vec![Intermission],
         }
     }
 
@@ -253,11 +250,13 @@ impl AppState {
     /// Broadcast current phase to all clients
     async fn broadcast_phase_change(&self) {
         if let Some(game) = self.get_game().await {
+            let valid_transitions = Self::get_valid_transitions(&game.phase);
             self.broadcast_to_all(crate::protocol::ServerMessage::Phase {
                 phase: game.phase.clone(),
                 round_no: game.round_no,
                 server_now: chrono::Utc::now().to_rfc3339(),
                 deadline: game.phase_deadline.clone(),
+                valid_transitions,
             });
         }
     }

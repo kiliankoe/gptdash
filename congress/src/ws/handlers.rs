@@ -239,10 +239,13 @@ async fn handle_host_transition_phase(
 ) -> Option<ServerMessage> {
     tracing::info!("Host transitioning to phase: {:?}", phase);
     match state.transition_phase(phase).await {
-        Ok(_) => state
-            .get_game()
-            .await
-            .map(|game| ServerMessage::GameState { game }),
+        Ok(_) => state.get_game().await.map(|game| {
+            let valid_transitions = AppState::get_valid_transitions(&game.phase);
+            ServerMessage::GameState {
+                game,
+                valid_transitions,
+            }
+        }),
         Err(e) => Some(ServerMessage::Error {
             code: "TRANSITION_FAILED".to_string(),
             msg: e,
@@ -391,7 +394,11 @@ async fn handle_host_reset_game(state: &Arc<AppState>) -> Option<ServerMessage> 
 
     // Return game state after reset
     let game = state.get_game().await?;
-    Some(ServerMessage::GameState { game })
+    let valid_transitions = AppState::get_valid_transitions(&game.phase);
+    Some(ServerMessage::GameState {
+        game,
+        valid_transitions,
+    })
 }
 
 #[cfg(test)]
@@ -446,7 +453,7 @@ mod tests {
         .await;
 
         assert!(result.is_some());
-        if let Some(ServerMessage::GameState { game }) = result {
+        if let Some(ServerMessage::GameState { game, .. }) = result {
             assert_eq!(game.phase, GamePhase::PromptSelection);
         } else {
             panic!("Expected GameState message");
@@ -481,7 +488,7 @@ mod tests {
 
         // Verify response
         assert!(result.is_some());
-        if let Some(ServerMessage::GameState { game }) = result {
+        if let Some(ServerMessage::GameState { game, .. }) = result {
             assert_eq!(game.phase, GamePhase::Lobby);
             assert_eq!(game.round_no, 0);
             assert_eq!(game.current_round_id, None);
