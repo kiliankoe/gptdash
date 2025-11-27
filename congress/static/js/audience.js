@@ -9,6 +9,7 @@ let submissions = [];
 let selectedAiAnswer = null;
 let selectedFunnyAnswer = null;
 let hasVoted = false;
+let panicMode = false;
 const STORAGE_KEY = "gptdash_voter_token";
 
 // Initialize
@@ -41,6 +42,7 @@ function handleMessage(message) {
     case "welcome":
       console.log("Welcome message:", message);
       if (message.game) {
+        panicMode = message.game.panic_mode || false;
         updatePhase(message.game.phase);
       }
       break;
@@ -88,8 +90,13 @@ function handleMessage(message) {
       updateVoteButtonState();
       break;
 
+    case "panic_mode_update":
+      panicMode = message.enabled;
+      updatePanicModeUI();
+      break;
+
     case "error":
-      handleError(message.msg);
+      handleError(message.code, message.msg);
       break;
   }
 }
@@ -164,6 +171,7 @@ function showVotingScreen() {
   showScreen("votingScreen");
   updateVoteSummary();
   updateVoteButtonState();
+  updatePanicModeUI();
 }
 
 function renderAnswerOptions() {
@@ -233,7 +241,8 @@ function selectAnswer(category, answerId) {
 
 function updateVoteButtonState() {
   const voteButton = document.getElementById("voteButton");
-  voteButton.disabled = hasVoted || !(selectedAiAnswer && selectedFunnyAnswer);
+  voteButton.disabled =
+    panicMode || hasVoted || !(selectedAiAnswer && selectedFunnyAnswer);
 }
 
 function submitVote() {
@@ -289,12 +298,40 @@ function updateVoteSummary() {
   document.getElementById("summaryFunnyPick").textContent = funnyLabel;
 }
 
-function handleError(message) {
-  console.error("Server error:", message);
+function handleError(code, message) {
+  console.error("Server error:", code, message);
+
+  // Handle panic mode error specially
+  if (code === "PANIC_MODE") {
+    panicMode = true;
+    updatePanicModeUI();
+    return;
+  }
+
   if (document.getElementById("welcomeScreen").classList.contains("active")) {
     showError("welcomeError", message);
   } else {
     showError("voteError", message);
+  }
+}
+
+function updatePanicModeUI() {
+  const panicOverlay = document.getElementById("panicModeOverlay");
+  const votingContent = document.getElementById("votingContent");
+  const voteButton = document.getElementById("voteButton");
+
+  if (panicOverlay) {
+    panicOverlay.style.display = panicMode ? "flex" : "none";
+  }
+
+  if (votingContent) {
+    votingContent.style.opacity = panicMode ? "0.3" : "1";
+    votingContent.style.pointerEvents = panicMode ? "none" : "auto";
+  }
+
+  if (voteButton) {
+    voteButton.disabled =
+      panicMode || hasVoted || !(selectedAiAnswer && selectedFunnyAnswer);
   }
 }
 

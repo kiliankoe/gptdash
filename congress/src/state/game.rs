@@ -12,6 +12,7 @@ impl AppState {
             config: GameConfig::default(),
             current_round_id: None,
             phase_deadline: None,
+            panic_mode: false,
         };
 
         *self.game.write().await = Some(game.clone());
@@ -289,6 +290,7 @@ impl AppState {
             g.round_no = 0;
             g.current_round_id = None;
             g.phase_deadline = None;
+            g.panic_mode = false;
             g.version += 1;
         }
         drop(game);
@@ -297,5 +299,92 @@ impl AppState {
         self.broadcast_phase_change().await;
 
         tracing::info!("Game reset to initial state");
+    }
+
+    /// Toggle panic mode on/off
+    pub async fn set_panic_mode(&self, enabled: bool) {
+        let mut game = self.game.write().await;
+        if let Some(ref mut g) = *game {
+            g.panic_mode = enabled;
+            g.version += 1;
+        }
+        drop(game);
+
+        // Broadcast panic mode change to all clients
+        self.broadcast_to_all(crate::protocol::ServerMessage::PanicModeUpdate { enabled });
+
+        tracing::info!("Panic mode set to: {}", enabled);
+    }
+
+    /// Check if panic mode is active
+    pub async fn is_panic_mode(&self) -> bool {
+        self.game
+            .read()
+            .await
+            .as_ref()
+            .map(|g| g.panic_mode)
+            .unwrap_or(false)
+    }
+
+    /// Set manual AI winner for panic mode scoring
+    pub async fn set_manual_ai_winner(
+        &self,
+        round_id: &str,
+        submission_id: String,
+    ) -> Result<(), String> {
+        // Validate submission exists and belongs to this round
+        let submissions = self.submissions.read().await;
+        match submissions.get(&submission_id) {
+            Some(sub) if sub.round_id == round_id => {}
+            Some(_) => {
+                return Err(format!(
+                    "Submission {} does not belong to round {}",
+                    submission_id, round_id
+                ));
+            }
+            None => {
+                return Err(format!("Submission {} not found", submission_id));
+            }
+        }
+        drop(submissions);
+
+        let mut rounds = self.rounds.write().await;
+        if let Some(round) = rounds.get_mut(round_id) {
+            round.manual_ai_winner = Some(submission_id);
+            Ok(())
+        } else {
+            Err("Round not found".to_string())
+        }
+    }
+
+    /// Set manual funny winner for panic mode scoring
+    pub async fn set_manual_funny_winner(
+        &self,
+        round_id: &str,
+        submission_id: String,
+    ) -> Result<(), String> {
+        // Validate submission exists and belongs to this round
+        let submissions = self.submissions.read().await;
+        match submissions.get(&submission_id) {
+            Some(sub) if sub.round_id == round_id => {}
+            Some(_) => {
+                return Err(format!(
+                    "Submission {} does not belong to round {}",
+                    submission_id, round_id
+                ));
+            }
+            None => {
+                return Err(format!("Submission {} not found", submission_id));
+            }
+        }
+        drop(submissions);
+
+        let mut rounds = self.rounds.write().await;
+        if let Some(round) = rounds.get_mut(round_id) {
+            round.manual_funny_winner = Some(submission_id);
+            Ok(())
+        } else {
+            Err("Round not found".to_string())
+        }
     }
 }

@@ -297,6 +297,17 @@ test.describe("Full Game Flow", () => {
     const submissionCount = await host.locator(".submission-card").count();
     expect(submissionCount).toBeGreaterThanOrEqual(2);
 
+    // Mark first submission as AI (required for RESULTS phase)
+    // Must be done during WRITING phase while "Als KI markieren" buttons are visible
+    const aiButtonsWriting = host.locator('button:has-text("Als KI markieren")');
+    const aiButtonCountWriting = await aiButtonsWriting.count();
+    console.log(`Found ${aiButtonCountWriting} AI marking buttons during WRITING`);
+    if (aiButtonCountWriting > 0) {
+      await aiButtonsWriting.first().click();
+      await host.waitForTimeout(500);
+      console.log("Marked submission as AI during WRITING phase");
+    }
+
     // ============================================
     // STEP 8: Host transitions to REVEAL
     // ============================================
@@ -332,22 +343,6 @@ test.describe("Full Game Flow", () => {
     // Navigate to next answer
     await host.click('button:has-text("Weiter")');
     await host.waitForTimeout(500);
-
-    // Mark first submission as AI (required for RESULTS phase)
-    // Go to submissions panel and click "Als KI markieren" button
-    await host.click('.sidebar-item:has-text("Antworten")');
-    await host.waitForSelector("#submissions.active", { timeout: 2000 });
-
-    const aiButtons = host.locator('button:has-text("Als KI markieren")');
-    const aiButtonCount = await aiButtons.count();
-    console.log(`Found ${aiButtonCount} AI marking buttons`);
-    if (aiButtonCount > 0) {
-      await aiButtons.first().click();
-      await host.waitForTimeout(500);
-      console.log("Clicked AI marking button");
-    } else {
-      console.log("Warning: No AI marking buttons found!");
-    }
 
     // ============================================
     // STEP 10: Host transitions to VOTING
@@ -606,5 +601,154 @@ test.describe("Full Game Flow", () => {
 
     // Beamer should show lobby
     await waitForBeamerScene(beamer, "sceneLobby");
+  });
+
+  test("panic mode blocks audience voting and shows overlay", async () => {
+    const { host, beamer, players, audience } = clients;
+
+    // ============================================
+    // SETUP: Get to voting phase with submissions
+    // ============================================
+    console.log("Panic mode test: Setting up game...");
+
+    // Navigate to pages
+    await Promise.all([
+      host.goto("/host.html"),
+      beamer.goto("/beamer.html"),
+      players[0].goto("/player.html"),
+      audience[0].goto("/"),
+    ]);
+
+    await Promise.all([waitForConnection(host), waitForConnection(beamer)]);
+
+    // Create player token
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "1");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForSelector("#playerTokensList .token");
+    const tokens = await getPlayerTokens(host);
+
+    // Player joins
+    await players[0].fill("#tokenInput", tokens[0]);
+    await players[0].click("#joinButton");
+    await players[0].waitForSelector("#registerScreen.active");
+    await players[0].fill("#nameInput", "PanicTester");
+    await players[0].click("#registerButton");
+    await players[0].waitForSelector("#waitingScreen.active");
+
+    // Audience joins
+    await audience[0].click("#joinButton");
+    await audience[0].waitForSelector("#waitingScreen.active");
+
+    // Start round and add prompt
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+    await host.click('button:has-text("Neue Runde starten")');
+    await host.waitForTimeout(500);
+
+    await host.click('.sidebar-item:has-text("Fragen")');
+    await host.waitForSelector("#prompts.active");
+    await host.fill("#promptText", "Panic mode test question");
+    await host.click('#prompts button:has-text("Frage hinzufügen")');
+    await host.waitForTimeout(500);
+
+    // Transition to WRITING
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="PROMPT_SELECTION"]');
+    await host.waitForTimeout(500);
+    await host.click('button[data-phase="WRITING"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
+      timeout: 5000,
+    });
+
+    // Player submits answer
+    await players[0].waitForSelector("#writingScreen.active", { timeout: 5000 });
+    await players[0].fill("#answerInput", "Test answer for panic mode");
+    await players[0].click("#submitButton");
+    await players[0].waitForSelector("#submittedScreen.active");
+
+    // Mark submission as AI
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.waitForSelector("#submissions.active");
+    await host.waitForSelector(".submission-card", { timeout: 5000 });
+    const aiButton = host.locator('button:has-text("Als KI markieren")').first();
+    if ((await aiButton.count()) > 0) {
+      await aiButton.click();
+      await host.waitForTimeout(500);
+    }
+
+    // Transition to REVEAL then VOTING
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="REVEAL"]');
+    await host.waitForTimeout(500);
+    await host.click('button[data-phase="VOTING"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("VOTING", {
+      timeout: 5000,
+    });
+
+    // ============================================
+    // TEST: Audience sees voting screen normally
+    // ============================================
+    console.log("Panic mode test: Verifying normal voting screen...");
+
+    await audience[0].waitForSelector("#votingScreen.active", { timeout: 5000 });
+    await audience[0].waitForSelector(".answer-option", { timeout: 5000 });
+
+    // Panic overlay should NOT be visible initially
+    const overlayBefore = audience[0].locator("#panicModeOverlay");
+    await expect(overlayBefore).toHaveCSS("display", "none");
+
+    // ============================================
+    // TEST: Host enables panic mode
+    // ============================================
+    console.log("Panic mode test: Enabling panic mode...");
+
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+
+    // Handle confirmation dialog for panic mode
+    host.on("dialog", (dialog) => dialog.accept());
+
+    // Click panic mode button
+    await host.click("#panicModeBtn");
+    await host.waitForTimeout(500);
+
+    // Verify host shows panic mode active
+    await expect(host.locator("#panicStatus")).toHaveText("AKTIV");
+
+    // ============================================
+    // TEST: Audience sees panic overlay
+    // ============================================
+    console.log("Panic mode test: Verifying panic overlay on audience...");
+
+    // Panic overlay should now be visible
+    const overlayAfter = audience[0].locator("#panicModeOverlay");
+    await expect(overlayAfter).toBeVisible({ timeout: 5000 });
+
+    // Verify overlay text
+    await expect(
+      audience[0].locator("#panicModeOverlay h3")
+    ).toContainText("deaktiviert", { ignoreCase: true });
+
+    // Vote button should be disabled
+    const voteButton = audience[0].locator("#voteButton");
+    await expect(voteButton).toBeDisabled();
+
+    // ============================================
+    // TEST: Host can disable panic mode
+    // ============================================
+    console.log("Panic mode test: Disabling panic mode...");
+
+    await host.click("#panicModeBtn");
+    await host.waitForTimeout(500);
+
+    // Verify host shows panic mode inactive
+    await expect(host.locator("#panicStatus")).toHaveText("Inaktiv");
+
+    // Audience panic overlay should be hidden again
+    await expect(overlayAfter).toHaveCSS("display", "none");
+
+    console.log("Panic mode test completed successfully!");
   });
 });

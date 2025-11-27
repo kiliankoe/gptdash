@@ -129,6 +129,27 @@
                         <button class="danger" onclick="resetGame()">Spiel zurücksetzen</button>
                     </div>
                 </div>
+
+                <div class="card" style="border: 2px solid #ff4444;">
+                    <div class="card-header" style="color: #ff4444;">PANIK-MODUS</div>
+                    <p style="opacity: 0.8; margin-bottom: 10px;">
+                        Deaktiviert alle Publikums-Abstimmungen. Das Publikum stimmt dann analog ab (z.B. durch Klatschen),
+                        und du wählst die Gewinner manuell aus.
+                    </p>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                        <span>Status: <strong id="panicStatus">Inaktiv</strong></span>
+                    </div>
+                    <button id="panicModeBtn" class="danger" onclick="togglePanicMode()">PANIK-MODUS aktivieren</button>
+
+                    <div id="manualWinnerSection" style="display: none; margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <h4 style="margin-bottom: 10px;">Manuelle Gewinner-Auswahl</h4>
+                        <p style="opacity: 0.8; margin-bottom: 10px;">Wähle die Gewinner basierend auf dem Applaus des Publikums.</p>
+                        <div id="manualWinnerButtons">
+                            <!-- Will be populated with submission buttons when submissions exist -->
+                            <p style="opacity: 0.6;">Antworten werden hier angezeigt, sobald verfügbar.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Players Panel -->

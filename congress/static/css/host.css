@@ -292,3 +292,16 @@ select:focus {
   opacity: 0.6;
   font-size: 10px;
 }
+
+/* Panic Mode */
+#panicModeBtn.active {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #0f172a;
+  animation: pulse 2s infinite;
+}
+
+#panicStatus.active {
+  color: #ef4444;
+  animation: pulse 2s infinite;
+}

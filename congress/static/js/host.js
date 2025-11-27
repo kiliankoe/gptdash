@@ -10,6 +10,7 @@ const gameState = {
   submissions: [],
   scores: { players: [], audience_top: [] },
   validTransitions: [], // Populated by server
+  panicMode: false,
 };
 
 // Initialize
@@ -28,7 +29,9 @@ function handleMessage(message) {
         gameState.phase = message.game.phase;
         gameState.roundNo = message.game.round_no;
         gameState.validTransitions = message.valid_transitions || [];
+        gameState.panicMode = message.game.panic_mode || false;
         updateUI();
+        updatePanicModeUI();
       }
       break;
 
@@ -49,11 +52,13 @@ function handleMessage(message) {
     case "submissions":
       gameState.submissions = message.list || [];
       updateSubmissionsList();
+      updatePanicModeUI();
       break;
 
     case "host_submissions":
       gameState.submissions = message.list || [];
       updateSubmissionsList();
+      updatePanicModeUI();
       break;
 
     case "scores":
@@ -78,6 +83,15 @@ function handleMessage(message) {
         updateScores();
         showAlert("Spiel wurde zurückgesetzt", "success");
       }
+      break;
+
+    case "panic_mode_update":
+      gameState.panicMode = message.enabled;
+      updatePanicModeUI();
+      showAlert(
+        message.enabled ? "PANIK-MODUS AKTIVIERT" : "Panik-Modus deaktiviert",
+        message.enabled ? "error" : "success",
+      );
       break;
 
     case "error":
@@ -233,6 +247,86 @@ function resetGame() {
     )
   ) {
     wsConn.send({ t: "host_reset_game" });
+  }
+}
+
+function togglePanicMode() {
+  const newState = !gameState.panicMode;
+  if (
+    newState &&
+    !confirm(
+      "PANIK-MODUS AKTIVIEREN?\n\nDas Publikum kann dann nicht mehr abstimmen. Du musst die Gewinner manuell auswählen.",
+    )
+  ) {
+    return;
+  }
+  wsConn.send({ t: "host_toggle_panic_mode", enabled: newState });
+}
+
+function setManualWinner(winnerType, submissionId) {
+  wsConn.send({
+    t: "host_set_manual_winner",
+    winner_type: winnerType,
+    submission_id: submissionId,
+  });
+  showAlert(
+    `Manueller ${winnerType === "ai" ? "KI" : "Lustigster"}-Gewinner gesetzt`,
+    "success",
+  );
+}
+
+function updatePanicModeUI() {
+  const panicBtn = document.getElementById("panicModeBtn");
+  const panicStatus = document.getElementById("panicStatus");
+  const manualWinnerSection = document.getElementById("manualWinnerSection");
+  const manualWinnerButtons = document.getElementById("manualWinnerButtons");
+
+  if (panicBtn) {
+    panicBtn.textContent = gameState.panicMode
+      ? "Panik-Modus DEAKTIVIEREN"
+      : "PANIK-MODUS aktivieren";
+    panicBtn.classList.toggle("active", gameState.panicMode);
+  }
+
+  if (panicStatus) {
+    panicStatus.textContent = gameState.panicMode ? "AKTIV" : "Inaktiv";
+    panicStatus.classList.toggle("active", gameState.panicMode);
+  }
+
+  if (manualWinnerSection) {
+    manualWinnerSection.style.display = gameState.panicMode ? "block" : "none";
+  }
+
+  // Populate manual winner buttons
+  if (manualWinnerButtons && gameState.panicMode) {
+    if (gameState.submissions.length === 0) {
+      manualWinnerButtons.innerHTML =
+        '<p style="opacity: 0.6;">Antworten werden hier angezeigt, sobald verfügbar.</p>';
+    } else {
+      let html =
+        '<div style="margin-bottom: 15px;"><strong>Als KI-Gewinner markieren:</strong></div>';
+      html += '<div class="button-group" style="margin-bottom: 20px;">';
+      gameState.submissions.forEach((sub, idx) => {
+        const shortText =
+          sub.display_text.substring(0, 30) +
+          (sub.display_text.length > 30 ? "..." : "");
+        html += `<button class="secondary" onclick="setManualWinner('ai', '${sub.id}')" title="${escapeHtml(sub.display_text)}">${idx + 1}. ${escapeHtml(shortText)}</button>`;
+      });
+      html += "</div>";
+
+      html +=
+        '<div style="margin-bottom: 15px;"><strong>Als Lustigster markieren:</strong></div>';
+      html += '<div class="button-group">';
+      gameState.submissions.forEach((sub, idx) => {
+        const shortText =
+          sub.display_text.substring(0, 30) +
+          (sub.display_text.length > 30 ? "..." : "");
+        html += `<button class="secondary" onclick="setManualWinner('funny', '${sub.id}')" title="${escapeHtml(sub.display_text)}">${idx + 1}. ${escapeHtml(shortText)}</button>`;
+      });
+      html += "</div>";
+
+      manualWinnerButtons.innerHTML = html;
+    }
   }
 }
 
@@ -392,5 +486,7 @@ if (typeof window !== "undefined") {
     closeWriting,
     clearLog,
     copyAudienceUrl,
+    togglePanicMode,
+    setManualWinner,
   });
 }

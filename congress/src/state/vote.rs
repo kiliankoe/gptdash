@@ -11,6 +11,8 @@ pub enum VoteResult {
     Duplicate,
     /// No active round to vote in
     NoActiveRound,
+    /// Panic mode is active, voting disabled
+    PanicModeActive,
 }
 
 impl AppState {
@@ -23,6 +25,16 @@ impl AppState {
         funny_pick: SubmissionId,
         msg_id: String,
     ) -> VoteResult {
+        // Check panic mode first
+        {
+            let game = self.game.read().await;
+            if let Some(ref g) = *game {
+                if g.panic_mode {
+                    return VoteResult::PanicModeActive;
+                }
+            }
+        }
+
         // Get current round
         let round = match self.get_current_round().await {
             Some(r) => r,

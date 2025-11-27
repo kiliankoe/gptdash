@@ -60,7 +60,17 @@
 
             <!-- Voting Screen -->
             <div class="screen" id="votingScreen">
-                <div class="card">
+                <!-- Panic Mode Overlay -->
+                <div id="panicModeOverlay" class="panic-overlay" style="display: none;">
+                    <div class="panic-content">
+                        <div class="panic-icon">&#x1F6AB;</div>
+                        <h3>Abstimmung deaktiviert</h3>
+                        <p>Bitte stimme durch Klatschen ab!</p>
+                        <p class="help-text">Der Host zählt die Stimmen manuell.</p>
+                    </div>
+                </div>
+
+                <div class="card" id="votingContent">
                     <h2>Gib deine Stimme ab</h2>
                     <p class="text-center mb-16">Wähle eine Antwort pro Kategorie</p>
 

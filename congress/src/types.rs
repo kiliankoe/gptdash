@@ -60,6 +60,7 @@ pub struct Game {
     pub config: GameConfig,
     pub current_round_id: Option<RoundId>,
     pub phase_deadline: Option<String>, // ISO timestamp for phase timer (Writing, Voting, etc.)
+    pub panic_mode: bool,               // When true, audience interactions are disabled
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,6 +91,9 @@ pub struct Round {
     pub reveal_index: usize, // Current position in reveal carousel (0-based)
     pub ai_submission_id: Option<SubmissionId>,
     pub scored_at: Option<String>, // Timestamp when scores were computed (for idempotency)
+    // Panic mode manual winners (host picks when audience voting is disabled)
+    pub manual_ai_winner: Option<SubmissionId>,
+    pub manual_funny_winner: Option<SubmissionId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

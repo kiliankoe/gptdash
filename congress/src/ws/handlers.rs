@@ -120,6 +120,23 @@ pub async fn handle_message(
             }
             handle_host_add_prompt(state, text).await
         }
+
+        ClientMessage::HostTogglePanicMode { enabled } => {
+            if *role != Role::Host {
+                return unauthorized("Only host can toggle panic mode");
+            }
+            handle_host_toggle_panic_mode(state, enabled).await
+        }
+
+        ClientMessage::HostSetManualWinner {
+            winner_type,
+            submission_id,
+        } => {
+            if *role != Role::Host {
+                return unauthorized("Only host can set manual winners");
+            }
+            handle_host_set_manual_winner(state, winner_type, submission_id).await
+        }
     }
 }
 
@@ -198,17 +215,24 @@ async fn handle_vote(
     {
         VoteResult::Recorded => {
             tracing::debug!("Vote recorded");
+            Some(ServerMessage::VoteAck { msg_id })
         }
         VoteResult::Duplicate => {
             tracing::debug!("Duplicate vote msg_id, returning ack");
+            Some(ServerMessage::VoteAck { msg_id })
         }
         VoteResult::NoActiveRound => {
             tracing::warn!("Vote received but no active round");
+            Some(ServerMessage::VoteAck { msg_id })
+        }
+        VoteResult::PanicModeActive => {
+            tracing::info!("Vote rejected: panic mode active");
+            Some(ServerMessage::Error {
+                code: "PANIC_MODE".to_string(),
+                msg: "Voting is temporarily disabled".to_string(),
+            })
         }
     }
-
-    // Always return VoteAck for idempotency
-    Some(ServerMessage::VoteAck { msg_id })
 }
 
 async fn handle_submit_prompt(state: &Arc<AppState>, text: String) -> Option<ServerMessage> {
@@ -436,6 +460,56 @@ async fn handle_host_add_prompt(state: &Arc<AppState>, text: String) -> Option<S
     }
 }
 
+async fn handle_host_toggle_panic_mode(
+    state: &Arc<AppState>,
+    enabled: bool,
+) -> Option<ServerMessage> {
+    tracing::info!("Host toggling panic mode: {}", enabled);
+    state.set_panic_mode(enabled).await;
+    Some(ServerMessage::PanicModeUpdate { enabled })
+}
+
+async fn handle_host_set_manual_winner(
+    state: &Arc<AppState>,
+    winner_type: crate::protocol::ManualWinnerType,
+    submission_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!(
+        "Host setting manual {:?} winner: {}",
+        winner_type,
+        submission_id
+    );
+
+    let round = match state.get_current_round().await {
+        Some(r) => r,
+        None => {
+            return Some(ServerMessage::Error {
+                code: "NO_ACTIVE_ROUND".to_string(),
+                msg: "No active round".to_string(),
+            });
+        }
+    };
+
+    let result = match winner_type {
+        crate::protocol::ManualWinnerType::Ai => {
+            state.set_manual_ai_winner(&round.id, submission_id).await
+        }
+        crate::protocol::ManualWinnerType::Funny => {
+            state
+                .set_manual_funny_winner(&round.id, submission_id)
+                .await
+        }
+    };
+
+    match result {
+        Ok(_) => None,
+        Err(e) => Some(ServerMessage::Error {
+            code: "SET_MANUAL_WINNER_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -560,6 +634,90 @@ mod tests {
         let role = Role::Audience;
 
         let result = handle_message(ClientMessage::HostResetGame, &role, &state).await;
+
+        assert!(result.is_some());
+        if let Some(ServerMessage::Error { code, .. }) = result {
+            assert_eq!(code, "UNAUTHORIZED");
+        } else {
+            panic!("Expected Error message");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_panic_mode_toggle() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let role = Role::Host;
+
+        // Enable panic mode
+        let result = handle_message(
+            ClientMessage::HostTogglePanicMode { enabled: true },
+            &role,
+            &state,
+        )
+        .await;
+
+        assert!(result.is_some());
+        if let Some(ServerMessage::PanicModeUpdate { enabled }) = result {
+            assert!(enabled);
+        } else {
+            panic!("Expected PanicModeUpdate message");
+        }
+
+        // Verify state
+        assert!(state.is_panic_mode().await);
+
+        // Disable panic mode
+        let result = handle_message(
+            ClientMessage::HostTogglePanicMode { enabled: false },
+            &role,
+            &state,
+        )
+        .await;
+
+        assert!(result.is_some());
+        if let Some(ServerMessage::PanicModeUpdate { enabled }) = result {
+            assert!(!enabled);
+        }
+
+        assert!(!state.is_panic_mode().await);
+    }
+
+    #[tokio::test]
+    async fn test_panic_mode_blocks_votes() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        state.start_round().await.ok();
+
+        // Enable panic mode
+        state.set_panic_mode(true).await;
+
+        // Try to vote
+        use crate::state::vote::VoteResult;
+        let result = state
+            .submit_vote(
+                "voter1".to_string(),
+                "sub1".to_string(),
+                "sub2".to_string(),
+                "msg1".to_string(),
+            )
+            .await;
+
+        assert_eq!(result, VoteResult::PanicModeActive);
+    }
+
+    #[tokio::test]
+    async fn test_panic_mode_requires_host() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let role = Role::Audience;
+
+        let result = handle_message(
+            ClientMessage::HostTogglePanicMode { enabled: true },
+            &role,
+            &state,
+        )
+        .await;
 
         assert!(result.is_some());
         if let Some(ServerMessage::Error { code, .. }) = result {

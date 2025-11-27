@@ -55,6 +55,20 @@ pub enum ClientMessage {
     HostAddPrompt {
         text: String,
     },
+    HostTogglePanicMode {
+        enabled: bool,
+    },
+    HostSetManualWinner {
+        winner_type: ManualWinnerType,
+        submission_id: SubmissionId,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ManualWinnerType {
+    Ai,
+    Funny,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +138,10 @@ pub enum ServerMessage {
     AudienceState {
         has_voted: bool,
         current_vote: Option<AudienceVoteInfo>,
+    },
+    /// Broadcast when panic mode is toggled
+    PanicModeUpdate {
+        enabled: bool,
     },
     Error {
         code: String,
