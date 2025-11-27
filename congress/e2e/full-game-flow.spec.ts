@@ -227,7 +227,7 @@ test.describe("Full Game Flow", () => {
     await host.waitForTimeout(500);
 
     // Navigate to prompts panel
-    await host.click('.sidebar-item:has-text("Fragen")');
+    await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
 
     // Add a prompt (auto-selects when added by host)
@@ -235,7 +235,7 @@ test.describe("Full Game Flow", () => {
       "#promptText",
       "What is the meaning of life, the universe, and everything?",
     );
-    await host.click('#prompts button:has-text("Frage hinzufügen")');
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
 
     // Wait a bit for prompt to be added and selected
     await host.waitForTimeout(500);
@@ -550,10 +550,10 @@ test.describe("Full Game Flow", () => {
     await host.waitForTimeout(500);
 
     // Add prompt (auto-selects when added by host)
-    await host.click('.sidebar-item:has-text("Fragen")');
+    await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Scene test prompt");
-    await host.click('#prompts button:has-text("Frage hinzufügen")');
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForTimeout(500);
 
     // Go back to game control
@@ -665,10 +665,10 @@ test.describe("Full Game Flow", () => {
     await host.click('button:has-text("Neue Runde starten")');
     await host.waitForTimeout(500);
 
-    await host.click('.sidebar-item:has-text("Fragen")');
+    await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Panic mode test question");
-    await host.click('#prompts button:has-text("Frage hinzufügen")');
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForTimeout(500);
 
     // Transition to WRITING
@@ -825,10 +825,10 @@ test.describe("Full Game Flow", () => {
     await host.click('button:has-text("Neue Runde starten")');
     await host.waitForTimeout(500);
 
-    await host.click('.sidebar-item:has-text("Fragen")');
+    await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Duplicate detection test question");
-    await host.click('#prompts button:has-text("Frage hinzufügen")');
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForTimeout(500);
 
     // Transition to WRITING

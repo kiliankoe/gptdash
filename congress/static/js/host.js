@@ -210,7 +210,7 @@ function hostStartRound() {
 function addPrompt() {
   const text = document.getElementById("promptText").value.trim();
   if (!text) {
-    alert("Bitte gib eine Frage ein");
+    alert("Bitte gib einen Prompt ein");
     return;
   }
 
@@ -223,7 +223,7 @@ function addPrompt() {
 }
 
 function selectPrompt() {
-  const promptId = prompt("Gib die Fragen-ID ein:");
+  const promptId = prompt("Gib die Prompt-ID ein:");
   if (promptId) {
     wsConn.send({
       t: "host_select_prompt",

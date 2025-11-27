@@ -37,7 +37,7 @@
             <div class="sidebar-item active" onclick="showPanel('overview')">Übersicht</div>
             <div class="sidebar-item" onclick="showPanel('game')">Spiel-Steuerung</div>
             <div class="sidebar-item" onclick="showPanel('players')">Spieler</div>
-            <div class="sidebar-item" onclick="showPanel('prompts')">Fragen</div>
+            <div class="sidebar-item" onclick="showPanel('prompts')">Prompts</div>
             <div class="sidebar-item" onclick="showPanel('submissions')">Antworten</div>
             <div class="sidebar-item" onclick="showPanel('scores')">Punkte</div>
             <div class="sidebar-item" onclick="showPanel('logs')">Nachrichten-Log</div>
@@ -102,7 +102,7 @@
                     <div class="card-header">Phasen-Übergänge</div>
                     <div class="phase-selector" id="phaseButtons">
                         <button data-phase="LOBBY" onclick="transitionPhase('LOBBY')">Lobby</button>
-                        <button data-phase="PROMPT_SELECTION" onclick="transitionPhase('PROMPT_SELECTION')">Frage auswählen</button>
+                        <button data-phase="PROMPT_SELECTION" onclick="transitionPhase('PROMPT_SELECTION')">Prompt auswählen</button>
                         <button data-phase="WRITING" onclick="transitionPhase('WRITING')">Schreiben</button>
                         <button data-phase="REVEAL" onclick="transitionPhase('REVEAL')">Antworten zeigen</button>
                         <button data-phase="VOTING" onclick="transitionPhase('VOTING')">Abstimmen</button>
@@ -117,7 +117,7 @@
                     <div class="card-header">Runden-Verwaltung</div>
                     <div class="button-group">
                         <button onclick="hostStartRound()">Neue Runde starten</button>
-                        <button onclick="selectPrompt()">Frage auswählen</button>
+                        <button onclick="selectPrompt()">Prompt auswählen</button>
                         <button onclick="closeWriting()">Schreib-Phase beenden</button>
                     </div>
                 </div>
@@ -184,18 +184,18 @@
 
             <!-- Prompts Panel -->
             <div class="panel" id="prompts">
-                <h2>Fragen-Verwaltung</h2>
+                <h2>Prompt-Verwaltung</h2>
 
                 <div class="card">
-                    <div class="card-header">Frage hinzufügen</div>
-                    <textarea id="promptText" placeholder="Gib hier deine Frage ein..."></textarea>
-                    <button onclick="addPrompt()">Frage hinzufügen</button>
+                    <div class="card-header">Prompt hinzufügen</div>
+                    <textarea id="promptText" placeholder="Gib hier deinen Prompt ein..."></textarea>
+                    <button onclick="addPrompt()">Prompt hinzufügen</button>
                 </div>
 
                 <div class="card">
-                    <div class="card-header">Verfügbare Fragen</div>
+                    <div class="card-header">Verfügbare Prompts</div>
                     <div id="promptsList">
-                        <p style="opacity: 0.6;">Keine Fragen verfügbar</p>
+                        <p style="opacity: 0.6;">Keine Prompts verfügbar</p>
                     </div>
                 </div>
             </div>
