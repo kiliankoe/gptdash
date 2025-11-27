@@ -51,6 +51,11 @@ function handleMessage(message) {
       updateSubmissionsList();
       break;
 
+    case "host_submissions":
+      gameState.submissions = message.list || [];
+      updateSubmissionsList();
+      break;
+
     case "scores":
       gameState.scores = {
         players: message.players || [],
@@ -77,6 +82,10 @@ function handleMessage(message) {
 
     case "error":
       showAlert(`Fehler: ${message.msg}`, "error");
+      break;
+
+    default:
+      console.log("Unhandled message type:", message.t, message);
       break;
   }
 }
@@ -249,6 +258,7 @@ function updatePlayersList() {
 
 function updateSubmissionsList() {
   const container = document.getElementById("submissionsList");
+  if (!container) return;
   container.innerHTML = "";
 
   if (gameState.submissions.length === 0) {
@@ -258,15 +268,16 @@ function updateSubmissionsList() {
 
   gameState.submissions.forEach((sub) => {
     const div = document.createElement("div");
-    div.className = `submission-card${sub.author_kind === "ai" ? " ai" : ""}`;
+    const authorKind = sub.author_kind || "unknown";
+    div.className = `submission-card${authorKind === "ai" ? " ai" : ""}`;
     div.innerHTML = `
             <div class="header">
                 <span>${sub.id}</span>
-                <span class="badge ${sub.author_kind}">${sub.author_kind.toUpperCase()}</span>
+                <span class="badge ${authorKind}">${authorKind.toUpperCase()}</span>
             </div>
             <div class="text">${escapeHtml(sub.display_text)}</div>
             <div class="actions">
-                ${sub.author_kind === "player" ? `<button onclick="setAiSubmission('${sub.id}')">Als KI markieren</button>` : ""}
+                ${authorKind === "player" ? `<button onclick="setAiSubmission('${sub.id}')">Als KI markieren</button>` : ""}
                 <button class="secondary">Bearbeiten</button>
             </div>
         `;

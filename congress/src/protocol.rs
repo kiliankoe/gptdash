@@ -52,6 +52,9 @@ pub enum ClientMessage {
     HostRevealNext,
     HostRevealPrev,
     HostResetGame,
+    HostAddPrompt {
+        text: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

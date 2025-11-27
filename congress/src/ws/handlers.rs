@@ -113,6 +113,13 @@ pub async fn handle_message(
             }
             handle_host_reset_game(state).await
         }
+
+        ClientMessage::HostAddPrompt { text } => {
+            if *role != Role::Host {
+                return unauthorized("Only host can add prompts");
+            }
+            handle_host_add_prompt(state, text).await
+        }
     }
 }
 
@@ -241,8 +248,13 @@ async fn handle_host_transition_phase(
     match state.transition_phase(phase).await {
         Ok(_) => state.get_game().await.map(|game| {
             let valid_transitions = AppState::get_valid_transitions(&game.phase);
-            ServerMessage::GameState {
-                game,
+            // Use Phase message for transitions (preserves client state)
+            // GameState is only for full game resets
+            ServerMessage::Phase {
+                phase: game.phase,
+                round_no: game.round_no,
+                server_now: chrono::Utc::now().to_rfc3339(),
+                deadline: game.phase_deadline,
                 valid_transitions,
             }
         }),
@@ -401,6 +413,29 @@ async fn handle_host_reset_game(state: &Arc<AppState>) -> Option<ServerMessage> 
     })
 }
 
+async fn handle_host_add_prompt(state: &Arc<AppState>, text: String) -> Option<ServerMessage> {
+    tracing::info!("Host adding prompt: {}", text);
+    let round = state.get_current_round().await?;
+
+    match state
+        .add_prompt(&round.id, text, crate::types::PromptSource::Host)
+        .await
+    {
+        Ok(prompt) => {
+            // Auto-select the prompt when added by host
+            let prompt_id = prompt.id.clone();
+            if let Err(e) = state.select_prompt(&round.id, &prompt_id).await {
+                tracing::warn!("Failed to auto-select prompt: {}", e);
+            }
+            Some(ServerMessage::PromptSelected { prompt })
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "PROMPT_ADD_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -453,10 +488,11 @@ mod tests {
         .await;
 
         assert!(result.is_some());
-        if let Some(ServerMessage::GameState { game, .. }) = result {
-            assert_eq!(game.phase, GamePhase::PromptSelection);
+        // Phase transitions now return Phase message instead of GameState
+        if let Some(ServerMessage::Phase { phase, .. }) = result {
+            assert_eq!(phase, GamePhase::PromptSelection);
         } else {
-            panic!("Expected GameState message");
+            panic!("Expected Phase message");
         }
     }
 

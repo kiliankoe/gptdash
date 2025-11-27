@@ -172,10 +172,22 @@ impl AppState {
 
                 // Handle phase-specific actions
                 if new_phase == GamePhase::Reveal {
-                    // Reset reveal to first submission and broadcast it
+                    // Auto-populate reveal_order if not set, then reset reveal to first submission
                     if let Some(rid) = &round_id {
+                        // Get submissions for auto-populating reveal_order if needed
+                        let submissions = self.get_submissions(rid).await;
+
                         let mut rounds = self.rounds.write().await;
                         if let Some(round) = rounds.get_mut(rid) {
+                            // Auto-populate reveal_order if empty
+                            if round.reveal_order.is_empty() && !submissions.is_empty() {
+                                round.reveal_order =
+                                    submissions.iter().map(|s| s.id.clone()).collect();
+                                tracing::info!(
+                                    "Auto-populated reveal_order with {} submissions",
+                                    round.reveal_order.len()
+                                );
+                            }
                             round.reveal_index = 0; // Reset to first submission
                         }
                         drop(rounds);

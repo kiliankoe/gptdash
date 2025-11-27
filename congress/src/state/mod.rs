@@ -242,7 +242,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_voting_phase_requires_reveal_order() {
+    async fn test_reveal_auto_populates_reveal_order() {
         let state = AppState::new();
         state.create_game().await;
         state
@@ -260,7 +260,7 @@ mod tests {
 
         // Add a submission
         let player = state.create_player().await;
-        state
+        let sub = state
             .submit_answer(
                 &round.id,
                 Some(player.id.clone()),
@@ -269,12 +269,13 @@ mod tests {
             .await
             .unwrap();
 
+        // Transition to Reveal should auto-populate reveal_order
         state.transition_phase(GamePhase::Reveal).await.unwrap();
 
-        // Try to go to Voting without reveal order
-        let result = state.transition_phase(GamePhase::Voting).await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("reveal order"));
+        // Check reveal_order was auto-populated
+        let current_round = state.get_current_round().await.unwrap();
+        assert!(!current_round.reveal_order.is_empty());
+        assert!(current_round.reveal_order.contains(&sub.id));
     }
 
     // RoundState validation tests

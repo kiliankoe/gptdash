@@ -61,13 +61,23 @@ impl AppState {
     /// Broadcast submissions list for a round to all clients
     pub async fn broadcast_submissions(&self, round_id: &str) {
         let submissions = self.get_submissions(round_id).await;
+        tracing::info!(
+            "Broadcasting {} submissions for round {}",
+            submissions.len(),
+            round_id
+        );
 
         // Public broadcast (no author_kind to prevent spoilers)
         let public_infos: Vec<_> = submissions.iter().map(|s| s.into()).collect();
         self.broadcast_to_all(crate::protocol::ServerMessage::Submissions { list: public_infos });
 
         // Host-only broadcast (includes author_kind for managing the game)
-        let host_infos: Vec<_> = submissions.iter().map(|s| s.into()).collect();
+        let host_infos: Vec<crate::protocol::HostSubmissionInfo> =
+            submissions.iter().map(|s| s.into()).collect();
+        tracing::info!(
+            "Sending HostSubmissions to host with {} items",
+            host_infos.len()
+        );
         self.broadcast_to_host(crate::protocol::ServerMessage::HostSubmissions {
             list: host_infos,
         });

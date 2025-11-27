@@ -86,11 +86,12 @@ async fn test_full_game_flow() {
     )
     .await;
 
+    // Phase transitions now return Phase message instead of GameState
     match phase_result {
-        Some(ServerMessage::GameState { game, .. }) => {
-            assert_eq!(game.phase, GamePhase::PromptSelection);
+        Some(ServerMessage::Phase { phase, .. }) => {
+            assert_eq!(phase, GamePhase::PromptSelection);
         }
-        _ => panic!("Expected GameState message"),
+        _ => panic!("Expected Phase message"),
     }
 
     // 5. Start round
@@ -402,15 +403,16 @@ async fn test_full_game_flow() {
     )
     .await;
 
+    // Phase transitions now return Phase message instead of GameState
     match intermission_result {
-        Some(ServerMessage::GameState { game, .. }) => {
+        Some(ServerMessage::Phase { phase, .. }) => {
             assert_eq!(
-                game.phase,
+                phase,
                 GamePhase::Intermission,
                 "Should transition to Intermission"
             );
         }
-        _ => panic!("Expected GameState message for Intermission transition"),
+        _ => panic!("Expected Phase message for Intermission transition"),
     }
 
     let results_again_result = handle_message(
@@ -423,14 +425,14 @@ async fn test_full_game_flow() {
     .await;
 
     match results_again_result {
-        Some(ServerMessage::GameState { game, .. }) => {
+        Some(ServerMessage::Phase { phase, .. }) => {
             assert_eq!(
-                game.phase,
+                phase,
                 GamePhase::Results,
                 "Should transition back to Results"
             );
         }
-        _ => panic!("Expected GameState message for Results re-entry"),
+        _ => panic!("Expected Phase message for Results re-entry"),
     }
 
     let (player_scores_again, _) = state.get_leaderboards().await;
