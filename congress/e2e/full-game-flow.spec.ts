@@ -898,12 +898,12 @@ test.describe("Full Game Flow", () => {
     await players[1].click("#submitButton");
     await players[1].waitForSelector("#submittedScreen.active");
 
-    // Verify both submissions appear in host view
+    // Verify both player submissions appear in host view (exclude AI submissions)
     await host.waitForTimeout(500);
-    const submissionCountBefore = await host
-      .locator(".submission-card")
-      .count();
-    expect(submissionCountBefore).toBe(2);
+    const playerSubmissionsBefore = host.locator(
+      ".submission-card:has-text('PLAYER')",
+    );
+    await expect(playerSubmissionsBefore).toHaveCount(2);
 
     // ============================================
     // TEST 4: Host marks Player 2's submission as duplicate
@@ -913,16 +913,20 @@ test.describe("Full Game Flow", () => {
     // Handle confirmation dialog
     host.on("dialog", (dialog) => dialog.accept());
 
-    // Find the Dupe button for Player 2's submission (the second one)
-    // Submissions are displayed in order, so Player 1's is first, Player 2's is second
-    const dupeButton = host.locator('button:has-text("Dupe")').nth(1);
+    // Find the Dupe button for Player 2's submission by locating the card with their answer text
+    const player2Card = host.locator(
+      ".submission-card:has-text('This is a completely different answer')",
+    );
+    const dupeButton = player2Card.locator('button:has-text("Dupe")');
     await expect(dupeButton).toBeVisible();
     await dupeButton.click();
 
     // Wait for the submission to be removed
     await host.waitForTimeout(1000);
-    const submissionCountAfter = await host.locator(".submission-card").count();
-    expect(submissionCountAfter).toBe(1);
+    const playerSubmissionsAfter = host.locator(
+      ".submission-card:has-text('PLAYER')",
+    );
+    await expect(playerSubmissionsAfter).toHaveCount(1);
 
     // ============================================
     // TEST 5: Player 2 is notified and can resubmit
@@ -951,8 +955,10 @@ test.describe("Full Game Flow", () => {
 
     // Verify the new submission appears
     await host.waitForTimeout(500);
-    const finalCount = await host.locator(".submission-card").count();
-    expect(finalCount).toBe(2);
+    const playerSubmissionsFinal = host.locator(
+      ".submission-card:has-text('PLAYER')",
+    );
+    await expect(playerSubmissionsFinal).toHaveCount(2);
 
     console.log("Duplicate detection test completed successfully!");
   });

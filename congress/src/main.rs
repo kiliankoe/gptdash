@@ -8,6 +8,14 @@ use gptdash::{auth, broadcast, llm, state::AppState, ws};
 
 #[tokio::main]
 async fn main() {
+    // Load .env file if present (before any env var reads)
+    if let Err(e) = dotenvy::dotenv() {
+        // Not an error if .env doesn't exist, only log if it's a different issue
+        if !matches!(e, dotenvy::Error::Io(_)) {
+            eprintln!("Warning: Failed to load .env file: {}", e);
+        }
+    }
+
     // Initialize tracing
     tracing_subscriber::registry()
         .with(

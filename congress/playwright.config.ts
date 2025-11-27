@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import { config } from "dotenv";
+
+// Load .env file for webServer process
+config();
 
 export default defineConfig({
   testDir: "./e2e",
