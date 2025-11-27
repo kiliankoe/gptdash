@@ -3,6 +3,7 @@
  */
 
 let wsConn = null;
+let hostTimer = null;
 const gameState = {
   phase: "LOBBY",
   roundNo: 0,
@@ -11,12 +12,16 @@ const gameState = {
   scores: { players: [], audience_top: [] },
   validTransitions: [], // Populated by server
   panicMode: false,
+  deadline: null,
 };
 
 // Initialize
 function init() {
   wsConn = new WSConnection("host", handleMessage, updateStatus);
   wsConn.connect();
+
+  // Initialize timer
+  hostTimer = new CountdownTimer("hostTimer");
 
   // Generate QR codes for joining
   generateJoinQRCodes();
@@ -30,16 +35,38 @@ function handleMessage(message) {
         gameState.roundNo = message.game.round_no;
         gameState.validTransitions = message.valid_transitions || [];
         gameState.panicMode = message.game.panic_mode || false;
+        gameState.deadline = message.game.phase_deadline || null;
         updateUI();
         updatePanicModeUI();
+        // Start timer if deadline exists
+        if (gameState.deadline && message.server_now) {
+          hostTimer.start(gameState.deadline, message.server_now);
+        }
       }
       break;
 
     case "phase":
       gameState.phase = message.phase;
       gameState.validTransitions = message.valid_transitions || [];
+      gameState.deadline = message.deadline || null;
       updateUI();
+      // Update timer
+      if (gameState.deadline && message.server_now) {
+        hostTimer.start(gameState.deadline, message.server_now);
+      } else {
+        hostTimer.stop();
+        hostTimer.hide();
+        document.getElementById("hostTimer").textContent = "--:--";
+      }
       showAlert(`Phase gewechselt zu: ${message.phase}`, "success");
+      break;
+
+    case "deadline_update":
+      gameState.deadline = message.deadline;
+      if (hostTimer && message.deadline && message.server_now) {
+        hostTimer.updateDeadline(message.deadline, message.server_now);
+      }
+      showAlert("Timer verlängert!", "success");
       break;
 
     case "players_created":
@@ -288,6 +315,17 @@ function markDuplicate(submissionId) {
   }
 }
 
+function extendTimer(seconds) {
+  if (!gameState.deadline) {
+    showAlert("Kein aktiver Timer zum Verlängern", "error");
+    return;
+  }
+  wsConn.send({
+    t: "host_extend_timer",
+    seconds: seconds,
+  });
+}
+
 function updatePanicModeUI() {
   const panicBtn = document.getElementById("panicModeBtn");
   const panicStatus = document.getElementById("panicStatus");
@@ -503,5 +541,6 @@ if (typeof window !== "undefined") {
     togglePanicMode,
     setManualWinner,
     markDuplicate,
+    extendTimer,
   });
 }

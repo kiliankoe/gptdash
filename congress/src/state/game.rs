@@ -326,6 +326,31 @@ impl AppState {
             .unwrap_or(false)
     }
 
+    /// Extend the current phase deadline by a number of seconds
+    pub async fn extend_deadline(&self, seconds: u32) -> Result<String, String> {
+        let mut game = self.game.write().await;
+        if let Some(ref mut g) = *game {
+            if let Some(ref deadline_str) = g.phase_deadline {
+                // Parse current deadline
+                let current_deadline = chrono::DateTime::parse_from_rfc3339(deadline_str)
+                    .map_err(|e| format!("Invalid deadline format: {}", e))?;
+
+                // Add seconds to deadline
+                let new_deadline = current_deadline + chrono::Duration::seconds(seconds as i64);
+                let new_deadline_str = new_deadline.to_rfc3339();
+
+                g.phase_deadline = Some(new_deadline_str.clone());
+                g.version += 1;
+
+                Ok(new_deadline_str)
+            } else {
+                Err("No active deadline to extend".to_string())
+            }
+        } else {
+            Err("No active game".to_string())
+        }
+    }
+
     /// Set manual AI winner for panic mode scoring
     pub async fn set_manual_ai_winner(
         &self,

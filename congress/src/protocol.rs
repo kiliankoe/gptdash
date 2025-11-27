@@ -65,6 +65,9 @@ pub enum ClientMessage {
     HostMarkDuplicate {
         submission_id: SubmissionId,
     },
+    HostExtendTimer {
+        seconds: u32,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -152,6 +155,11 @@ pub enum ServerMessage {
     SubmissionRejected {
         player_id: PlayerId,
         reason: String,
+    },
+    /// Broadcast when the deadline is extended
+    DeadlineUpdate {
+        deadline: String,
+        server_now: String,
     },
     Error {
         code: String,

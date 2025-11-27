@@ -9,6 +9,7 @@ let playerName = null;
 let currentPhase = null;
 let currentPrompt = null;
 let hasSubmitted = false;
+let playerTimer = null;
 const MAX_CHARS = 500;
 const WARN_THRESHOLD = 450;
 const STORAGE_KEY = "gptdash_player_token";
@@ -33,6 +34,9 @@ function init() {
   if (answerInput) {
     answerInput.addEventListener("input", updateCharCounter);
   }
+
+  // Initialize timer
+  playerTimer = new CountdownTimer("playerTimer");
 
   // Connect to WebSocket with token for state recovery
   wsConn = new WSConnection(
@@ -59,6 +63,14 @@ function handleMessage(message) {
     case "welcome":
       if (message.game) {
         currentPhase = message.game.phase;
+        // Start timer if in WRITING phase with deadline
+        if (
+          currentPhase === "WRITING" &&
+          message.game.phase_deadline &&
+          message.server_now
+        ) {
+          playerTimer.start(message.game.phase_deadline, message.server_now);
+        }
       }
       break;
 
@@ -86,7 +98,27 @@ function handleMessage(message) {
 
     case "phase":
       currentPhase = message.phase;
+      // Update timer for WRITING phase
+      if (
+        currentPhase === "WRITING" &&
+        message.deadline &&
+        message.server_now
+      ) {
+        playerTimer.start(message.deadline, message.server_now);
+      } else {
+        playerTimer.stop();
+        playerTimer.hide();
+        const timerEl = document.getElementById("playerTimer");
+        if (timerEl) timerEl.textContent = "--:--";
+      }
       updateScreen(message.phase);
+      break;
+
+    case "deadline_update":
+      // Update timer when deadline is extended
+      if (playerTimer && message.deadline && message.server_now) {
+        playerTimer.updateDeadline(message.deadline, message.server_now);
+      }
       break;
 
     case "prompt_selected":

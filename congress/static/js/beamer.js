@@ -121,6 +121,9 @@ function handleMessage(msg) {
     case "game_state":
       handleGameState(msg);
       break;
+    case "deadline_update":
+      handleDeadlineUpdate(msg);
+      break;
     case "error":
       console.error("[Beamer] Error:", msg.code, msg.msg);
       break;
@@ -242,6 +245,14 @@ function handleGameState(msg) {
     gameState.roundNo = msg.game.round_no;
     updateRoundBadge();
     showScene(phaseToScene(msg.game.phase));
+  }
+}
+
+function handleDeadlineUpdate(msg) {
+  // Update timer when deadline is extended
+  if (timer && msg.deadline && msg.server_now) {
+    timer.updateDeadline(msg.deadline, msg.server_now);
+    console.log("[Beamer] Timer updated with new deadline:", msg.deadline);
   }
 }
 

@@ -144,6 +144,13 @@ pub async fn handle_message(
             }
             handle_host_mark_duplicate(state, submission_id).await
         }
+
+        ClientMessage::HostExtendTimer { seconds } => {
+            if *role != Role::Host {
+                return unauthorized("Only host can extend timer");
+            }
+            handle_host_extend_timer(state, seconds).await
+        }
     }
 }
 
@@ -537,6 +544,29 @@ async fn handle_host_mark_duplicate(
         }
         Err(e) => Some(ServerMessage::Error {
             code: "MARK_DUPLICATE_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+async fn handle_host_extend_timer(state: &Arc<AppState>, seconds: u32) -> Option<ServerMessage> {
+    tracing::info!("Host extending timer by {} seconds", seconds);
+
+    match state.extend_deadline(seconds).await {
+        Ok(new_deadline) => {
+            let server_now = chrono::Utc::now().to_rfc3339();
+            // Broadcast to all clients
+            state.broadcast_to_all(ServerMessage::DeadlineUpdate {
+                deadline: new_deadline.clone(),
+                server_now: server_now.clone(),
+            });
+            Some(ServerMessage::DeadlineUpdate {
+                deadline: new_deadline,
+                server_now,
+            })
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "EXTEND_TIMER_FAILED".to_string(),
             msg: e,
         }),
     }

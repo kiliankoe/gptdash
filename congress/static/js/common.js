@@ -307,6 +307,32 @@ class CountdownTimer {
     el.textContent = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
     el.style.display = "block";
   }
+
+  /**
+   * Update deadline from server (e.g., when extended)
+   * @param {string} deadlineISO - New deadline ISO8601 timestamp
+   * @param {string} serverNowISO - Server's current time (for clock sync)
+   */
+  updateDeadline(deadlineISO, serverNowISO) {
+    if (!deadlineISO) {
+      this.hide();
+      return;
+    }
+
+    // Update server time offset
+    const serverNow = new Date(serverNowISO);
+    const localNow = new Date();
+    this.serverTimeOffset = serverNow.getTime() - localNow.getTime();
+
+    // Update deadline
+    this.deadline = new Date(deadlineISO);
+
+    // If timer was stopped, restart it
+    if (!this.interval) {
+      this.update();
+      this.interval = setInterval(() => this.update(), 100);
+    }
+  }
 }
 
 /**

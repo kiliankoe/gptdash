@@ -123,6 +123,15 @@
                 </div>
 
                 <div class="card">
+                    <div class="card-header">Timer</div>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                        <span>Verbleibend: <strong id="hostTimer" style="font-size: 1.5em; font-family: monospace;">--:--</strong></span>
+                        <button onclick="extendTimer(10)" class="secondary">+10 Sekunden</button>
+                    </div>
+                    <p style="opacity: 0.6; font-size: 0.9em;">Timer für Schreib- und Abstimmungsphase. Der Abstimmungstimer wechselt automatisch zur Auflösung.</p>
+                </div>
+
+                <div class="card">
                     <div class="card-header">Notfall-Steuerung</div>
                     <div class="button-group">
                         <button class="secondary" onclick="transitionPhase('INTERMISSION')">Pause</button>

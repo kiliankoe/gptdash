@@ -10,12 +10,16 @@ let selectedAiAnswer = null;
 let selectedFunnyAnswer = null;
 let hasVoted = false;
 let panicMode = false;
+let audienceTimer = null;
 const STORAGE_KEY = "gptdash_voter_token";
 
 // Initialize
 function init() {
   // Check if voter token is in localStorage
   voterToken = localStorage.getItem(STORAGE_KEY);
+
+  // Initialize timer
+  audienceTimer = new CountdownTimer("audienceTimer");
 
   // Connect to WebSocket with token for state recovery
   wsConn = new WSConnection(
@@ -44,6 +48,14 @@ function handleMessage(message) {
       if (message.game) {
         panicMode = message.game.panic_mode || false;
         updatePhase(message.game.phase);
+        // Start timer if in VOTING phase with deadline
+        if (
+          message.game.phase === "VOTING" &&
+          message.game.phase_deadline &&
+          message.server_now
+        ) {
+          audienceTimer.start(message.game.phase_deadline, message.server_now);
+        }
       }
       break;
 
@@ -71,7 +83,27 @@ function handleMessage(message) {
       break;
 
     case "phase":
+      // Update timer for VOTING phase
+      if (
+        message.phase === "VOTING" &&
+        message.deadline &&
+        message.server_now
+      ) {
+        audienceTimer.start(message.deadline, message.server_now);
+      } else {
+        audienceTimer.stop();
+        audienceTimer.hide();
+        const timerEl = document.getElementById("audienceTimer");
+        if (timerEl) timerEl.textContent = "--:--";
+      }
       updatePhase(message.phase);
+      break;
+
+    case "deadline_update":
+      // Update timer when deadline is extended
+      if (audienceTimer && message.deadline && message.server_now) {
+        audienceTimer.updateDeadline(message.deadline, message.server_now);
+      }
       break;
 
     case "submissions":
