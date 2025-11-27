@@ -137,6 +137,13 @@ pub async fn handle_message(
             }
             handle_host_set_manual_winner(state, winner_type, submission_id).await
         }
+
+        ClientMessage::HostMarkDuplicate { submission_id } => {
+            if *role != Role::Host {
+                return unauthorized("Only host can mark duplicates");
+            }
+            handle_host_mark_duplicate(state, submission_id).await
+        }
     }
 }
 
@@ -191,7 +198,7 @@ async fn handle_submit_answer(
     };
 
     match state.submit_answer(&round.id, player_id, text).await {
-        Ok(_) => None,
+        Ok(_) => Some(ServerMessage::SubmissionConfirmed),
         Err(e) => Some(ServerMessage::Error {
             code: "SUBMISSION_FAILED".to_string(),
             msg: e,
@@ -510,6 +517,31 @@ async fn handle_host_set_manual_winner(
     }
 }
 
+async fn handle_host_mark_duplicate(
+    state: &Arc<AppState>,
+    submission_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host marking submission as duplicate: {}", submission_id);
+
+    match state.mark_submission_duplicate(&submission_id).await {
+        Ok(player_id) => {
+            // If it was a player submission, notify the player via broadcast
+            // (players filter by their own ID)
+            if let Some(pid) = player_id {
+                state.broadcast_to_all(ServerMessage::SubmissionRejected {
+                    player_id: pid,
+                    reason: "duplicate".to_string(),
+                });
+            }
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "MARK_DUPLICATE_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -722,6 +754,84 @@ mod tests {
         assert!(result.is_some());
         if let Some(ServerMessage::Error { code, .. }) = result {
             assert_eq!(code, "UNAUTHORIZED");
+        } else {
+            panic!("Expected Error message");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_mark_duplicate_requires_host() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let role = Role::Audience;
+
+        let result = handle_message(
+            ClientMessage::HostMarkDuplicate {
+                submission_id: "sub1".to_string(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        assert!(result.is_some());
+        if let Some(ServerMessage::Error { code, .. }) = result {
+            assert_eq!(code, "UNAUTHORIZED");
+        } else {
+            panic!("Expected Error message");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_mark_duplicate_success() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+        let role = Role::Host;
+
+        // Create a player submission
+        let player = state.create_player().await;
+        let sub = state
+            .submit_answer(&round.id, Some(player.id.clone()), "Test".to_string())
+            .await
+            .unwrap();
+
+        // Mark as duplicate
+        let result = handle_message(
+            ClientMessage::HostMarkDuplicate {
+                submission_id: sub.id.clone(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        // Should return None (success, broadcast handled separately)
+        assert!(result.is_none());
+
+        // Verify submission is removed
+        let submissions = state.get_submissions(&round.id).await;
+        assert_eq!(submissions.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_mark_duplicate_nonexistent() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let role = Role::Host;
+
+        let result = handle_message(
+            ClientMessage::HostMarkDuplicate {
+                submission_id: "nonexistent".to_string(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        assert!(result.is_some());
+        if let Some(ServerMessage::Error { code, .. }) = result {
+            assert_eq!(code, "MARK_DUPLICATE_FAILED");
         } else {
             panic!("Expected Error message");
         }

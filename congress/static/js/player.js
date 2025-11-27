@@ -4,6 +4,7 @@
 
 let wsConn = null;
 let playerToken = null;
+let playerId = null;
 let playerName = null;
 let currentPhase = null;
 let currentPrompt = null;
@@ -56,7 +57,6 @@ function requireConnection(errorElementId) {
 function handleMessage(message) {
   switch (message.t) {
     case "welcome":
-      console.log("Welcome message:", message);
       if (message.game) {
         currentPhase = message.game.phase;
       }
@@ -64,7 +64,7 @@ function handleMessage(message) {
 
     case "player_state":
       // State recovery on reconnect
-      console.log("Player state recovery:", message);
+      playerId = message.player_id;
       playerName = message.display_name;
       hasSubmitted = message.has_submitted;
 
@@ -106,8 +106,44 @@ function handleMessage(message) {
       showScreen("submittedScreen");
       break;
 
+    case "player_registered":
+      // Capture player_id from registration
+      playerId = message.player_id;
+      break;
+
+    case "submission_rejected":
+      // Only handle if it's for this player
+      if (message.player_id === playerId) {
+        hasSubmitted = false;
+
+        // Clear the answer input
+        const answerInput = document.getElementById("answerInput");
+        if (answerInput) {
+          answerInput.value = "";
+          updateCharCounter();
+        }
+
+        // Show writing screen with error
+        showWritingScreen();
+        showError(
+          "submitError",
+          message.reason === "duplicate"
+            ? "Diese Antwort existiert schon. Bitte gib eine andere Antwort ein."
+            : "Deine Antwort wurde abgelehnt. Bitte versuch es erneut.",
+        );
+      }
+      break;
+
     case "error":
-      handleError(message.msg);
+      // Check for duplicate error from automatic detection
+      if (message.msg === "DUPLICATE_EXACT") {
+        showError(
+          "submitError",
+          "Diese Antwort existiert schon. Bitte gib eine andere Antwort ein.",
+        );
+      } else {
+        handleError(message.msg);
+      }
       break;
   }
 }
@@ -221,8 +257,8 @@ function submitAnswer() {
     return;
   }
 
-  // Show submitted screen
-  showScreen("submittedScreen");
+  // Don't show submitted screen immediately - wait for server response
+  // The server will send either submission_confirmed or error
   hideError("submitError");
 }
 

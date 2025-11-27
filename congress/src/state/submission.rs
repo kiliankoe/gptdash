@@ -1,14 +1,28 @@
 use super::AppState;
 use crate::types::*;
 
+/// Normalize text for duplicate comparison (trim whitespace, lowercase)
+fn normalize(text: &str) -> String {
+    text.trim().to_lowercase()
+}
+
 impl AppState {
-    /// Submit an answer
+    /// Submit an answer with automatic exact duplicate detection
     pub async fn submit_answer(
         &self,
         round_id: &str,
         player_id: Option<String>,
         text: String,
     ) -> Result<Submission, String> {
+        // Check for exact duplicates
+        let normalized_new = normalize(&text);
+        let existing = self.get_submissions(round_id).await;
+        for existing_sub in &existing {
+            if normalize(&existing_sub.original_text) == normalized_new {
+                return Err("DUPLICATE_EXACT".to_string());
+            }
+        }
+
         let submission = Submission {
             id: ulid::Ulid::new().to_string(),
             round_id: round_id.to_string(),
@@ -92,5 +106,31 @@ impl AppState {
             .filter(|s| s.round_id == round_id)
             .cloned()
             .collect()
+    }
+
+    /// Mark a submission as duplicate and remove it (host only)
+    /// Returns the player_id if it was a player submission, so we can notify them
+    pub async fn mark_submission_duplicate(
+        &self,
+        submission_id: &str,
+    ) -> Result<Option<String>, String> {
+        let (round_id, player_id) = {
+            let mut submissions = self.submissions.write().await;
+            if let Some(submission) = submissions.remove(submission_id) {
+                let player_id = if submission.author_kind == AuthorKind::Player {
+                    submission.author_ref.clone()
+                } else {
+                    None
+                };
+                (submission.round_id, player_id)
+            } else {
+                return Err("Submission not found".to_string());
+            }
+        };
+
+        // Broadcast updated submissions list
+        self.broadcast_submissions(&round_id).await;
+
+        Ok(player_id)
     }
 }

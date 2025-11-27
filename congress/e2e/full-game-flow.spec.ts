@@ -24,7 +24,7 @@ async function waitForConnection(page: Page, timeout = 10000): Promise<void> {
       const dot = document.getElementById("statusDot");
       return dot?.classList.contains("connected");
     },
-    { timeout }
+    { timeout },
   );
 }
 
@@ -38,7 +38,7 @@ async function getText(page: Page, selector: string): Promise<string> {
 async function waitForBeamerScene(
   beamer: Page,
   sceneId: string,
-  timeout = 10000
+  timeout = 10000,
 ): Promise<void> {
   await beamer.waitForSelector(`#${sceneId}.active`, { timeout });
 }
@@ -46,7 +46,7 @@ async function waitForBeamerScene(
 // Helper to extract player tokens from host UI
 async function getPlayerTokens(host: Page): Promise<string[]> {
   return host.$$eval("#playerTokensList .token", (els) =>
-    els.map((el) => el.textContent?.trim() ?? "")
+    els.map((el) => el.textContent?.trim() ?? ""),
   );
 }
 
@@ -233,7 +233,7 @@ test.describe("Full Game Flow", () => {
     // Add a prompt (auto-selects when added by host)
     await host.fill(
       "#promptText",
-      "What is the meaning of life, the universe, and everything?"
+      "What is the meaning of life, the universe, and everything?",
     );
     await host.click('#prompts button:has-text("Frage hinzufügen")');
 
@@ -270,13 +270,17 @@ test.describe("Full Game Flow", () => {
     console.log("Step 7: Players submitting answers...");
 
     // Wait for players to see writing screen
-    await players[0].waitForSelector("#writingScreen.active", { timeout: 5000 });
-    await players[1].waitForSelector("#writingScreen.active", { timeout: 5000 });
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+    await players[1].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
 
     // Player 1 submits answer
     await players[0].fill(
       "#answerInput",
-      "The answer is 42, as computed by Deep Thought over millions of years. This is the ultimate answer to everything."
+      "The answer is 42, as computed by Deep Thought over millions of years. This is the ultimate answer to everything.",
     );
     await players[0].click("#submitButton");
     await players[0].waitForSelector("#submittedScreen.active");
@@ -284,7 +288,7 @@ test.describe("Full Game Flow", () => {
     // Player 2 submits answer
     await players[1].fill(
       "#answerInput",
-      "Life has no inherent meaning - we create our own purpose through our choices and connections with others."
+      "Life has no inherent meaning - we create our own purpose through our choices and connections with others.",
     );
     await players[1].click("#submitButton");
     await players[1].waitForSelector("#submittedScreen.active");
@@ -299,9 +303,13 @@ test.describe("Full Game Flow", () => {
 
     // Mark first submission as AI (required for RESULTS phase)
     // Must be done during WRITING phase while "Als KI markieren" buttons are visible
-    const aiButtonsWriting = host.locator('button:has-text("Als KI markieren")');
+    const aiButtonsWriting = host.locator(
+      'button:has-text("Als KI markieren")',
+    );
     const aiButtonCountWriting = await aiButtonsWriting.count();
-    console.log(`Found ${aiButtonCountWriting} AI marking buttons during WRITING`);
+    console.log(
+      `Found ${aiButtonCountWriting} AI marking buttons during WRITING`,
+    );
     if (aiButtonCountWriting > 0) {
       await aiButtonsWriting.first().click();
       await host.waitForTimeout(500);
@@ -358,8 +366,12 @@ test.describe("Full Game Flow", () => {
     await waitForBeamerScene(beamer, "sceneVoting");
 
     // Audience should see voting screen
-    await audience[0].waitForSelector("#votingScreen.active", { timeout: 5000 });
-    await audience[1].waitForSelector("#votingScreen.active", { timeout: 5000 });
+    await audience[0].waitForSelector("#votingScreen.active", {
+      timeout: 5000,
+    });
+    await audience[1].waitForSelector("#votingScreen.active", {
+      timeout: 5000,
+    });
 
     // ============================================
     // STEP 11: Audience votes
@@ -373,7 +385,7 @@ test.describe("Full Game Flow", () => {
     // Audience 1 votes
     const aiOptions1 = audience[0].locator("#aiAnswerOptions .answer-option");
     const funnyOptions1 = audience[0].locator(
-      "#funnyAnswerOptions .answer-option"
+      "#funnyAnswerOptions .answer-option",
     );
 
     // Click first answer for AI, second for funny
@@ -387,7 +399,7 @@ test.describe("Full Game Flow", () => {
     // Audience 2 votes
     const aiOptions2 = audience[1].locator("#aiAnswerOptions .answer-option");
     const funnyOptions2 = audience[1].locator(
-      "#funnyAnswerOptions .answer-option"
+      "#funnyAnswerOptions .answer-option",
     );
 
     // Click second answer for AI, first for funny (different from audience 1)
@@ -469,18 +481,22 @@ test.describe("Full Game Flow", () => {
     await players[0].click("#joinButton");
 
     // Should see register screen
-    await players[0].waitForSelector("#registerScreen.active", { timeout: 5000 });
+    await players[0].waitForSelector("#registerScreen.active", {
+      timeout: 5000,
+    });
 
     // Player registers name
     await players[0].fill("#nameInput", "TestPlayer");
     await players[0].click("#registerButton");
 
     // Should see waiting screen
-    await players[0].waitForSelector("#waitingScreen.active", { timeout: 5000 });
+    await players[0].waitForSelector("#waitingScreen.active", {
+      timeout: 5000,
+    });
 
     // Verify token was stored
     const storedToken = await players[0].evaluate(() =>
-      localStorage.getItem("gptdash_player_token")
+      localStorage.getItem("gptdash_player_token"),
     );
     expect(storedToken).toBe(tokens[0]);
   });
@@ -497,11 +513,13 @@ test.describe("Full Game Flow", () => {
     await audience[0].click("#joinButton");
 
     // Audience should see waiting screen during LOBBY
-    await audience[0].waitForSelector("#waitingScreen.active", { timeout: 5000 });
+    await audience[0].waitForSelector("#waitingScreen.active", {
+      timeout: 5000,
+    });
 
     // Verify voter token was stored
     const voterToken = await audience[0].evaluate(() =>
-      localStorage.getItem("gptdash_voter_token")
+      localStorage.getItem("gptdash_voter_token"),
     );
     expect(voterToken).toBeTruthy();
   });
@@ -663,7 +681,9 @@ test.describe("Full Game Flow", () => {
     });
 
     // Player submits answer
-    await players[0].waitForSelector("#writingScreen.active", { timeout: 5000 });
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
     await players[0].fill("#answerInput", "Test answer for panic mode");
     await players[0].click("#submitButton");
     await players[0].waitForSelector("#submittedScreen.active");
@@ -672,7 +692,9 @@ test.describe("Full Game Flow", () => {
     await host.click('.sidebar-item:has-text("Antworten")');
     await host.waitForSelector("#submissions.active");
     await host.waitForSelector(".submission-card", { timeout: 5000 });
-    const aiButton = host.locator('button:has-text("Als KI markieren")').first();
+    const aiButton = host
+      .locator('button:has-text("Als KI markieren")')
+      .first();
     if ((await aiButton.count()) > 0) {
       await aiButton.click();
       await host.waitForTimeout(500);
@@ -692,7 +714,9 @@ test.describe("Full Game Flow", () => {
     // ============================================
     console.log("Panic mode test: Verifying normal voting screen...");
 
-    await audience[0].waitForSelector("#votingScreen.active", { timeout: 5000 });
+    await audience[0].waitForSelector("#votingScreen.active", {
+      timeout: 5000,
+    });
     await audience[0].waitForSelector(".answer-option", { timeout: 5000 });
 
     // Panic overlay should NOT be visible initially
@@ -727,9 +751,10 @@ test.describe("Full Game Flow", () => {
     await expect(overlayAfter).toBeVisible({ timeout: 5000 });
 
     // Verify overlay text
-    await expect(
-      audience[0].locator("#panicModeOverlay h3")
-    ).toContainText("deaktiviert", { ignoreCase: true });
+    await expect(audience[0].locator("#panicModeOverlay h3")).toContainText(
+      "deaktiviert",
+      { ignoreCase: true },
+    );
 
     // Vote button should be disabled
     const voteButton = audience[0].locator("#voteButton");
@@ -750,5 +775,185 @@ test.describe("Full Game Flow", () => {
     await expect(overlayAfter).toHaveCSS("display", "none");
 
     console.log("Panic mode test completed successfully!");
+  });
+
+  test("duplicate detection blocks exact duplicates and host can mark duplicates", async () => {
+    const { host, beamer, players } = clients;
+
+    // ============================================
+    // SETUP: Get to writing phase with player
+    // ============================================
+    console.log("Duplicate test: Setting up game...");
+
+    // Navigate to pages
+    await Promise.all([
+      host.goto("/host.html"),
+      beamer.goto("/beamer.html"),
+      players[0].goto("/player.html"),
+      players[1].goto("/player.html"),
+    ]);
+
+    await Promise.all([waitForConnection(host), waitForConnection(beamer)]);
+
+    // Create player tokens
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "2");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForSelector("#playerTokensList .token");
+    const tokens = await getPlayerTokens(host);
+
+    // Player 1 joins
+    await players[0].fill("#tokenInput", tokens[0]);
+    await players[0].click("#joinButton");
+    await players[0].waitForSelector("#registerScreen.active");
+    await players[0].fill("#nameInput", "DuplicateTester1");
+    await players[0].click("#registerButton");
+    await players[0].waitForSelector("#waitingScreen.active");
+
+    // Player 2 joins
+    await players[1].fill("#tokenInput", tokens[1]);
+    await players[1].click("#joinButton");
+    await players[1].waitForSelector("#registerScreen.active");
+    await players[1].fill("#nameInput", "DuplicateTester2");
+    await players[1].click("#registerButton");
+    await players[1].waitForSelector("#waitingScreen.active");
+
+    // Start round and add prompt
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+    await host.click('button:has-text("Neue Runde starten")');
+    await host.waitForTimeout(500);
+
+    await host.click('.sidebar-item:has-text("Fragen")');
+    await host.waitForSelector("#prompts.active");
+    await host.fill("#promptText", "Duplicate detection test question");
+    await host.click('#prompts button:has-text("Frage hinzufügen")');
+    await host.waitForTimeout(500);
+
+    // Transition to WRITING
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="PROMPT_SELECTION"]');
+    await host.waitForTimeout(500);
+    await host.click('button[data-phase="WRITING"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
+      timeout: 5000,
+    });
+
+    // ============================================
+    // TEST 1: Player 1 submits an answer
+    // ============================================
+    console.log("Duplicate test: Player 1 submitting answer...");
+
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+    await players[0].fill(
+      "#answerInput",
+      "This is a unique answer that no one else will submit",
+    );
+    await players[0].click("#submitButton");
+    await players[0].waitForSelector("#submittedScreen.active");
+
+    // Verify submission appears in host view
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.waitForSelector("#submissions.active");
+    await host.waitForSelector(".submission-card", { timeout: 5000 });
+
+    // ============================================
+    // TEST 2: Player 2 tries to submit exact duplicate
+    // ============================================
+    console.log("Duplicate test: Player 2 trying exact duplicate...");
+
+    await players[1].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+    // Submit the EXACT same answer (case insensitive with whitespace)
+    await players[1].fill(
+      "#answerInput",
+      "  THIS IS A UNIQUE ANSWER THAT NO ONE ELSE WILL SUBMIT  ",
+    );
+    await players[1].click("#submitButton");
+
+    // Player 2 should see an error message (stays on writing screen)
+    // and the error message should appear
+    await players[1].waitForSelector("#submitError:not(:empty)", {
+      timeout: 5000,
+    });
+    const errorText = await getText(players[1], "#submitError");
+    expect(errorText).toContain("existiert schon");
+
+    // Player 2 should still be on writing screen (not submitted)
+    await expect(players[1].locator("#writingScreen")).toHaveClass(/active/);
+
+    // ============================================
+    // TEST 3: Player 2 submits a different answer
+    // ============================================
+    console.log("Duplicate test: Player 2 submitting different answer...");
+
+    await players[1].fill(
+      "#answerInput",
+      "This is a completely different answer",
+    );
+    await players[1].click("#submitButton");
+    await players[1].waitForSelector("#submittedScreen.active");
+
+    // Verify both submissions appear in host view
+    await host.waitForTimeout(500);
+    const submissionCountBefore = await host
+      .locator(".submission-card")
+      .count();
+    expect(submissionCountBefore).toBe(2);
+
+    // ============================================
+    // TEST 4: Host marks Player 2's submission as duplicate
+    // ============================================
+    console.log("Duplicate test: Host marking submission as duplicate...");
+
+    // Handle confirmation dialog
+    host.on("dialog", (dialog) => dialog.accept());
+
+    // Find the Dupe button for Player 2's submission (the second one)
+    // Submissions are displayed in order, so Player 1's is first, Player 2's is second
+    const dupeButton = host.locator('button:has-text("Dupe")').nth(1);
+    await expect(dupeButton).toBeVisible();
+    await dupeButton.click();
+
+    // Wait for the submission to be removed
+    await host.waitForTimeout(1000);
+    const submissionCountAfter = await host.locator(".submission-card").count();
+    expect(submissionCountAfter).toBe(1);
+
+    // ============================================
+    // TEST 5: Player 2 is notified and can resubmit
+    // ============================================
+    console.log("Duplicate test: Verifying player notification...");
+
+    // Player 2 should be back on writing screen with an error message
+    await players[1].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+
+    // The error message should indicate duplicate
+    await players[1].waitForSelector("#submitError:not(:empty)", {
+      timeout: 5000,
+    });
+    const rejectionError = await getText(players[1], "#submitError");
+    expect(rejectionError).toContain("existiert schon");
+
+    // Player 2 can now submit a new answer
+    await players[1].fill(
+      "#answerInput",
+      "Yet another completely unique and original answer",
+    );
+    await players[1].click("#submitButton");
+    await players[1].waitForSelector("#submittedScreen.active");
+
+    // Verify the new submission appears
+    await host.waitForTimeout(500);
+    const finalCount = await host.locator(".submission-card").count();
+    expect(finalCount).toBe(2);
+
+    console.log("Duplicate detection test completed successfully!");
   });
 });

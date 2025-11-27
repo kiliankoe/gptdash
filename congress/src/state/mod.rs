@@ -601,4 +601,114 @@ mod tests {
         assert_eq!(scores2.len(), 1);
         assert_eq!(scores2[0].total, 2); // Still 2, not 4!
     }
+
+    #[tokio::test]
+    async fn test_exact_duplicate_detection() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // First submission succeeds
+        let result = state
+            .submit_answer(&round.id, None, "Test answer".to_string())
+            .await;
+        assert!(result.is_ok());
+
+        // Exact duplicate fails
+        let result = state
+            .submit_answer(&round.id, None, "Test answer".to_string())
+            .await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "DUPLICATE_EXACT");
+    }
+
+    #[tokio::test]
+    async fn test_duplicate_detection_case_insensitive() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // First submission succeeds
+        state
+            .submit_answer(&round.id, None, "Test Answer".to_string())
+            .await
+            .unwrap();
+
+        // Same text different case fails
+        let result = state
+            .submit_answer(&round.id, None, "test answer".to_string())
+            .await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "DUPLICATE_EXACT");
+
+        // Different case with whitespace also fails
+        let result = state
+            .submit_answer(&round.id, None, "  TEST ANSWER  ".to_string())
+            .await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "DUPLICATE_EXACT");
+    }
+
+    #[tokio::test]
+    async fn test_mark_submission_duplicate() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // Create a player and their submission
+        let player = state.create_player().await;
+        let sub = state
+            .submit_answer(
+                &round.id,
+                Some(player.id.clone()),
+                "Player answer".to_string(),
+            )
+            .await
+            .unwrap();
+
+        // Verify submission exists
+        let submissions = state.get_submissions(&round.id).await;
+        assert_eq!(submissions.len(), 1);
+
+        // Mark as duplicate
+        let result = state.mark_submission_duplicate(&sub.id).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some(player.id));
+
+        // Verify submission is removed
+        let submissions = state.get_submissions(&round.id).await;
+        assert_eq!(submissions.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_mark_ai_submission_duplicate() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // Create AI submission
+        let sub = state
+            .submit_answer(&round.id, None, "AI answer".to_string())
+            .await
+            .unwrap();
+
+        // Mark as duplicate - returns None for AI submissions
+        let result = state.mark_submission_duplicate(&sub.id).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
+
+        // Verify submission is removed
+        let submissions = state.get_submissions(&round.id).await;
+        assert_eq!(submissions.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_mark_nonexistent_duplicate() {
+        let state = AppState::new();
+        state.create_game().await;
+
+        let result = state.mark_submission_duplicate("nonexistent").await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
 }

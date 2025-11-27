@@ -50,9 +50,8 @@ function handleMessage(message) {
       break;
 
     case "submissions":
-      gameState.submissions = message.list || [];
-      updateSubmissionsList();
-      updatePanicModeUI();
+      // Host should ignore public submissions and use host_submissions instead
+      // (host_submissions includes author_kind which we need for managing the game)
       break;
 
     case "host_submissions":
@@ -275,6 +274,20 @@ function setManualWinner(winnerType, submissionId) {
   );
 }
 
+function markDuplicate(submissionId) {
+  if (
+    confirm(
+      "Diese Antwort als Duplikat markieren?\n\nDer Spieler wird benachrichtigt und muss eine neue Antwort einreichen.",
+    )
+  ) {
+    wsConn.send({
+      t: "host_mark_duplicate",
+      submission_id: submissionId,
+    });
+    showAlert("Antwort als Duplikat markiert", "success");
+  }
+}
+
 function updatePanicModeUI() {
   const panicBtn = document.getElementById("panicModeBtn");
   const panicStatus = document.getElementById("panicStatus");
@@ -372,6 +385,7 @@ function updateSubmissionsList() {
             <div class="text">${escapeHtml(sub.display_text)}</div>
             <div class="actions">
                 ${authorKind === "player" ? `<button onclick="setAiSubmission('${sub.id}')">Als KI markieren</button>` : ""}
+                ${authorKind === "player" ? `<button class="danger" onclick="markDuplicate('${sub.id}')">Dupe</button>` : ""}
                 <button class="secondary">Bearbeiten</button>
             </div>
         `;
@@ -488,5 +502,6 @@ if (typeof window !== "undefined") {
     copyAudienceUrl,
     togglePanicMode,
     setManualWinner,
+    markDuplicate,
   });
 }

@@ -62,6 +62,9 @@ pub enum ClientMessage {
         winner_type: ManualWinnerType,
         submission_id: SubmissionId,
     },
+    HostMarkDuplicate {
+        submission_id: SubmissionId,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -142,6 +145,13 @@ pub enum ServerMessage {
     /// Broadcast when panic mode is toggled
     PanicModeUpdate {
         enabled: bool,
+    },
+    /// Sent to a player when their submission is accepted
+    SubmissionConfirmed,
+    /// Sent to a player when their submission is rejected (e.g., marked as duplicate by host)
+    SubmissionRejected {
+        player_id: PlayerId,
+        reason: String,
     },
     Error {
         code: String,
