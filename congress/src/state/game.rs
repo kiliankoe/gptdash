@@ -282,6 +282,7 @@ impl AppState {
         self.submissions.write().await.clear();
         self.votes.write().await.clear();
         self.scores.write().await.clear();
+        self.player_status.write().await.clear();
 
         // Reset game to initial state
         let mut game = self.game.write().await;

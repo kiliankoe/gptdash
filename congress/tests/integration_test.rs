@@ -1,4 +1,4 @@
-use gptdash::protocol::{ClientMessage, ServerMessage};
+use gptdash::protocol::{ClientMessage, PlayerSubmissionStatus, ServerMessage};
 use gptdash::state::AppState;
 use gptdash::types::{GamePhase, PromptSource, Role};
 use gptdash::ws::handlers::handle_message;
@@ -550,4 +550,397 @@ async fn test_unauthorized_host_commands() {
         }
         _ => panic!("Expected unauthorized error"),
     }
+}
+
+/// Test typo check request flow (without actual LLM - returns original text)
+#[tokio::test]
+async fn test_typo_check_request() {
+    let state = Arc::new(AppState::new());
+    let player_role = Role::Player;
+
+    state.create_game().await;
+
+    // Create a player
+    let player = state.create_player().await;
+    state
+        .register_player(&player.token, "TestPlayer".to_string())
+        .await
+        .expect("Should register player");
+
+    // Request typo check (no LLM configured, should return original text unchanged)
+    let result = handle_message(
+        ClientMessage::RequestTypoCheck {
+            player_token: player.token.clone(),
+            text: "Dies ist ein Test mit Tippfehler".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    match result {
+        Some(ServerMessage::TypoCheckResult {
+            original,
+            corrected,
+            has_changes,
+        }) => {
+            assert_eq!(original, "Dies ist ein Test mit Tippfehler");
+            assert_eq!(corrected, original, "Without LLM, should return original");
+            assert!(!has_changes, "Without LLM, should have no changes");
+        }
+        _ => panic!("Expected TypoCheckResult message"),
+    }
+
+    println!("✅ Typo check request test passed!");
+}
+
+/// Test typo check with invalid player token
+#[tokio::test]
+async fn test_typo_check_invalid_token() {
+    let state = Arc::new(AppState::new());
+    let player_role = Role::Player;
+
+    state.create_game().await;
+
+    // Request typo check with invalid token
+    let result = handle_message(
+        ClientMessage::RequestTypoCheck {
+            player_token: "invalid_token".to_string(),
+            text: "Some text".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    match result {
+        Some(ServerMessage::Error { code, .. }) => {
+            assert_eq!(code, "INVALID_PLAYER_TOKEN");
+        }
+        _ => panic!("Expected error for invalid token"),
+    }
+
+    println!("✅ Typo check invalid token test passed!");
+}
+
+/// Test player status tracking
+#[tokio::test]
+async fn test_player_status_tracking() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+    let player_role = Role::Player;
+
+    state.create_game().await;
+
+    // Create players
+    let create_result = handle_message(
+        ClientMessage::HostCreatePlayers { count: 2 },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    let player_tokens = match create_result {
+        Some(ServerMessage::PlayersCreated { players }) => players,
+        _ => panic!("Expected PlayersCreated"),
+    };
+
+    // Check initial status - all should be NotSubmitted
+    let statuses = state.get_all_player_status().await;
+    assert_eq!(statuses.len(), 2);
+    for status in &statuses {
+        assert_eq!(status.status, PlayerSubmissionStatus::NotSubmitted);
+        assert!(status.display_name.is_none());
+    }
+
+    // Register first player
+    handle_message(
+        ClientMessage::RegisterPlayer {
+            player_token: player_tokens[0].token.clone(),
+            display_name: "Alice".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    // Check status after registration - should have name now
+    let statuses = state.get_all_player_status().await;
+    let alice_status = statuses
+        .iter()
+        .find(|s| s.id == player_tokens[0].id)
+        .expect("Should find Alice");
+    assert_eq!(alice_status.display_name, Some("Alice".to_string()));
+    assert_eq!(alice_status.status, PlayerSubmissionStatus::NotSubmitted);
+
+    // Start a round and submit
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+        .await
+        .unwrap();
+    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Alice submits
+    handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some(player_tokens[0].token.clone()),
+            text: "Alice's answer to the prompt".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    // Check status after submission
+    let statuses = state.get_all_player_status().await;
+    let alice_status = statuses
+        .iter()
+        .find(|s| s.id == player_tokens[0].id)
+        .expect("Should find Alice");
+    assert_eq!(
+        alice_status.status,
+        PlayerSubmissionStatus::Submitted,
+        "Alice should be Submitted after submitting"
+    );
+
+    let bob_status = statuses
+        .iter()
+        .find(|s| s.id == player_tokens[1].id)
+        .expect("Should find Bob");
+    assert_eq!(
+        bob_status.status,
+        PlayerSubmissionStatus::NotSubmitted,
+        "Bob should still be NotSubmitted"
+    );
+
+    println!("✅ Player status tracking test passed!");
+}
+
+/// Test submission update flow (accepting typo correction)
+#[tokio::test]
+async fn test_submission_update() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+    let player_role = Role::Player;
+
+    state.create_game().await;
+
+    // Create and register player
+    let player = state.create_player().await;
+    state
+        .register_player(&player.token, "TestPlayer".to_string())
+        .await
+        .unwrap();
+
+    // Setup round
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+        .await
+        .unwrap();
+    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Submit original answer
+    let submit_result = handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some(player.token.clone()),
+            text: "Original answer with typo".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    match submit_result {
+        Some(ServerMessage::SubmissionConfirmed) => {}
+        _ => panic!("Expected SubmissionConfirmed"),
+    }
+
+    // Get the submission ID
+    let submissions = state.get_submissions(&round.id).await;
+    let player_sub = submissions
+        .iter()
+        .find(|s| s.author_ref.as_ref() == Some(&player.id))
+        .expect("Should find player submission");
+
+    // Update submission (simulating accepting typo correction)
+    let update_result = handle_message(
+        ClientMessage::UpdateSubmission {
+            player_token: player.token.clone(),
+            submission_id: player_sub.id.clone(),
+            new_text: "Corrected answer without typo".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    match update_result {
+        Some(ServerMessage::SubmissionConfirmed) => {}
+        _ => panic!("Expected SubmissionConfirmed after update"),
+    }
+
+    // Verify the submission was updated
+    let updated_submissions = state.get_submissions(&round.id).await;
+    let updated_sub = updated_submissions
+        .iter()
+        .find(|s| s.id == player_sub.id)
+        .expect("Should find updated submission");
+
+    assert_eq!(
+        updated_sub.display_text, "Corrected answer without typo",
+        "Submission text should be updated"
+    );
+    assert_eq!(
+        updated_sub.original_text, "Corrected answer without typo",
+        "Original text should also be updated"
+    );
+
+    println!("✅ Submission update test passed!");
+}
+
+/// Test submission update with unauthorized player
+#[tokio::test]
+async fn test_submission_update_unauthorized() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+    let player_role = Role::Player;
+
+    state.create_game().await;
+
+    // Create two players
+    let player1 = state.create_player().await;
+    let player2 = state.create_player().await;
+    state
+        .register_player(&player1.token, "Player1".to_string())
+        .await
+        .unwrap();
+    state
+        .register_player(&player2.token, "Player2".to_string())
+        .await
+        .unwrap();
+
+    // Setup round
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+        .await
+        .unwrap();
+    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Player1 submits
+    handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some(player1.token.clone()),
+            text: "Player 1's answer".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    // Get Player1's submission ID
+    let submissions = state.get_submissions(&round.id).await;
+    let player1_sub = submissions
+        .iter()
+        .find(|s| s.author_ref.as_ref() == Some(&player1.id))
+        .expect("Should find player1 submission");
+
+    // Player2 tries to update Player1's submission (should fail)
+    let update_result = handle_message(
+        ClientMessage::UpdateSubmission {
+            player_token: player2.token.clone(),
+            submission_id: player1_sub.id.clone(),
+            new_text: "Hacked by Player2".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    match update_result {
+        Some(ServerMessage::Error { code, msg }) => {
+            assert_eq!(code, "UPDATE_SUBMISSION_FAILED");
+            assert!(
+                msg.contains("Not authorized"),
+                "Should indicate authorization failure"
+            );
+        }
+        _ => panic!("Expected error for unauthorized update"),
+    }
+
+    // Verify submission was not changed
+    let unchanged_submissions = state.get_submissions(&round.id).await;
+    let unchanged_sub = unchanged_submissions
+        .iter()
+        .find(|s| s.id == player1_sub.id)
+        .expect("Should find submission");
+
+    assert_eq!(
+        unchanged_sub.display_text, "Player 1's answer",
+        "Submission should not be changed by unauthorized player"
+    );
+
+    println!("✅ Submission update unauthorized test passed!");
 }

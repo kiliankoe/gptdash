@@ -68,6 +68,17 @@ pub enum ClientMessage {
     HostExtendTimer {
         seconds: u32,
     },
+    /// Request typo correction for text before final submission
+    RequestTypoCheck {
+        player_token: String,
+        text: String,
+    },
+    /// Update an existing submission with corrected text (after typo check)
+    UpdateSubmission {
+        player_token: String,
+        submission_id: SubmissionId,
+        new_text: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -161,6 +172,16 @@ pub enum ServerMessage {
         deadline: String,
         server_now: String,
     },
+    /// Result of typo check - sent to requesting player
+    TypoCheckResult {
+        original: String,
+        corrected: String,
+        has_changes: bool,
+    },
+    /// Player status list sent to host (names + submission status)
+    HostPlayerStatus {
+        players: Vec<PlayerStatusInfo>,
+    },
     Error {
         code: String,
         msg: String,
@@ -215,4 +236,25 @@ impl From<&Submission> for HostSubmissionInfo {
 pub struct PlayerToken {
     pub id: PlayerId,
     pub token: String,
+}
+
+/// Player submission status for host display
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PlayerSubmissionStatus {
+    /// Player hasn't submitted yet
+    NotSubmitted,
+    /// Player has submitted their answer
+    Submitted,
+    /// Player is waiting for typo check result
+    CheckingTypos,
+}
+
+/// Player status info sent to host (combines token, name, and submission status)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlayerStatusInfo {
+    pub id: PlayerId,
+    pub token: String,
+    pub display_name: Option<String>,
+    pub status: PlayerSubmissionStatus,
 }

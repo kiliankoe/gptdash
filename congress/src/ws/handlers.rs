@@ -151,6 +151,16 @@ pub async fn handle_message(
             }
             handle_host_extend_timer(state, seconds).await
         }
+
+        ClientMessage::RequestTypoCheck { player_token, text } => {
+            handle_request_typo_check(state, player_token, text).await
+        }
+
+        ClientMessage::UpdateSubmission {
+            player_token,
+            submission_id,
+            new_text,
+        } => handle_update_submission(state, player_token, submission_id, new_text).await,
     }
 }
 
@@ -171,10 +181,14 @@ async fn handle_register_player(
         .register_player(&player_token, display_name.clone())
         .await
     {
-        Ok(player) => Some(ServerMessage::PlayerRegistered {
-            player_id: player.id,
-            display_name,
-        }),
+        Ok(player) => {
+            // Broadcast updated player status to host (name now set)
+            broadcast_player_status_to_host(state).await;
+            Some(ServerMessage::PlayerRegistered {
+                player_id: player.id,
+                display_name,
+            })
+        }
         Err(e) => Some(ServerMessage::Error {
             code: "REGISTRATION_FAILED".to_string(),
             msg: e,
@@ -205,7 +219,11 @@ async fn handle_submit_answer(
     };
 
     match state.submit_answer(&round.id, player_id, text).await {
-        Ok(_) => Some(ServerMessage::SubmissionConfirmed),
+        Ok(_) => {
+            // Broadcast player status update to host (submission status changed)
+            broadcast_player_status_to_host(state).await;
+            Some(ServerMessage::SubmissionConfirmed)
+        }
         Err(e) => Some(ServerMessage::Error {
             code: "SUBMISSION_FAILED".to_string(),
             msg: e,
@@ -275,6 +293,8 @@ async fn handle_host_create_players(state: &Arc<AppState>, count: u32) -> Option
             token: player.token,
         });
     }
+    // Broadcast updated player status to host
+    broadcast_player_status_to_host(state).await;
     Some(ServerMessage::PlayersCreated { players })
 }
 
@@ -570,6 +590,143 @@ async fn handle_host_extend_timer(state: &Arc<AppState>, seconds: u32) -> Option
             msg: e,
         }),
     }
+}
+
+async fn handle_request_typo_check(
+    state: &Arc<AppState>,
+    player_token: String,
+    text: String,
+) -> Option<ServerMessage> {
+    tracing::info!(
+        "Typo check requested for text: {}",
+        &text[..text.len().min(50)]
+    );
+
+    // Validate player token
+    let player = match state.get_player_by_token(&player_token).await {
+        Some(p) => p,
+        None => {
+            return Some(ServerMessage::Error {
+                code: "INVALID_PLAYER_TOKEN".to_string(),
+                msg: "Invalid player token".to_string(),
+            });
+        }
+    };
+
+    // Set player status to checking typos
+    state
+        .set_player_status(
+            &player.id,
+            crate::protocol::PlayerSubmissionStatus::CheckingTypos,
+        )
+        .await;
+
+    // Broadcast player status update to host
+    broadcast_player_status_to_host(state).await;
+
+    // Check if we have an LLM provider
+    let llm = match &state.llm {
+        Some(llm) => llm,
+        None => {
+            tracing::warn!("No LLM provider available for typo check, returning original");
+            // Clear the checking status since we're done
+            state
+                .set_player_status(
+                    &player.id,
+                    crate::protocol::PlayerSubmissionStatus::NotSubmitted,
+                )
+                .await;
+            broadcast_player_status_to_host(state).await;
+            return Some(ServerMessage::TypoCheckResult {
+                original: text.clone(),
+                corrected: text,
+                has_changes: false,
+            });
+        }
+    };
+
+    // Use the first available provider for typo checking
+    // In the future we could make this configurable
+    let providers = &llm.providers;
+    if providers.is_empty() {
+        tracing::warn!("No LLM providers configured for typo check");
+        state
+            .set_player_status(
+                &player.id,
+                crate::protocol::PlayerSubmissionStatus::NotSubmitted,
+            )
+            .await;
+        broadcast_player_status_to_host(state).await;
+        return Some(ServerMessage::TypoCheckResult {
+            original: text.clone(),
+            corrected: text,
+            has_changes: false,
+        });
+    }
+
+    // Run typo check
+    let corrected = crate::llm::check_typos(providers[0].as_ref(), &text).await;
+
+    // Clear the checking status
+    state
+        .set_player_status(
+            &player.id,
+            crate::protocol::PlayerSubmissionStatus::NotSubmitted,
+        )
+        .await;
+    broadcast_player_status_to_host(state).await;
+
+    let has_changes = corrected != text;
+    tracing::info!(
+        "Typo check complete. Has changes: {}, original len: {}, corrected len: {}",
+        has_changes,
+        text.len(),
+        corrected.len()
+    );
+
+    Some(ServerMessage::TypoCheckResult {
+        original: text,
+        corrected,
+        has_changes,
+    })
+}
+
+async fn handle_update_submission(
+    state: &Arc<AppState>,
+    player_token: String,
+    submission_id: String,
+    new_text: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Submission update requested: {}", submission_id);
+
+    // Validate player token
+    let player = match state.get_player_by_token(&player_token).await {
+        Some(p) => p,
+        None => {
+            return Some(ServerMessage::Error {
+                code: "INVALID_PLAYER_TOKEN".to_string(),
+                msg: "Invalid player token".to_string(),
+            });
+        }
+    };
+
+    // Update the submission
+    match state
+        .update_player_submission(&submission_id, &player.id, new_text)
+        .await
+    {
+        Ok(_) => Some(ServerMessage::SubmissionConfirmed),
+        Err(e) => Some(ServerMessage::Error {
+            code: "UPDATE_SUBMISSION_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+/// Broadcast current player status to host
+async fn broadcast_player_status_to_host(state: &Arc<AppState>) {
+    let players = state.get_all_player_status().await;
+    state.broadcast_to_host(ServerMessage::HostPlayerStatus { players });
 }
 
 #[cfg(test)]

@@ -7,7 +7,8 @@ let hostTimer = null;
 const gameState = {
   phase: "LOBBY",
   roundNo: 0,
-  players: [],
+  players: [], // Legacy: just tokens
+  playerStatus: [], // New: full player status with names
   submissions: [],
   scores: { players: [], audience_top: [] },
   validTransitions: [], // Populated by server
@@ -85,6 +86,11 @@ function handleMessage(message) {
       gameState.submissions = message.list || [];
       updateSubmissionsList();
       updatePanicModeUI();
+      break;
+
+    case "host_player_status":
+      gameState.playerStatus = message.players || [];
+      updatePlayersList();
       break;
 
     case "scores":
@@ -390,15 +396,68 @@ function updatePlayersList() {
   const container = document.getElementById("playerTokensList");
   container.innerHTML = "";
 
-  gameState.players.forEach((token, idx) => {
+  // Use playerStatus if available, fall back to legacy players array
+  const players =
+    gameState.playerStatus.length > 0
+      ? gameState.playerStatus
+      : gameState.players.map((token, idx) => ({
+          token,
+          display_name: null,
+          status: "not_submitted",
+          id: `player_${idx}`,
+        }));
+
+  if (players.length === 0) {
+    container.innerHTML = '<p style="opacity: 0.6;">Keine Spieler erstellt</p>';
+    return;
+  }
+
+  players.forEach((player) => {
     const div = document.createElement("div");
-    div.className = "token-display";
+    div.className = "player-status-card";
+
+    // Determine status display
+    const token = typeof player === "string" ? player : player.token;
+    const name = player.display_name || "Nicht registriert";
+    const status = player.status || "not_submitted";
+
+    // Status badge
+    let statusBadge = "";
+    let statusClass = "";
+    switch (status) {
+      case "submitted":
+        statusBadge = "✅ Eingereicht";
+        statusClass = "submitted";
+        break;
+      case "checking_typos":
+        statusBadge = "🔄 Prüft...";
+        statusClass = "checking";
+        break;
+      default:
+        statusBadge = "⏳ Wartet";
+        statusClass = "waiting";
+    }
+
     div.innerHTML = `
-            <span>Spieler ${idx + 1}: <span class="token">${token}</span></span>
-            <button onclick="copyToClipboard('${token}')">Kopieren</button>
-        `;
+      <div class="player-info">
+        <div class="player-header">
+          <span class="player-name">${escapeHtml(name)}</span>
+          <span class="status-badge ${statusClass}">${statusBadge}</span>
+        </div>
+        <div class="player-token">
+          <span class="token">${token}</span>
+          <button onclick="copyToClipboard('${token}')" class="copy-btn">📋</button>
+        </div>
+      </div>
+    `;
     container.appendChild(div);
   });
+
+  // Update overview count
+  const overviewPlayers = document.getElementById("overviewPlayers");
+  if (overviewPlayers) {
+    overviewPlayers.textContent = players.length;
+  }
 }
 
 function updateSubmissionsList() {

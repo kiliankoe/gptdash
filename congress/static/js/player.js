@@ -10,6 +10,7 @@ let currentPhase = null;
 let currentPrompt = null;
 let hasSubmitted = false;
 let playerTimer = null;
+let pendingTypoCheck = null; // Track pending typo check data
 const MAX_CHARS = 500;
 const WARN_THRESHOLD = 450;
 const STORAGE_KEY = "gptdash_player_token";
@@ -135,7 +136,30 @@ function handleMessage(message) {
 
     case "submission_confirmed":
       hasSubmitted = true;
-      showScreen("submittedScreen");
+      // If we were showing the typo correction screen, stay there
+      // Otherwise show submitted screen
+      if (
+        document.getElementById("typoCheckScreen")?.classList.contains("active")
+      ) {
+        // We just accepted a correction, go to submitted screen
+        showScreen("submittedScreen");
+        pendingTypoCheck = null;
+      } else if (!pendingTypoCheck) {
+        // Normal submission confirmed, now request typo check
+        showScreen("submittedScreen");
+        // Request typo check in background
+        const answerInput = document.getElementById("answerInput");
+        if (answerInput?.value.trim()) {
+          requestTypoCheck(answerInput.value.trim());
+        }
+      } else {
+        // Submission confirmed while typo check is pending - show submitted
+        showScreen("submittedScreen");
+      }
+      break;
+
+    case "typo_check_result":
+      handleTypoCheckResult(message);
       break;
 
     case "player_registered":
@@ -364,12 +388,109 @@ function handleError(message) {
   }
 }
 
+function requestTypoCheck(text) {
+  if (!wsConn || !wsConn.isConnected()) {
+    console.warn("Cannot request typo check: not connected");
+    return;
+  }
+
+  pendingTypoCheck = { original: text };
+
+  wsConn.send({
+    t: "request_typo_check",
+    player_token: playerToken,
+    text: text,
+  });
+
+  console.log("Requested typo check for submission");
+}
+
+function handleTypoCheckResult(message) {
+  console.log("Typo check result:", message.has_changes);
+
+  if (!message.has_changes) {
+    // No changes needed, stay on submitted screen
+    pendingTypoCheck = null;
+    return;
+  }
+
+  // Store the correction data
+  pendingTypoCheck = {
+    original: message.original,
+    corrected: message.corrected,
+  };
+
+  // Show the comparison UI
+  showTypoCheckScreen(message.original, message.corrected);
+}
+
+function showTypoCheckScreen(original, corrected) {
+  // Update the comparison texts
+  const originalEl = document.getElementById("originalText");
+  const correctedEl = document.getElementById("correctedText");
+
+  if (originalEl) {
+    originalEl.textContent = original;
+  }
+  if (correctedEl) {
+    correctedEl.textContent = corrected;
+  }
+
+  showScreen("typoCheckScreen");
+}
+
+function acceptCorrection() {
+  if (!pendingTypoCheck || !pendingTypoCheck.corrected) {
+    console.error("No pending correction to accept");
+    return;
+  }
+
+  if (!wsConn || !wsConn.isConnected()) {
+    showError("typoError", "Verbindung verloren. Bitte versuche es erneut.");
+    return;
+  }
+
+  // We need to get the submission ID from the server
+  // Since we already submitted, we send an update
+  // The server will find our submission by player token
+  wsConn.send({
+    t: "submit_answer",
+    player_token: playerToken,
+    text: pendingTypoCheck.corrected,
+  });
+
+  // Show submitting state
+  showScreen("submittedScreen");
+  pendingTypoCheck = null;
+}
+
+function rejectCorrection() {
+  // Keep original (already submitted), just close the comparison
+  pendingTypoCheck = null;
+  showScreen("submittedScreen");
+}
+
+function editManually() {
+  // Go back to writing screen with the original text
+  const answerInput = document.getElementById("answerInput");
+  if (answerInput && pendingTypoCheck) {
+    answerInput.value = pendingTypoCheck.original;
+    updateCharCounter();
+  }
+  pendingTypoCheck = null;
+  hasSubmitted = false; // Allow resubmission
+  showWritingScreen();
+}
+
 if (typeof window !== "undefined") {
   Object.assign(window, {
     joinGame,
     registerName,
     submitAnswer,
     editAnswer,
+    acceptCorrection,
+    rejectCorrection,
+    editManually,
   });
 }
 

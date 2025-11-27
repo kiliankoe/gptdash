@@ -133,4 +133,58 @@ impl AppState {
 
         Ok(player_id)
     }
+
+    /// Update a player's submission (after typo correction acceptance)
+    /// Only the owning player can update their own submission
+    pub async fn update_player_submission(
+        &self,
+        submission_id: &str,
+        player_id: &str,
+        new_text: String,
+    ) -> Result<(), String> {
+        // Check for exact duplicates with the new text
+        let round_id = {
+            let submissions = self.submissions.read().await;
+            let submission = submissions
+                .get(submission_id)
+                .ok_or_else(|| "Submission not found".to_string())?;
+
+            // Verify player owns this submission
+            if submission.author_kind != AuthorKind::Player {
+                return Err("Cannot update non-player submission".to_string());
+            }
+            if submission.author_ref.as_ref() != Some(&player_id.to_string()) {
+                return Err("Not authorized to update this submission".to_string());
+            }
+
+            submission.round_id.clone()
+        };
+
+        // Check for duplicates with the new text
+        let normalized_new = normalize(&new_text);
+        let existing = self.get_submissions(&round_id).await;
+        for existing_sub in &existing {
+            // Skip the submission being updated
+            if existing_sub.id == submission_id {
+                continue;
+            }
+            if normalize(&existing_sub.original_text) == normalized_new {
+                return Err("DUPLICATE_EXACT".to_string());
+            }
+        }
+
+        // Update the submission
+        {
+            let mut submissions = self.submissions.write().await;
+            if let Some(submission) = submissions.get_mut(submission_id) {
+                submission.original_text = new_text.clone();
+                submission.display_text = new_text;
+            }
+        }
+
+        // Broadcast updated submissions list
+        self.broadcast_submissions(&round_id).await;
+
+        Ok(())
+    }
 }

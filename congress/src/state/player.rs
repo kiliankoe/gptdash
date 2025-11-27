@@ -1,4 +1,5 @@
 use super::AppState;
+use crate::protocol::{PlayerStatusInfo, PlayerSubmissionStatus};
 use crate::types::*;
 use rand::Rng;
 
@@ -93,5 +94,71 @@ impl AppState {
             .values()
             .find(|v| v.round_id == round.id && v.voter_id == *voter_id)
             .cloned()
+    }
+
+    /// Set player submission status
+    pub async fn set_player_status(&self, player_id: &PlayerId, status: PlayerSubmissionStatus) {
+        self.player_status
+            .write()
+            .await
+            .insert(player_id.clone(), status);
+    }
+
+    /// Get player submission status
+    pub async fn get_player_status(&self, player_id: &PlayerId) -> PlayerSubmissionStatus {
+        self.player_status
+            .read()
+            .await
+            .get(player_id)
+            .cloned()
+            .unwrap_or(PlayerSubmissionStatus::NotSubmitted)
+    }
+
+    /// Get all players with their status info (for host display)
+    pub async fn get_all_player_status(&self) -> Vec<PlayerStatusInfo> {
+        let players = self.players.read().await;
+        let statuses = self.player_status.read().await;
+
+        // Check which players have submitted in the current round
+        let round = self.get_current_round().await;
+        let submissions = self.submissions.read().await;
+
+        let submitted_player_ids: std::collections::HashSet<_> = if let Some(ref r) = round {
+            submissions
+                .values()
+                .filter(|s| s.round_id == r.id && s.author_kind == AuthorKind::Player)
+                .filter_map(|s| s.author_ref.clone())
+                .collect()
+        } else {
+            std::collections::HashSet::new()
+        };
+
+        players
+            .values()
+            .map(|p| {
+                // Determine status: if they have a submission, they're Submitted
+                // Otherwise check the status map (for CheckingTypos) or default to NotSubmitted
+                let status = if submitted_player_ids.contains(&p.id) {
+                    PlayerSubmissionStatus::Submitted
+                } else {
+                    statuses
+                        .get(&p.id)
+                        .cloned()
+                        .unwrap_or(PlayerSubmissionStatus::NotSubmitted)
+                };
+
+                PlayerStatusInfo {
+                    id: p.id.clone(),
+                    token: p.token.clone(),
+                    display_name: p.display_name.clone(),
+                    status,
+                }
+            })
+            .collect()
+    }
+
+    /// Clear all player statuses (for new round)
+    pub async fn clear_player_statuses(&self) {
+        self.player_status.write().await.clear();
     }
 }

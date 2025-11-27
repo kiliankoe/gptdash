@@ -108,6 +108,37 @@
             </div>
         </div>
 
+        <!-- Typo Check Screen -->
+        <div class="screen" id="typoCheckScreen">
+            <div class="card">
+                <h2>Korrekturvorschlag</h2>
+                <p class="typo-intro">Wir haben mögliche Verbesserungen gefunden:</p>
+
+                <div class="comparison-container">
+                    <div class="comparison-box original">
+                        <div class="comparison-label">Deine Eingabe</div>
+                        <div class="comparison-text" id="originalText"></div>
+                    </div>
+
+                    <div class="comparison-arrow">→</div>
+
+                    <div class="comparison-box corrected">
+                        <div class="comparison-label">Korrigiert</div>
+                        <div class="comparison-text" id="correctedText"></div>
+                    </div>
+                </div>
+
+                <div id="typoError" class="error-message" style="display: none;"></div>
+
+                <div class="button-group">
+                    <button onclick="acceptCorrection()" class="primary">Korrektur übernehmen</button>
+                    <button onclick="rejectCorrection()" class="secondary">Original behalten</button>
+                </div>
+
+                <button onclick="editManually()" class="text-button">Selbst bearbeiten</button>
+            </div>
+        </div>
+
         <!-- Locked Screen (after writing phase ends) -->
         <div class="screen" id="lockedScreen">
             <div class="card">

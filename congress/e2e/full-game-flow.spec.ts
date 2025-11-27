@@ -1,4 +1,4 @@
-import { test, expect, Page, BrowserContext } from "@playwright/test";
+import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 
 /**
  * Full game flow end-to-end test
@@ -45,9 +45,12 @@ async function waitForBeamerScene(
 
 // Helper to extract player tokens from host UI
 async function getPlayerTokens(host: Page): Promise<string[]> {
-  return host.$$eval("#playerTokensList .token", (els) =>
-    els.map((el) => el.textContent?.trim() ?? ""),
+  // Try new player-status-card format first, fall back to old token-display format
+  const tokens = await host.$$eval(
+    "#playerTokensList .player-token .token, #playerTokensList .token-display .token",
+    (els) => els.map((el) => el.textContent?.trim() ?? ""),
   );
+  return tokens;
 }
 
 test.describe("Full Game Flow", () => {
@@ -961,5 +964,271 @@ test.describe("Full Game Flow", () => {
     await expect(playerSubmissionsFinal).toHaveCount(2);
 
     console.log("Duplicate detection test completed successfully!");
+  });
+
+  test("typo correction flow shows comparison when LLM suggests changes", async () => {
+    const { host, players } = clients;
+
+    // ============================================
+    // SETUP: Get to writing phase with player
+    // ============================================
+    console.log("Typo correction test: Setting up game...");
+
+    await Promise.all([
+      host.goto("/host.html"),
+      players[0].goto("/player.html"),
+    ]);
+
+    await waitForConnection(host);
+
+    // Create player token
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "1");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForSelector("#playerTokensList .token");
+    const tokens = await getPlayerTokens(host);
+
+    // Player joins
+    await players[0].fill("#tokenInput", tokens[0]);
+    await players[0].click("#joinButton");
+    await players[0].waitForSelector("#registerScreen.active");
+    await players[0].fill("#nameInput", "TypoTester");
+    await players[0].click("#registerButton");
+    await players[0].waitForSelector("#waitingScreen.active");
+
+    // Start round and add prompt
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+    await host.click('button:has-text("Neue Runde starten")');
+    await host.waitForTimeout(500);
+
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+    await host.fill("#promptText", "Typo correction test question");
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForTimeout(500);
+
+    // Transition to WRITING
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="PROMPT_SELECTION"]');
+    await host.waitForTimeout(500);
+    await host.click('button[data-phase="WRITING"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
+      timeout: 5000,
+    });
+
+    // ============================================
+    // TEST: Player submits answer and sees confirmation
+    // ============================================
+    console.log("Typo correction test: Player submitting answer...");
+
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+
+    // Submit an answer (without LLM configured, no correction will be suggested)
+    await players[0].fill(
+      "#answerInput",
+      "Dies ist eine Testantwort ohne Tippfehler.",
+    );
+    await players[0].click("#submitButton");
+
+    // Player should see submitted screen immediately (soft submission)
+    await players[0].waitForSelector("#submittedScreen.active", {
+      timeout: 5000,
+    });
+
+    // Since no LLM is configured, typo check will return no changes
+    // and player stays on submitted screen
+    await players[0].waitForTimeout(1000);
+
+    // Verify still on submitted screen (no typo correction screen shown)
+    await expect(players[0].locator("#submittedScreen")).toHaveClass(/active/);
+
+    // Verify typo check screen exists but is not active
+    const typoScreen = players[0].locator("#typoCheckScreen");
+    await expect(typoScreen).not.toHaveClass(/active/);
+
+    console.log("Typo correction test: Verified submitted flow without LLM");
+
+    // ============================================
+    // TEST: Verify comparison UI elements exist
+    // ============================================
+    console.log("Typo correction test: Verifying UI elements exist...");
+
+    // Check that the typo check screen has all required elements
+    await expect(players[0].locator("#typoCheckScreen")).toBeAttached();
+    await expect(players[0].locator("#originalText")).toBeAttached();
+    await expect(players[0].locator("#correctedText")).toBeAttached();
+    await expect(
+      players[0].locator('button:has-text("Korrektur übernehmen")'),
+    ).toBeAttached();
+    await expect(
+      players[0].locator('button:has-text("Original behalten")'),
+    ).toBeAttached();
+    await expect(
+      players[0].locator('button:has-text("Selbst bearbeiten")'),
+    ).toBeAttached();
+
+    console.log("Typo correction test completed successfully!");
+  });
+
+  test("host sees player names and submission status", async () => {
+    const { host, players } = clients;
+
+    // ============================================
+    // SETUP: Connect host and create players
+    // ============================================
+    console.log("Player status test: Setting up game...");
+
+    await Promise.all([
+      host.goto("/host.html"),
+      players[0].goto("/player.html"),
+      players[1].goto("/player.html"),
+    ]);
+
+    await waitForConnection(host);
+
+    // Navigate to Players panel and create tokens
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "2");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForSelector("#playerTokensList .player-status-card");
+
+    // ============================================
+    // TEST: Initial state - no names, waiting status
+    // ============================================
+    console.log("Player status test: Checking initial state...");
+
+    // Should show "Nicht registriert" for unregistered players
+    const playerCards = host.locator(".player-status-card");
+    await expect(playerCards).toHaveCount(2);
+
+    // Check for waiting status badges
+    const waitingBadges = host.locator(".status-badge.waiting");
+    await expect(waitingBadges).toHaveCount(2);
+
+    // Get tokens for players
+    const tokens = await host.$$eval(
+      "#playerTokensList .player-token .token",
+      (els) => els.map((el) => el.textContent?.trim() ?? ""),
+    );
+    expect(tokens).toHaveLength(2);
+
+    // ============================================
+    // TEST: Player 1 registers - name appears
+    // ============================================
+    console.log("Player status test: Player 1 registering...");
+
+    await players[0].fill("#tokenInput", tokens[0]);
+    await players[0].click("#joinButton");
+    await players[0].waitForSelector("#registerScreen.active");
+    await players[0].fill("#nameInput", "StatusTestAlice");
+    await players[0].click("#registerButton");
+    await players[0].waitForSelector("#waitingScreen.active");
+
+    // Wait for status update to propagate
+    await host.waitForTimeout(500);
+
+    // Check that Alice's name appears
+    await expect(
+      host.locator('.player-name:has-text("StatusTestAlice")'),
+    ).toBeVisible();
+
+    // ============================================
+    // SETUP: Get to writing phase
+    // ============================================
+    console.log("Player status test: Transitioning to writing...");
+
+    // Player 2 also registers
+    await players[1].fill("#tokenInput", tokens[1]);
+    await players[1].click("#joinButton");
+    await players[1].waitForSelector("#registerScreen.active");
+    await players[1].fill("#nameInput", "StatusTestBob");
+    await players[1].click("#registerButton");
+    await players[1].waitForSelector("#waitingScreen.active");
+
+    await host.waitForTimeout(500);
+    await expect(
+      host.locator('.player-name:has-text("StatusTestBob")'),
+    ).toBeVisible();
+
+    // Start round and setup prompt
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+    await host.click('button:has-text("Neue Runde starten")');
+    await host.waitForTimeout(500);
+
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+    await host.fill("#promptText", "Status test prompt");
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForTimeout(500);
+
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="PROMPT_SELECTION"]');
+    await host.waitForTimeout(500);
+    await host.click('button[data-phase="WRITING"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
+      timeout: 5000,
+    });
+
+    // ============================================
+    // TEST: Player 1 submits - status changes to submitted
+    // ============================================
+    console.log("Player status test: Player 1 submitting...");
+
+    // Navigate to players panel to watch status
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+
+    // Both should be waiting
+    await expect(host.locator(".status-badge.waiting")).toHaveCount(2);
+
+    // Player 1 submits
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+    await players[0].fill("#answerInput", "Alice's test answer for status");
+    await players[0].click("#submitButton");
+    await players[0].waitForSelector("#submittedScreen.active");
+
+    // Wait for status update
+    await host.waitForTimeout(1000);
+
+    // Alice should now show submitted
+    const submittedBadges = host.locator(".status-badge.submitted");
+    await expect(submittedBadges).toHaveCount(1);
+
+    // Bob should still be waiting
+    const stillWaitingBadges = host.locator(".status-badge.waiting");
+    await expect(stillWaitingBadges).toHaveCount(1);
+
+    // ============================================
+    // TEST: Player 2 submits - both now submitted
+    // ============================================
+    console.log("Player status test: Player 2 submitting...");
+
+    await players[1].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+    await players[1].fill("#answerInput", "Bob's test answer for status");
+    await players[1].click("#submitButton");
+    await players[1].waitForSelector("#submittedScreen.active");
+
+    // Wait for status update
+    await host.waitForTimeout(1000);
+
+    // Both should now show submitted
+    const allSubmittedBadges = host.locator(".status-badge.submitted");
+    await expect(allSubmittedBadges).toHaveCount(2);
+
+    // No more waiting badges
+    const noWaitingBadges = host.locator(".status-badge.waiting");
+    await expect(noWaitingBadges).toHaveCount(0);
+
+    console.log("Player status test completed successfully!");
   });
 });

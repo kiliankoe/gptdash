@@ -79,7 +79,7 @@ pub trait LlmProvider: Send + Sync {
 
 /// Manager for multiple LLM providers
 pub struct LlmManager {
-    providers: Vec<Box<dyn LlmProvider>>,
+    pub providers: Vec<Box<dyn LlmProvider>>,
 }
 
 impl LlmManager {
@@ -203,6 +203,80 @@ impl LlmConfig {
 
         Ok(LlmManager::new(providers))
     }
+}
+
+/// System prompt for German typo correction
+const TYPO_CORRECTION_SYSTEM_PROMPT: &str = r#"Du bist ein Rechtschreib- und Grammatikprüfer für deutsche Texte.
+
+Korrigiere NUR:
+- Rechtschreibfehler
+- Groß-/Kleinschreibung
+- Grammatikfehler
+- Zeichensetzung
+
+Ändere NICHTS anderes:
+- Keine Umformulierungen
+- Keine Stiländerungen
+- Kein Hinzufügen oder Entfernen von Inhalten
+- Behalte den ursprünglichen Ton bei
+
+Gib NUR den korrigierten Text zurück, ohne Erklärungen oder Kommentare."#;
+
+/// Check and correct typos in German text
+/// Returns the corrected text, or the original if correction fails
+pub async fn check_typos(provider: &dyn LlmProvider, text: &str) -> String {
+    let request = GenerateRequest {
+        prompt: text.to_string(),
+        image_url: None,
+        max_tokens: Some(500), // Allow for text that might slightly expand
+        timeout: Duration::from_secs(5), // Short timeout for typo check
+    };
+
+    match check_typos_with_system_prompt(provider, request).await {
+        Ok(response) => {
+            let corrected = response.text.trim().to_string();
+            // Sanity check: if the response is drastically different in length, use original
+            // (LLM might have hallucinated)
+            let len_ratio = corrected.len() as f64 / text.len() as f64;
+            if !(0.5..=2.0).contains(&len_ratio) {
+                tracing::warn!(
+                    "Typo correction output length differs too much ({:.1}x), using original",
+                    len_ratio
+                );
+                text.to_string()
+            } else if corrected.is_empty() {
+                tracing::warn!("Typo correction returned empty, using original");
+                text.to_string()
+            } else {
+                corrected
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Typo correction failed: {}, using original text", e);
+            text.to_string()
+        }
+    }
+}
+
+/// Internal function to call LLM with typo correction system prompt
+async fn check_typos_with_system_prompt(
+    provider: &dyn LlmProvider,
+    request: GenerateRequest,
+) -> LlmResult<GenerateResponse> {
+    // For OpenAI, we need to use a custom system prompt
+    // Since the trait doesn't support system prompts directly,
+    // we'll prepend instructions to the user prompt
+    let modified_request = GenerateRequest {
+        prompt: format!(
+            "{}\n\nText zu korrigieren:\n{}",
+            TYPO_CORRECTION_SYSTEM_PROMPT, request.prompt
+        ),
+        image_url: request.image_url,
+        max_tokens: request.max_tokens,
+        timeout: request.timeout,
+    };
+
+    provider.generate(modified_request).await
 }
 
 #[cfg(test)]
