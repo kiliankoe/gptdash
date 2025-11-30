@@ -1,3 +1,4 @@
+pub mod export;
 mod game;
 mod player;
 mod round;
@@ -8,6 +9,7 @@ pub mod vote;
 use crate::llm::{LlmConfig, LlmManager};
 use crate::protocol::{PlayerSubmissionStatus, ServerMessage};
 use crate::types::*;
+use export::GameStateExport;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
@@ -71,6 +73,63 @@ impl AppState {
     /// Broadcast a message to host clients only
     pub fn broadcast_to_host(&self, msg: ServerMessage) {
         let _ = self.host_broadcast.send(msg);
+    }
+
+    /// Export the entire game state as a serializable snapshot.
+    ///
+    /// Acquires all locks to ensure a consistent snapshot.
+    pub async fn export_state(&self) -> GameStateExport {
+        // Acquire all locks to get a consistent snapshot
+        let game = self.game.read().await.clone();
+        let rounds = self.rounds.read().await.clone();
+        let submissions = self.submissions.read().await.clone();
+        let votes = self.votes.read().await.clone();
+        let players = self.players.read().await.clone();
+        let scores = self.scores.read().await.clone();
+        let processed_vote_msg_ids = self.processed_vote_msg_ids.read().await.clone();
+        let player_status = self.player_status.read().await.clone();
+
+        GameStateExport::new(
+            game,
+            rounds,
+            submissions,
+            votes,
+            players,
+            scores,
+            processed_vote_msg_ids,
+            player_status,
+        )
+    }
+
+    /// Import a state snapshot, replacing all current state.
+    ///
+    /// This validates the import first, then atomically replaces all state.
+    /// After import, broadcasts a full state refresh to all connected clients.
+    pub async fn import_state(&self, export: GameStateExport) -> Result<(), String> {
+        // Validate before importing
+        export.validate()?;
+
+        // Acquire all write locks and replace state
+        *self.game.write().await = export.game.clone();
+        *self.rounds.write().await = export.rounds;
+        *self.submissions.write().await = export.submissions;
+        *self.votes.write().await = export.votes;
+        *self.players.write().await = export.players;
+        *self.scores.write().await = export.scores;
+        *self.processed_vote_msg_ids.write().await = export.processed_vote_msg_ids;
+        *self.player_status.write().await = export.player_status;
+
+        // Broadcast state refresh to all clients
+        if let Some(ref game) = export.game {
+            let valid_transitions = Self::get_valid_transitions(&game.phase);
+            self.broadcast_to_all(ServerMessage::GameState {
+                game: game.clone(),
+                valid_transitions,
+            });
+        }
+
+        tracing::info!("State imported successfully");
+        Ok(())
     }
 }
 

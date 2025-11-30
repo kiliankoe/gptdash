@@ -1,10 +1,14 @@
-use axum::{middleware, routing::get, Router};
+use axum::{
+    middleware,
+    routing::{get, post},
+    Router,
+};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use gptdash::{abuse, auth, broadcast, llm, state::AppState, ws};
+use gptdash::{abuse, api, auth, broadcast, llm, state::AppState, ws};
 
 #[tokio::main]
 async fn main() {
@@ -62,6 +66,8 @@ async fn main() {
     // Protected host routes (with HTTP Basic Auth)
     let host_routes = Router::new()
         .route("/host.html", get(auth::serve_host_html))
+        .route("/api/state/export", get(api::export_state))
+        .route("/api/state/import", post(api::import_state))
         .layer(middleware::from_fn_with_state(
             auth_config.clone(),
             auth::host_auth_middleware,

@@ -40,6 +40,7 @@
             <div class="sidebar-item" onclick="showPanel('prompts')">Prompts</div>
             <div class="sidebar-item" onclick="showPanel('submissions')">Antworten</div>
             <div class="sidebar-item" onclick="showPanel('scores')">Punkte</div>
+            <div class="sidebar-item" onclick="showPanel('state')">State-Export</div>
             <div class="sidebar-item" onclick="showPanel('logs')">Nachrichten-Log</div>
         </div>
 
@@ -270,6 +271,54 @@
                     <div id="audienceScores">
                         <p style="opacity: 0.6;">Noch keine Publikums-Punkte</p>
                     </div>
+                </div>
+            </div>
+
+            <!-- State Export/Import Panel -->
+            <div class="panel" id="state">
+                <h2>State-Verwaltung</h2>
+
+                <div class="card">
+                    <div class="card-header">Export</div>
+                    <p style="opacity: 0.8; margin-bottom: 15px;">
+                        Exportiere den kompletten Spielzustand als JSON-Datei für Backup oder Debugging.
+                    </p>
+                    <div class="button-group">
+                        <button onclick="refreshStateView()">Aktualisieren</button>
+                        <button onclick="downloadStateExport()">Als Datei herunterladen</button>
+                        <button onclick="copyStateToClipboard()" class="secondary">In Zwischenablage</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Aktueller Zustand</div>
+                    <div style="position: relative;">
+                        <pre id="stateJsonView" class="state-json-view">Klicke "Aktualisieren" um den Zustand zu laden...</pre>
+                    </div>
+                </div>
+
+                <div class="card" style="border: 2px solid #ff9800;">
+                    <div class="card-header" style="color: #ff9800;">⚠️ Import (Vorsicht!)</div>
+                    <p style="opacity: 0.8; margin-bottom: 15px;">
+                        <strong>Warnung:</strong> Der Import ersetzt den gesamten Spielzustand!
+                        Alle verbundenen Clients werden über den neuen Zustand informiert.
+                    </p>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px;">JSON-Datei hochladen:</label>
+                        <input type="file" id="stateImportFile" accept=".json" onchange="handleStateFileSelect(event)" style="margin-bottom: 10px;">
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px;">Oder JSON einfügen:</label>
+                        <textarea id="stateImportText" placeholder='{"schema_version": 1, ...}' style="height: 150px; font-family: monospace; font-size: 12px;"></textarea>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="validateStateImport()" class="secondary">Validieren</button>
+                        <button onclick="executeStateImport()" class="danger">Importieren</button>
+                    </div>
+                    <div id="stateImportStatus" style="margin-top: 10px;"></div>
                 </div>
             </div>
 
