@@ -68,6 +68,12 @@ pub enum ClientMessage {
     HostExtendTimer {
         seconds: u32,
     },
+    /// Regenerate AI submissions (retry after failure or get new options)
+    HostRegenerateAi,
+    /// Manually write an AI submission (host override)
+    HostWriteAiSubmission {
+        text: String,
+    },
     /// Request typo correction for text before final submission
     RequestTypoCheck {
         player_token: String,
@@ -182,10 +188,32 @@ pub enum ServerMessage {
     HostPlayerStatus {
         players: Vec<PlayerStatusInfo>,
     },
+    /// AI generation status update (sent to host only)
+    AiGenerationStatus {
+        status: AiGenStatus,
+        provider: Option<String>,
+        message: Option<String>,
+    },
     Error {
         code: String,
         msg: String,
     },
+}
+
+/// Status of AI generation
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum AiGenStatus {
+    /// Generation started
+    Started,
+    /// A provider completed successfully
+    ProviderSuccess,
+    /// A provider failed
+    ProviderFailed,
+    /// All providers completed
+    Completed,
+    /// All providers failed
+    AllFailed,
 }
 
 /// Audience vote info for state recovery

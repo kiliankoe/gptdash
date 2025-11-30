@@ -134,6 +134,38 @@ impl AppState {
         Ok(player_id)
     }
 
+    /// Create a manual AI submission (host override when LLM fails)
+    pub async fn create_manual_ai_submission(
+        &self,
+        round_id: &str,
+        text: String,
+    ) -> Result<Submission, String> {
+        // Validate round exists
+        let rounds = self.rounds.read().await;
+        if !rounds.contains_key(round_id) {
+            return Err("Round not found".to_string());
+        }
+        drop(rounds);
+
+        let submission = Submission {
+            id: ulid::Ulid::new().to_string(),
+            round_id: round_id.to_string(),
+            author_kind: AuthorKind::Ai,
+            author_ref: Some("host:manual".to_string()),
+            original_text: text.clone(),
+            display_text: text,
+            edited_by_host: Some(true),
+            tts_asset_url: None,
+        };
+
+        self.submissions
+            .write()
+            .await
+            .insert(submission.id.clone(), submission.clone());
+
+        Ok(submission)
+    }
+
     /// Update a player's submission (after typo correction acceptance)
     /// Only the owning player can update their own submission
     pub async fn update_player_submission(

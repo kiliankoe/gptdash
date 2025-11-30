@@ -944,3 +944,339 @@ async fn test_submission_update_unauthorized() {
 
     println!("✅ Submission update unauthorized test passed!");
 }
+
+/// Test manual AI submission creation by host
+#[tokio::test]
+async fn test_host_write_ai_submission() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Setup round with prompt
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+        .await
+        .unwrap();
+    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+
+    // Host writes manual AI submission
+    let result = handle_message(
+        ClientMessage::HostWriteAiSubmission {
+            text: "This is a manually written AI answer".to_string(),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Should return None on success (broadcast handled separately)
+    assert!(result.is_none(), "Should return None on success");
+
+    // Verify submission was created
+    let submissions = state.get_submissions(&round.id).await;
+    let ai_submission = submissions
+        .iter()
+        .find(|s| s.author_kind == gptdash::types::AuthorKind::Ai)
+        .expect("Should find AI submission");
+
+    assert_eq!(
+        ai_submission.display_text, "This is a manually written AI answer",
+        "AI submission should have correct text"
+    );
+    assert_eq!(
+        ai_submission.author_ref,
+        Some("host:manual".to_string()),
+        "AI submission should be marked as host:manual"
+    );
+
+    println!("✅ Host write AI submission test passed!");
+}
+
+/// Test manual AI submission requires host role
+#[tokio::test]
+async fn test_host_write_ai_submission_unauthorized() {
+    let state = Arc::new(AppState::new());
+    let audience_role = Role::Audience;
+
+    state.create_game().await;
+
+    // Audience tries to write AI submission (should fail)
+    let result = handle_message(
+        ClientMessage::HostWriteAiSubmission {
+            text: "Hacker AI answer".to_string(),
+        },
+        &audience_role,
+        &state,
+    )
+    .await;
+
+    match result {
+        Some(ServerMessage::Error { code, .. }) => {
+            assert_eq!(code, "UNAUTHORIZED");
+        }
+        _ => panic!("Expected unauthorized error"),
+    }
+
+    println!("✅ Host write AI submission unauthorized test passed!");
+}
+
+/// Test manual AI submission requires active round
+#[tokio::test]
+async fn test_host_write_ai_submission_no_round() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Try to write AI submission without starting a round
+    let result = handle_message(
+        ClientMessage::HostWriteAiSubmission {
+            text: "AI answer without round".to_string(),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    match result {
+        Some(ServerMessage::Error { code, .. }) => {
+            assert_eq!(code, "NO_ACTIVE_ROUND");
+        }
+        _ => panic!("Expected NO_ACTIVE_ROUND error"),
+    }
+
+    println!("✅ Host write AI submission no round test passed!");
+}
+
+/// Test AI regeneration requires host role
+#[tokio::test]
+async fn test_host_regenerate_ai_unauthorized() {
+    let state = Arc::new(AppState::new());
+    let audience_role = Role::Audience;
+
+    state.create_game().await;
+
+    // Audience tries to regenerate AI (should fail)
+    let result = handle_message(ClientMessage::HostRegenerateAi, &audience_role, &state).await;
+
+    match result {
+        Some(ServerMessage::Error { code, .. }) => {
+            assert_eq!(code, "UNAUTHORIZED");
+        }
+        _ => panic!("Expected unauthorized error"),
+    }
+
+    println!("✅ Host regenerate AI unauthorized test passed!");
+}
+
+/// Test AI regeneration requires active round
+#[tokio::test]
+async fn test_host_regenerate_ai_no_round() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Try to regenerate AI without starting a round
+    let result = handle_message(ClientMessage::HostRegenerateAi, &host_role, &state).await;
+
+    match result {
+        Some(ServerMessage::Error { code, .. }) => {
+            assert_eq!(code, "NO_ACTIVE_ROUND");
+        }
+        _ => panic!("Expected NO_ACTIVE_ROUND error"),
+    }
+
+    println!("✅ Host regenerate AI no round test passed!");
+}
+
+/// Test AI regeneration requires selected prompt
+#[tokio::test]
+async fn test_host_regenerate_ai_no_prompt() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Setup round without selecting prompt
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    // Try to regenerate AI without selecting a prompt
+    let result = handle_message(ClientMessage::HostRegenerateAi, &host_role, &state).await;
+
+    match result {
+        Some(ServerMessage::Error { code, .. }) => {
+            assert_eq!(code, "NO_PROMPT_SELECTED");
+        }
+        _ => panic!("Expected NO_PROMPT_SELECTED error"),
+    }
+
+    println!("✅ Host regenerate AI no prompt test passed!");
+}
+
+/// Test selecting AI submission for scoring
+#[tokio::test]
+async fn test_select_ai_submission() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Setup round with prompt
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+        .await
+        .unwrap();
+    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+
+    // Create two manual AI submissions
+    handle_message(
+        ClientMessage::HostWriteAiSubmission {
+            text: "First AI answer".to_string(),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(
+        ClientMessage::HostWriteAiSubmission {
+            text: "Second AI answer".to_string(),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Get submissions
+    let submissions = state.get_submissions(&round.id).await;
+    let ai_submissions: Vec<_> = submissions
+        .iter()
+        .filter(|s| s.author_kind == gptdash::types::AuthorKind::Ai)
+        .collect();
+
+    assert_eq!(ai_submissions.len(), 2, "Should have 2 AI submissions");
+
+    // Select the second AI submission
+    let second_ai_id = ai_submissions[1].id.clone();
+    let result = handle_message(
+        ClientMessage::HostSetAiSubmission {
+            submission_id: second_ai_id.clone(),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Should return None on success
+    assert!(result.is_none(), "Should return None on success");
+
+    // Verify the selection
+    let updated_round = state.get_current_round().await.expect("Should have round");
+    assert_eq!(
+        updated_round.ai_submission_id,
+        Some(second_ai_id),
+        "Should have selected the second AI submission"
+    );
+
+    println!("✅ Select AI submission test passed!");
+}
+
+/// Test create_manual_ai_submission state method directly
+#[tokio::test]
+async fn test_create_manual_ai_submission_method() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Setup round
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+
+    // Create manual AI submission directly
+    let result = state
+        .create_manual_ai_submission(&round.id, "Direct manual AI".to_string())
+        .await;
+
+    match result {
+        Ok(submission) => {
+            assert_eq!(submission.display_text, "Direct manual AI");
+            assert_eq!(submission.author_kind, gptdash::types::AuthorKind::Ai);
+            assert_eq!(submission.author_ref, Some("host:manual".to_string()));
+            assert_eq!(submission.edited_by_host, Some(true));
+        }
+        Err(e) => panic!("Expected success, got error: {}", e),
+    }
+
+    println!("✅ Create manual AI submission method test passed!");
+}
+
+/// Test create_manual_ai_submission with invalid round
+#[tokio::test]
+async fn test_create_manual_ai_submission_invalid_round() {
+    let state = Arc::new(AppState::new());
+
+    state.create_game().await;
+
+    // Try to create manual AI submission with invalid round ID
+    let result = state
+        .create_manual_ai_submission("invalid_round_id", "AI text".to_string())
+        .await;
+
+    match result {
+        Err(e) => {
+            assert!(
+                e.contains("Round not found"),
+                "Should indicate round not found"
+            );
+        }
+        Ok(_) => panic!("Expected error for invalid round"),
+    }
+
+    println!("✅ Create manual AI submission invalid round test passed!");
+}

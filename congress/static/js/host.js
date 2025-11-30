@@ -14,6 +14,8 @@ const gameState = {
   validTransitions: [], // Populated by server
   panicMode: false,
   deadline: null,
+  selectedAiSubmissionId: null, // Currently selected AI submission
+  aiGenerationStatus: "idle", // idle, generating, completed, failed
 };
 
 // Initialize
@@ -124,6 +126,10 @@ function handleMessage(message) {
         message.enabled ? "PANIK-MODUS AKTIVIERT" : "Panik-Modus deaktiviert",
         message.enabled ? "error" : "success",
       );
+      break;
+
+    case "ai_generation_status":
+      handleAiGenerationStatus(message);
       break;
 
     case "error":
@@ -332,6 +338,131 @@ function extendTimer(seconds) {
   });
 }
 
+// AI Management Functions
+function regenerateAi() {
+  wsConn.send({ t: "host_regenerate_ai" });
+  showAlert("KI-Generierung gestartet...", "info");
+}
+
+function writeManualAiSubmission() {
+  const text = document.getElementById("manualAiText").value.trim();
+  if (!text) {
+    showAlert("Bitte gib einen Text für die KI-Antwort ein", "error");
+    return;
+  }
+  wsConn.send({
+    t: "host_write_ai_submission",
+    text: text,
+  });
+  document.getElementById("manualAiText").value = "";
+  showAlert("Manuelle KI-Antwort gespeichert", "success");
+}
+
+function selectAiSubmission(submissionId) {
+  wsConn.send({
+    t: "host_set_ai_submission",
+    submission_id: submissionId,
+  });
+  gameState.selectedAiSubmissionId = submissionId;
+  updateAiSubmissionsList();
+  showAlert("KI-Antwort ausgewählt", "success");
+}
+
+function handleAiGenerationStatus(message) {
+  gameState.aiGenerationStatus = message.status;
+  updateAiGenerationStatusUI(message);
+
+  switch (message.status) {
+    case "started":
+      showAlert("KI-Generierung gestartet...", "info");
+      break;
+    case "completed":
+      showAlert("KI-Generierung abgeschlossen!", "success");
+      break;
+    case "all_failed":
+      showAlert(
+        `KI-Generierung fehlgeschlagen: ${message.message || "Unbekannter Fehler"}`,
+        "error",
+      );
+      break;
+  }
+}
+
+function updateAiGenerationStatusUI(message) {
+  const statusEl = document.getElementById("aiGenerationStatus");
+  if (!statusEl) return;
+
+  let statusText = "";
+  let statusClass = "";
+
+  switch (message?.status || gameState.aiGenerationStatus) {
+    case "started":
+      statusText = "KI-Status: Generiere Antworten...";
+      statusClass = "info";
+      break;
+    case "completed":
+      statusText = "KI-Status: Generierung abgeschlossen";
+      statusClass = "success";
+      break;
+    case "all_failed":
+      statusText = `KI-Status: Fehlgeschlagen - ${message?.message || "Alle Provider haben keine Antwort geliefert"}`;
+      statusClass = "error";
+      break;
+    default:
+      statusText = "KI-Status: Warte auf Prompt-Auswahl";
+      statusClass = "";
+  }
+
+  statusEl.innerHTML = `<p class="${statusClass}" style="margin: 0;">${statusText}</p>`;
+}
+
+function updateAiSubmissionsList() {
+  const container = document.getElementById("aiSubmissionsList");
+  if (!container) return;
+
+  const aiSubmissions = gameState.submissions.filter(
+    (s) => s.author_kind === "ai",
+  );
+
+  if (aiSubmissions.length === 0) {
+    container.innerHTML =
+      '<p style="opacity: 0.6;">Keine KI-Antworten vorhanden</p>';
+    return;
+  }
+
+  let html =
+    '<p style="margin-bottom: 10px; opacity: 0.8;">Wähle die KI-Antwort für diese Runde:</p>';
+  html += '<div class="ai-submissions-grid">';
+
+  aiSubmissions.forEach((sub) => {
+    const isSelected = gameState.selectedAiSubmissionId === sub.id;
+    const provider = sub.author_ref || "unbekannt";
+    // Parse provider info (format: "provider:model")
+    const providerParts = provider.split(":");
+    const providerName = providerParts[0] || "?";
+    const modelName = providerParts[1] || "";
+
+    html += `
+      <div class="ai-submission-card ${isSelected ? "selected" : ""}" onclick="selectAiSubmission('${sub.id}')">
+        <div class="ai-card-header">
+          <span class="provider-badge">${escapeHtml(providerName)}</span>
+          ${modelName ? `<span class="model-name">${escapeHtml(modelName)}</span>` : ""}
+          ${isSelected ? '<span class="selected-badge">AUSGEWÄHLT</span>' : ""}
+        </div>
+        <div class="ai-card-text">${escapeHtml(sub.display_text)}</div>
+        <div class="ai-card-actions">
+          <button class="${isSelected ? "" : "secondary"}" onclick="event.stopPropagation(); selectAiSubmission('${sub.id}')">
+            ${isSelected ? "Ausgewählt" : "Auswählen"}
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  html += "</div>";
+  container.innerHTML = html;
+}
+
 function updatePanicModeUI() {
   const panicBtn = document.getElementById("panicModeBtn");
   const panicStatus = document.getElementById("panicStatus");
@@ -465,6 +596,9 @@ function updateSubmissionsList() {
   if (!container) return;
   container.innerHTML = "";
 
+  // Also update the AI-specific submissions list
+  updateAiSubmissionsList();
+
   if (gameState.submissions.length === 0) {
     container.innerHTML = '<p style="opacity: 0.6;">Noch keine Antworten</p>';
     return;
@@ -473,15 +607,27 @@ function updateSubmissionsList() {
   gameState.submissions.forEach((sub) => {
     const div = document.createElement("div");
     const authorKind = sub.author_kind || "unknown";
-    div.className = `submission-card${authorKind === "ai" ? " ai" : ""}`;
+    const isSelectedAi =
+      authorKind === "ai" && gameState.selectedAiSubmissionId === sub.id;
+    div.className = `submission-card${authorKind === "ai" ? " ai" : ""}${isSelectedAi ? " selected-ai" : ""}`;
+
+    // Show provider info for AI submissions
+    const providerInfo =
+      authorKind === "ai" && sub.author_ref
+        ? `<span class="provider-info">(${escapeHtml(sub.author_ref)})</span>`
+        : "";
+
     div.innerHTML = `
             <div class="header">
                 <span>${sub.id}</span>
                 <span class="badge ${authorKind}">${authorKind.toUpperCase()}</span>
+                ${providerInfo}
+                ${isSelectedAi ? '<span class="badge selected">AUSGEWÄHLT</span>' : ""}
             </div>
             <div class="text">${escapeHtml(sub.display_text)}</div>
             <div class="actions">
                 ${authorKind === "player" ? `<button onclick="setAiSubmission('${sub.id}')">Als KI markieren</button>` : ""}
+                ${authorKind === "ai" && !isSelectedAi ? `<button onclick="selectAiSubmission('${sub.id}')">Als KI auswählen</button>` : ""}
                 ${authorKind === "player" ? `<button class="danger" onclick="markDuplicate('${sub.id}')">Dupe</button>` : ""}
                 <button class="secondary">Bearbeiten</button>
             </div>
@@ -601,5 +747,8 @@ if (typeof window !== "undefined") {
     setManualWinner,
     markDuplicate,
     extendTimer,
+    regenerateAi,
+    writeManualAiSubmission,
+    selectAiSubmission,
   });
 }

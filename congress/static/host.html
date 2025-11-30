@@ -204,8 +204,34 @@
             <div class="panel" id="submissions">
                 <h2>Antworten</h2>
 
+                <div class="card" style="border: 2px solid #4dabf7;">
+                    <div class="card-header" style="color: #4dabf7;">KI-Antwort Verwaltung</div>
+                    <div id="aiGenerationStatus" style="margin-bottom: 15px;">
+                        <p style="opacity: 0.6;">KI-Status: Warte auf Prompt-Auswahl</p>
+                    </div>
+
+                    <div id="aiSubmissionsList" style="margin-bottom: 15px;">
+                        <!-- AI submissions will be listed here for selection -->
+                    </div>
+
+                    <div class="button-group" style="margin-bottom: 15px;">
+                        <button onclick="regenerateAi()" class="secondary">KI neu generieren</button>
+                    </div>
+
+                    <details style="margin-top: 10px;">
+                        <summary style="cursor: pointer; opacity: 0.8;">Manuelle KI-Antwort (Notfall-Override)</summary>
+                        <div style="margin-top: 10px;">
+                            <p style="opacity: 0.7; font-size: 0.9em; margin-bottom: 10px;">
+                                Falls die automatische KI-Generierung fehlschlägt, kannst du hier manuell eine KI-Antwort eingeben.
+                            </p>
+                            <textarea id="manualAiText" placeholder="Manuelle KI-Antwort eingeben..." style="margin-bottom: 10px;"></textarea>
+                            <button onclick="writeManualAiSubmission()">Als KI-Antwort speichern</button>
+                        </div>
+                    </details>
+                </div>
+
                 <div class="card">
-                    <div class="card-header">Antworten verwalten</div>
+                    <div class="card-header">Alle Antworten</div>
                     <div id="submissionsList">
                         <p style="opacity: 0.6;">Noch keine Antworten</p>
                     </div>

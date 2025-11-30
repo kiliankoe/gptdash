@@ -152,6 +152,20 @@ pub async fn handle_message(
             handle_host_extend_timer(state, seconds).await
         }
 
+        ClientMessage::HostRegenerateAi => {
+            if *role != Role::Host {
+                return unauthorized("Only host can regenerate AI");
+            }
+            handle_host_regenerate_ai(state).await
+        }
+
+        ClientMessage::HostWriteAiSubmission { text } => {
+            if *role != Role::Host {
+                return unauthorized("Only host can write AI submissions");
+            }
+            handle_host_write_ai_submission(state, text).await
+        }
+
         ClientMessage::RequestTypoCheck { player_token, text } => {
             handle_request_typo_check(state, player_token, text).await
         }
@@ -587,6 +601,108 @@ async fn handle_host_extend_timer(state: &Arc<AppState>, seconds: u32) -> Option
         }
         Err(e) => Some(ServerMessage::Error {
             code: "EXTEND_TIMER_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+async fn handle_host_regenerate_ai(state: &Arc<AppState>) -> Option<ServerMessage> {
+    use crate::protocol::AiGenStatus;
+
+    tracing::info!("Host requesting AI regeneration");
+
+    let round = match state.get_current_round().await {
+        Some(r) => r,
+        None => {
+            return Some(ServerMessage::Error {
+                code: "NO_ACTIVE_ROUND".to_string(),
+                msg: "No active round".to_string(),
+            });
+        }
+    };
+
+    let prompt_text = match &round.selected_prompt {
+        Some(p) => match &p.text {
+            Some(t) => t.clone(),
+            None => {
+                return Some(ServerMessage::Error {
+                    code: "NO_PROMPT_TEXT".to_string(),
+                    msg: "Selected prompt has no text".to_string(),
+                });
+            }
+        },
+        None => {
+            return Some(ServerMessage::Error {
+                code: "NO_PROMPT_SELECTED".to_string(),
+                msg: "No prompt selected for this round".to_string(),
+            });
+        }
+    };
+
+    // Notify host that generation is starting
+    state.broadcast_to_host(ServerMessage::AiGenerationStatus {
+        status: AiGenStatus::Started,
+        provider: None,
+        message: Some("Generating AI submissions...".to_string()),
+    });
+
+    // Spawn generation in background
+    let state_clone = state.clone();
+    let round_id = round.id.clone();
+    tokio::spawn(async move {
+        match state_clone
+            .generate_ai_submissions(&round_id, &prompt_text)
+            .await
+        {
+            Ok(_) => {
+                state_clone.broadcast_to_host(ServerMessage::AiGenerationStatus {
+                    status: AiGenStatus::Completed,
+                    provider: None,
+                    message: Some("AI generation completed".to_string()),
+                });
+            }
+            Err(e) => {
+                state_clone.broadcast_to_host(ServerMessage::AiGenerationStatus {
+                    status: AiGenStatus::AllFailed,
+                    provider: None,
+                    message: Some(e),
+                });
+            }
+        }
+    });
+
+    None
+}
+
+async fn handle_host_write_ai_submission(
+    state: &Arc<AppState>,
+    text: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host writing manual AI submission");
+
+    let round = match state.get_current_round().await {
+        Some(r) => r,
+        None => {
+            return Some(ServerMessage::Error {
+                code: "NO_ACTIVE_ROUND".to_string(),
+                msg: "No active round".to_string(),
+            });
+        }
+    };
+
+    // Create a manual AI submission
+    match state
+        .create_manual_ai_submission(&round.id, text.clone())
+        .await
+    {
+        Ok(submission) => {
+            // Broadcast updated submissions
+            state.broadcast_submissions(&round.id).await;
+            tracing::info!("Manual AI submission created: {}", submission.id);
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "WRITE_AI_SUBMISSION_FAILED".to_string(),
             msg: e,
         }),
     }
