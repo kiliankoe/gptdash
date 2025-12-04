@@ -1,4 +1,7 @@
+pub mod audience;
 pub mod handlers;
+pub mod host;
+pub mod player;
 
 use axum::{
     extract::{

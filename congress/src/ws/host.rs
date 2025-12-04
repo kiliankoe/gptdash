@@ -1,0 +1,447 @@
+//! Host-only command handlers
+//!
+//! All handlers in this module require the Host role.
+//! Authorization is checked in the main dispatch layer before calling these.
+
+use crate::protocol::{AiGenStatus, ManualWinnerType, ServerMessage, SubmissionInfo};
+use crate::state::AppState;
+use std::sync::Arc;
+
+/// Broadcast current player status to host
+pub async fn broadcast_player_status_to_host(state: &Arc<AppState>) {
+    let players = state.get_all_player_status().await;
+    state.broadcast_to_host(ServerMessage::HostPlayerStatus { players });
+}
+
+pub async fn handle_create_players(state: &Arc<AppState>, count: u32) -> Option<ServerMessage> {
+    tracing::info!("Host creating {} players", count);
+    let mut players = Vec::new();
+    for _ in 0..count {
+        let player = state.create_player().await;
+        players.push(crate::protocol::PlayerToken {
+            id: player.id,
+            token: player.token,
+        });
+    }
+    // Broadcast updated player status to host
+    broadcast_player_status_to_host(state).await;
+    Some(ServerMessage::PlayersCreated { players })
+}
+
+pub async fn handle_transition_phase(
+    state: &Arc<AppState>,
+    phase: crate::types::GamePhase,
+) -> Option<ServerMessage> {
+    tracing::info!("Host transitioning to phase: {:?}", phase);
+    match state.transition_phase(phase).await {
+        Ok(_) => state.get_game().await.map(|game| {
+            let valid_transitions = AppState::get_valid_transitions(&game.phase);
+            ServerMessage::Phase {
+                phase: game.phase,
+                round_no: game.round_no,
+                server_now: chrono::Utc::now().to_rfc3339(),
+                deadline: game.phase_deadline,
+                valid_transitions,
+            }
+        }),
+        Err(e) => Some(ServerMessage::Error {
+            code: "TRANSITION_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_start_round(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host starting new round");
+    match state.start_round().await {
+        Ok(round) => Some(ServerMessage::RoundStarted { round }),
+        Err(e) => Some(ServerMessage::Error {
+            code: "ROUND_START_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_select_prompt(
+    state: &Arc<AppState>,
+    prompt_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host selecting prompt: {}", prompt_id);
+    let round = state.get_current_round().await?;
+
+    match state.select_prompt(&round.id, &prompt_id).await {
+        Ok(_) => {
+            let updated_round = state.get_current_round().await?;
+            updated_round
+                .selected_prompt
+                .map(|prompt| ServerMessage::PromptSelected { prompt })
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "PROMPT_SELECT_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_edit_submission(
+    state: &Arc<AppState>,
+    submission_id: String,
+    new_text: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host editing submission: {}", submission_id);
+    match state.edit_submission(&submission_id, new_text).await {
+        Ok(_) => None,
+        Err(e) => Some(ServerMessage::Error {
+            code: "EDIT_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_set_reveal_order(
+    state: &Arc<AppState>,
+    order: Vec<String>,
+) -> Option<ServerMessage> {
+    tracing::info!("Host setting reveal order: {} items", order.len());
+    let round = state.get_current_round().await?;
+
+    match state.set_reveal_order(&round.id, order).await {
+        Ok(_) => None,
+        Err(e) => Some(ServerMessage::Error {
+            code: "REVEAL_ORDER_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_set_ai_submission(
+    state: &Arc<AppState>,
+    submission_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host setting AI submission: {}", submission_id);
+    let round = state.get_current_round().await?;
+
+    match state.set_ai_submission(&round.id, submission_id).await {
+        Ok(_) => None,
+        Err(e) => Some(ServerMessage::Error {
+            code: "SET_AI_SUBMISSION_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_reveal_next(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host advancing reveal");
+    let round = state.get_current_round().await?;
+
+    match state.reveal_next(&round.id).await {
+        Ok(reveal_index) => {
+            let submission = state.get_current_reveal_submission(&round.id).await;
+            let submission_info = submission.map(|s| SubmissionInfo::from(&s));
+
+            // Broadcast to all clients
+            state.broadcast_to_all(ServerMessage::RevealUpdate {
+                reveal_index,
+                submission: submission_info.clone(),
+            });
+
+            Some(ServerMessage::RevealUpdate {
+                reveal_index,
+                submission: submission_info,
+            })
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "REVEAL_NEXT_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_reveal_prev(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host going back in reveal");
+    let round = state.get_current_round().await?;
+
+    match state.reveal_prev(&round.id).await {
+        Ok(reveal_index) => {
+            let submission = state.get_current_reveal_submission(&round.id).await;
+            let submission_info = submission.map(|s| SubmissionInfo::from(&s));
+
+            // Broadcast to all clients
+            state.broadcast_to_all(ServerMessage::RevealUpdate {
+                reveal_index,
+                submission: submission_info.clone(),
+            });
+
+            Some(ServerMessage::RevealUpdate {
+                reveal_index,
+                submission: submission_info,
+            })
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "REVEAL_PREV_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_reset_game(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host resetting game");
+    state.reset_game().await;
+
+    let game = state.get_game().await?;
+    let valid_transitions = AppState::get_valid_transitions(&game.phase);
+    Some(ServerMessage::GameState {
+        game,
+        valid_transitions,
+    })
+}
+
+pub async fn handle_add_prompt(state: &Arc<AppState>, text: String) -> Option<ServerMessage> {
+    tracing::info!("Host adding prompt: {}", text);
+    let round = state.get_current_round().await?;
+
+    match state
+        .add_prompt(&round.id, text, crate::types::PromptSource::Host, None)
+        .await
+    {
+        Ok(prompt) => {
+            // Auto-select the prompt when added by host
+            let prompt_id = prompt.id.clone();
+            if let Err(e) = state.select_prompt(&round.id, &prompt_id).await {
+                tracing::warn!("Failed to auto-select prompt: {}", e);
+            }
+            Some(ServerMessage::PromptSelected { prompt })
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "PROMPT_ADD_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_toggle_panic_mode(
+    state: &Arc<AppState>,
+    enabled: bool,
+) -> Option<ServerMessage> {
+    tracing::info!("Host toggling panic mode: {}", enabled);
+    state.set_panic_mode(enabled).await;
+    Some(ServerMessage::PanicModeUpdate { enabled })
+}
+
+pub async fn handle_set_manual_winner(
+    state: &Arc<AppState>,
+    winner_type: ManualWinnerType,
+    submission_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!(
+        "Host setting manual {:?} winner: {}",
+        winner_type,
+        submission_id
+    );
+
+    let round = match state.get_current_round().await {
+        Some(r) => r,
+        None => {
+            return Some(ServerMessage::Error {
+                code: "NO_ACTIVE_ROUND".to_string(),
+                msg: "No active round".to_string(),
+            });
+        }
+    };
+
+    let result = match winner_type {
+        ManualWinnerType::Ai => state.set_manual_ai_winner(&round.id, submission_id).await,
+        ManualWinnerType::Funny => {
+            state
+                .set_manual_funny_winner(&round.id, submission_id)
+                .await
+        }
+    };
+
+    match result {
+        Ok(_) => None,
+        Err(e) => Some(ServerMessage::Error {
+            code: "SET_MANUAL_WINNER_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_mark_duplicate(
+    state: &Arc<AppState>,
+    submission_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host marking submission as duplicate: {}", submission_id);
+
+    match state.mark_submission_duplicate(&submission_id).await {
+        Ok(player_id) => {
+            if let Some(pid) = player_id {
+                state.broadcast_to_all(ServerMessage::SubmissionRejected {
+                    player_id: pid,
+                    reason: "duplicate".to_string(),
+                });
+            }
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "MARK_DUPLICATE_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_extend_timer(state: &Arc<AppState>, seconds: u32) -> Option<ServerMessage> {
+    tracing::info!("Host extending timer by {} seconds", seconds);
+
+    match state.extend_deadline(seconds).await {
+        Ok(new_deadline) => {
+            let server_now = chrono::Utc::now().to_rfc3339();
+            state.broadcast_to_all(ServerMessage::DeadlineUpdate {
+                deadline: new_deadline.clone(),
+                server_now: server_now.clone(),
+            });
+            Some(ServerMessage::DeadlineUpdate {
+                deadline: new_deadline,
+                server_now,
+            })
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "EXTEND_TIMER_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_regenerate_ai(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host requesting AI regeneration");
+
+    let round = match state.get_current_round().await {
+        Some(r) => r,
+        None => {
+            return Some(ServerMessage::Error {
+                code: "NO_ACTIVE_ROUND".to_string(),
+                msg: "No active round".to_string(),
+            });
+        }
+    };
+
+    let prompt_text = match &round.selected_prompt {
+        Some(p) => match &p.text {
+            Some(t) => t.clone(),
+            None => {
+                return Some(ServerMessage::Error {
+                    code: "NO_PROMPT_TEXT".to_string(),
+                    msg: "Selected prompt has no text".to_string(),
+                });
+            }
+        },
+        None => {
+            return Some(ServerMessage::Error {
+                code: "NO_PROMPT_SELECTED".to_string(),
+                msg: "No prompt selected for this round".to_string(),
+            });
+        }
+    };
+
+    // Notify host that generation is starting
+    state.broadcast_to_host(ServerMessage::AiGenerationStatus {
+        status: AiGenStatus::Started,
+        provider: None,
+        message: Some("Generating AI submissions...".to_string()),
+    });
+
+    // Spawn generation in background
+    let state_clone = state.clone();
+    let round_id = round.id.clone();
+    tokio::spawn(async move {
+        match state_clone
+            .generate_ai_submissions(&round_id, &prompt_text)
+            .await
+        {
+            Ok(_) => {
+                state_clone.broadcast_to_host(ServerMessage::AiGenerationStatus {
+                    status: AiGenStatus::Completed,
+                    provider: None,
+                    message: Some("AI generation completed".to_string()),
+                });
+            }
+            Err(e) => {
+                state_clone.broadcast_to_host(ServerMessage::AiGenerationStatus {
+                    status: AiGenStatus::AllFailed,
+                    provider: None,
+                    message: Some(e),
+                });
+            }
+        }
+    });
+
+    None
+}
+
+pub async fn handle_write_ai_submission(
+    state: &Arc<AppState>,
+    text: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host writing manual AI submission");
+
+    let round = match state.get_current_round().await {
+        Some(r) => r,
+        None => {
+            return Some(ServerMessage::Error {
+                code: "NO_ACTIVE_ROUND".to_string(),
+                msg: "No active round".to_string(),
+            });
+        }
+    };
+
+    match state
+        .create_manual_ai_submission(&round.id, text.clone())
+        .await
+    {
+        Ok(submission) => {
+            state.broadcast_submissions(&round.id).await;
+            tracing::info!("Manual AI submission created: {}", submission.id);
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "WRITE_AI_SUBMISSION_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_shadowban_audience(
+    state: &Arc<AppState>,
+    voter_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host shadowbanning audience member: {}", voter_id);
+    state.shadowban_audience(voter_id.clone()).await;
+
+    // Re-broadcast prompts to host (now filtered)
+    if let Some(round) = state.get_current_round().await {
+        state.broadcast_prompts_to_host(&round.id).await;
+    }
+
+    None
+}
+
+pub async fn handle_remove_player(
+    state: &Arc<AppState>,
+    player_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host removing player: {}", player_id);
+
+    match state.remove_player(&player_id).await {
+        Ok(_player) => {
+            state.broadcast_to_all(ServerMessage::PlayerRemoved {
+                player_id: player_id.clone(),
+            });
+            broadcast_player_status_to_host(state).await;
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "REMOVE_PLAYER_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}

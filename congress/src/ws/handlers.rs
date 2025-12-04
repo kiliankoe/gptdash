@@ -1,7 +1,26 @@
+//! WebSocket message dispatch
+//!
+//! This module provides the main entry point for handling client messages.
+//! Authorization is checked here, then dispatched to role-specific handler modules.
+
 use crate::protocol::{ClientMessage, ServerMessage};
 use crate::state::AppState;
 use crate::types::Role;
 use std::sync::Arc;
+
+use super::{audience, host, player};
+
+/// Macro to check host authorization and return early if unauthorized
+macro_rules! check_host {
+    ($role:expr, $action:expr) => {
+        if *$role != Role::Host {
+            return Some(ServerMessage::Error {
+                code: "UNAUTHORIZED".to_string(),
+                msg: format!("Only host can {}", $action),
+            });
+        }
+    };
+}
 
 /// Handle client messages and return optional response
 pub async fn handle_message(
@@ -10,29 +29,10 @@ pub async fn handle_message(
     state: &Arc<AppState>,
 ) -> Option<ServerMessage> {
     match msg {
+        // Connection messages
         ClientMessage::Join { room_token } => {
             tracing::info!("Join request with token: {}", room_token);
             None
-        }
-
-        ClientMessage::RegisterPlayer {
-            player_token,
-            display_name,
-        } => handle_register_player(state, player_token, display_name).await,
-
-        ClientMessage::SubmitAnswer { player_token, text } => {
-            handle_submit_answer(state, player_token, text).await
-        }
-
-        ClientMessage::Vote {
-            voter_token,
-            ai,
-            funny,
-            msg_id,
-        } => handle_vote(state, voter_token, ai, funny, msg_id).await,
-
-        ClientMessage::SubmitPrompt { voter_token, text } => {
-            handle_submit_prompt(state, voter_token, text).await
         }
 
         ClientMessage::AckNeeded {
@@ -42,888 +42,139 @@ pub async fn handle_message(
             None
         }
 
-        // Host-only commands
-        ClientMessage::HostCreatePlayers { count } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can create players");
-            }
-            handle_host_create_players(state, count).await
-        }
+        // Player messages
+        ClientMessage::RegisterPlayer {
+            player_token,
+            display_name,
+        } => player::handle_register_player(state, player_token, display_name).await,
 
-        ClientMessage::HostTransitionPhase { phase } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can transition phases");
-            }
-            handle_host_transition_phase(state, phase).await
-        }
-
-        ClientMessage::HostStartRound => {
-            if *role != Role::Host {
-                return unauthorized("Only host can start rounds");
-            }
-            handle_host_start_round(state).await
-        }
-
-        ClientMessage::HostSelectPrompt { prompt_id } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can select prompts");
-            }
-            handle_host_select_prompt(state, prompt_id).await
-        }
-
-        ClientMessage::HostEditSubmission {
-            submission_id,
-            new_text,
-        } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can edit submissions");
-            }
-            handle_host_edit_submission(state, submission_id, new_text).await
-        }
-
-        ClientMessage::HostSetRevealOrder { order } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can set reveal order");
-            }
-            handle_host_set_reveal_order(state, order).await
-        }
-
-        ClientMessage::HostSetAiSubmission { submission_id } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can set AI submission");
-            }
-            handle_host_set_ai_submission(state, submission_id).await
-        }
-
-        ClientMessage::HostRevealNext => {
-            if *role != Role::Host {
-                return unauthorized("Only host can control reveal");
-            }
-            handle_host_reveal_next(state).await
-        }
-
-        ClientMessage::HostRevealPrev => {
-            if *role != Role::Host {
-                return unauthorized("Only host can control reveal");
-            }
-            handle_host_reveal_prev(state).await
-        }
-
-        ClientMessage::HostResetGame => {
-            if *role != Role::Host {
-                return unauthorized("Only host can reset game");
-            }
-            handle_host_reset_game(state).await
-        }
-
-        ClientMessage::HostAddPrompt { text } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can add prompts");
-            }
-            handle_host_add_prompt(state, text).await
-        }
-
-        ClientMessage::HostTogglePanicMode { enabled } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can toggle panic mode");
-            }
-            handle_host_toggle_panic_mode(state, enabled).await
-        }
-
-        ClientMessage::HostSetManualWinner {
-            winner_type,
-            submission_id,
-        } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can set manual winners");
-            }
-            handle_host_set_manual_winner(state, winner_type, submission_id).await
-        }
-
-        ClientMessage::HostMarkDuplicate { submission_id } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can mark duplicates");
-            }
-            handle_host_mark_duplicate(state, submission_id).await
-        }
-
-        ClientMessage::HostExtendTimer { seconds } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can extend timer");
-            }
-            handle_host_extend_timer(state, seconds).await
-        }
-
-        ClientMessage::HostRegenerateAi => {
-            if *role != Role::Host {
-                return unauthorized("Only host can regenerate AI");
-            }
-            handle_host_regenerate_ai(state).await
-        }
-
-        ClientMessage::HostWriteAiSubmission { text } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can write AI submissions");
-            }
-            handle_host_write_ai_submission(state, text).await
+        ClientMessage::SubmitAnswer { player_token, text } => {
+            player::handle_submit_answer(state, player_token, text).await
         }
 
         ClientMessage::RequestTypoCheck { player_token, text } => {
-            handle_request_typo_check(state, player_token, text).await
+            player::handle_request_typo_check(state, player_token, text).await
         }
 
         ClientMessage::UpdateSubmission {
             player_token,
             submission_id,
             new_text,
-        } => handle_update_submission(state, player_token, submission_id, new_text).await,
+        } => player::handle_update_submission(state, player_token, submission_id, new_text).await,
+
+        // Audience messages
+        ClientMessage::Vote {
+            voter_token,
+            ai,
+            funny,
+            msg_id,
+        } => audience::handle_vote(state, voter_token, ai, funny, msg_id).await,
+
+        ClientMessage::SubmitPrompt { voter_token, text } => {
+            audience::handle_submit_prompt(state, voter_token, text).await
+        }
+
+        // Host-only commands (authorization checked before dispatch)
+        ClientMessage::HostCreatePlayers { count } => {
+            check_host!(role, "create players");
+            host::handle_create_players(state, count).await
+        }
+
+        ClientMessage::HostTransitionPhase { phase } => {
+            check_host!(role, "transition phases");
+            host::handle_transition_phase(state, phase).await
+        }
+
+        ClientMessage::HostStartRound => {
+            check_host!(role, "start rounds");
+            host::handle_start_round(state).await
+        }
+
+        ClientMessage::HostSelectPrompt { prompt_id } => {
+            check_host!(role, "select prompts");
+            host::handle_select_prompt(state, prompt_id).await
+        }
+
+        ClientMessage::HostEditSubmission {
+            submission_id,
+            new_text,
+        } => {
+            check_host!(role, "edit submissions");
+            host::handle_edit_submission(state, submission_id, new_text).await
+        }
+
+        ClientMessage::HostSetRevealOrder { order } => {
+            check_host!(role, "set reveal order");
+            host::handle_set_reveal_order(state, order).await
+        }
+
+        ClientMessage::HostSetAiSubmission { submission_id } => {
+            check_host!(role, "set AI submission");
+            host::handle_set_ai_submission(state, submission_id).await
+        }
+
+        ClientMessage::HostRevealNext => {
+            check_host!(role, "control reveal");
+            host::handle_reveal_next(state).await
+        }
+
+        ClientMessage::HostRevealPrev => {
+            check_host!(role, "control reveal");
+            host::handle_reveal_prev(state).await
+        }
+
+        ClientMessage::HostResetGame => {
+            check_host!(role, "reset game");
+            host::handle_reset_game(state).await
+        }
+
+        ClientMessage::HostAddPrompt { text } => {
+            check_host!(role, "add prompts");
+            host::handle_add_prompt(state, text).await
+        }
+
+        ClientMessage::HostTogglePanicMode { enabled } => {
+            check_host!(role, "toggle panic mode");
+            host::handle_toggle_panic_mode(state, enabled).await
+        }
+
+        ClientMessage::HostSetManualWinner {
+            winner_type,
+            submission_id,
+        } => {
+            check_host!(role, "set manual winners");
+            host::handle_set_manual_winner(state, winner_type, submission_id).await
+        }
+
+        ClientMessage::HostMarkDuplicate { submission_id } => {
+            check_host!(role, "mark duplicates");
+            host::handle_mark_duplicate(state, submission_id).await
+        }
+
+        ClientMessage::HostExtendTimer { seconds } => {
+            check_host!(role, "extend timer");
+            host::handle_extend_timer(state, seconds).await
+        }
+
+        ClientMessage::HostRegenerateAi => {
+            check_host!(role, "regenerate AI");
+            host::handle_regenerate_ai(state).await
+        }
+
+        ClientMessage::HostWriteAiSubmission { text } => {
+            check_host!(role, "write AI submissions");
+            host::handle_write_ai_submission(state, text).await
+        }
 
         ClientMessage::HostShadowbanAudience { voter_id } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can shadowban audience members");
-            }
-            handle_host_shadowban_audience(state, voter_id).await
+            check_host!(role, "shadowban audience members");
+            host::handle_shadowban_audience(state, voter_id).await
         }
 
         ClientMessage::HostRemovePlayer { player_id } => {
-            if *role != Role::Host {
-                return unauthorized("Only host can remove players");
-            }
-            handle_host_remove_player(state, player_id).await
+            check_host!(role, "remove players");
+            host::handle_remove_player(state, player_id).await
         }
-    }
-}
-
-fn unauthorized(msg: &str) -> Option<ServerMessage> {
-    Some(ServerMessage::Error {
-        code: "UNAUTHORIZED".to_string(),
-        msg: msg.to_string(),
-    })
-}
-
-async fn handle_register_player(
-    state: &Arc<AppState>,
-    player_token: String,
-    display_name: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Player registration: {}", display_name);
-    match state
-        .register_player(&player_token, display_name.clone())
-        .await
-    {
-        Ok(player) => {
-            // Broadcast updated player status to host (name now set)
-            broadcast_player_status_to_host(state).await;
-            Some(ServerMessage::PlayerRegistered {
-                player_id: player.id,
-                display_name,
-            })
-        }
-        Err(e) => Some(ServerMessage::Error {
-            code: "REGISTRATION_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_submit_answer(
-    state: &Arc<AppState>,
-    player_token: Option<String>,
-    text: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Answer submitted: {}", text);
-    let round = state.get_current_round().await?;
-
-    let player_id = if let Some(token) = player_token {
-        match state.get_player_by_token(&token).await {
-            Some(player) => Some(player.id),
-            None => {
-                return Some(ServerMessage::Error {
-                    code: "INVALID_PLAYER_TOKEN".to_string(),
-                    msg: "Invalid player token".to_string(),
-                });
-            }
-        }
-    } else {
-        None
-    };
-
-    match state.submit_answer(&round.id, player_id, text).await {
-        Ok(_) => {
-            // Broadcast player status update to host (submission status changed)
-            broadcast_player_status_to_host(state).await;
-            Some(ServerMessage::SubmissionConfirmed)
-        }
-        Err(e) => Some(ServerMessage::Error {
-            code: "SUBMISSION_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_vote(
-    state: &Arc<AppState>,
-    voter_token: String,
-    ai: String,
-    funny: String,
-    msg_id: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Vote: AI={}, Funny={}, MsgID={}", ai, funny, msg_id);
-
-    use crate::state::vote::VoteResult;
-    match state
-        .submit_vote(voter_token, ai, funny, msg_id.clone())
-        .await
-    {
-        VoteResult::Recorded => {
-            tracing::debug!("Vote recorded");
-            Some(ServerMessage::VoteAck { msg_id })
-        }
-        VoteResult::Duplicate => {
-            tracing::debug!("Duplicate vote msg_id, returning ack");
-            Some(ServerMessage::VoteAck { msg_id })
-        }
-        VoteResult::NoActiveRound => {
-            tracing::warn!("Vote received but no active round");
-            Some(ServerMessage::VoteAck { msg_id })
-        }
-        VoteResult::PanicModeActive => {
-            tracing::info!("Vote rejected: panic mode active");
-            Some(ServerMessage::Error {
-                code: "PANIC_MODE".to_string(),
-                msg: "Voting is temporarily disabled".to_string(),
-            })
-        }
-    }
-}
-
-async fn handle_submit_prompt(
-    state: &Arc<AppState>,
-    voter_token: Option<String>,
-    text: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Prompt submitted: {}", text);
-    let round = state.get_current_round().await?;
-
-    // Check if this voter is shadowbanned
-    if let Some(ref token) = voter_token {
-        if state.is_shadowbanned(token).await {
-            tracing::info!(
-                "Shadowbanned voter {} submitted prompt, silently ignoring",
-                token
-            );
-            // Return success to the user so they don't know they're shadowbanned
-            return None;
-        }
-    }
-
-    match state
-        .add_prompt(
-            &round.id,
-            text,
-            crate::types::PromptSource::Audience,
-            voter_token.clone(),
-        )
-        .await
-    {
-        Ok(prompt) => {
-            // Broadcast updated prompts to host
-            state.broadcast_prompts_to_host(&round.id).await;
-            tracing::info!("Prompt added: {}", prompt.id);
-            None
-        }
-        Err(e) => Some(ServerMessage::Error {
-            code: "PROMPT_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_create_players(state: &Arc<AppState>, count: u32) -> Option<ServerMessage> {
-    tracing::info!("Host creating {} players", count);
-    let mut players = Vec::new();
-    for _ in 0..count {
-        let player = state.create_player().await;
-        players.push(crate::protocol::PlayerToken {
-            id: player.id,
-            token: player.token,
-        });
-    }
-    // Broadcast updated player status to host
-    broadcast_player_status_to_host(state).await;
-    Some(ServerMessage::PlayersCreated { players })
-}
-
-async fn handle_host_transition_phase(
-    state: &Arc<AppState>,
-    phase: crate::types::GamePhase,
-) -> Option<ServerMessage> {
-    tracing::info!("Host transitioning to phase: {:?}", phase);
-    match state.transition_phase(phase).await {
-        Ok(_) => state.get_game().await.map(|game| {
-            let valid_transitions = AppState::get_valid_transitions(&game.phase);
-            // Use Phase message for transitions (preserves client state)
-            // GameState is only for full game resets
-            ServerMessage::Phase {
-                phase: game.phase,
-                round_no: game.round_no,
-                server_now: chrono::Utc::now().to_rfc3339(),
-                deadline: game.phase_deadline,
-                valid_transitions,
-            }
-        }),
-        Err(e) => Some(ServerMessage::Error {
-            code: "TRANSITION_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_start_round(state: &Arc<AppState>) -> Option<ServerMessage> {
-    tracing::info!("Host starting new round");
-    match state.start_round().await {
-        Ok(round) => Some(ServerMessage::RoundStarted { round }),
-        Err(e) => Some(ServerMessage::Error {
-            code: "ROUND_START_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_select_prompt(
-    state: &Arc<AppState>,
-    prompt_id: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Host selecting prompt: {}", prompt_id);
-    let round = state.get_current_round().await?;
-
-    match state.select_prompt(&round.id, &prompt_id).await {
-        Ok(_) => {
-            let updated_round = state.get_current_round().await?;
-            updated_round
-                .selected_prompt
-                .map(|prompt| ServerMessage::PromptSelected { prompt })
-        }
-        Err(e) => Some(ServerMessage::Error {
-            code: "PROMPT_SELECT_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_edit_submission(
-    state: &Arc<AppState>,
-    submission_id: String,
-    new_text: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Host editing submission: {}", submission_id);
-    match state.edit_submission(&submission_id, new_text).await {
-        Ok(_) => None,
-        Err(e) => Some(ServerMessage::Error {
-            code: "EDIT_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_set_reveal_order(
-    state: &Arc<AppState>,
-    order: Vec<String>,
-) -> Option<ServerMessage> {
-    tracing::info!("Host setting reveal order: {} items", order.len());
-    let round = state.get_current_round().await?;
-
-    match state.set_reveal_order(&round.id, order).await {
-        Ok(_) => None,
-        Err(e) => Some(ServerMessage::Error {
-            code: "REVEAL_ORDER_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_set_ai_submission(
-    state: &Arc<AppState>,
-    submission_id: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Host setting AI submission: {}", submission_id);
-    let round = state.get_current_round().await?;
-
-    match state.set_ai_submission(&round.id, submission_id).await {
-        Ok(_) => None,
-        Err(e) => Some(ServerMessage::Error {
-            code: "SET_AI_SUBMISSION_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_reveal_next(state: &Arc<AppState>) -> Option<ServerMessage> {
-    tracing::info!("Host advancing reveal");
-    let round = state.get_current_round().await?;
-
-    match state.reveal_next(&round.id).await {
-        Ok(reveal_index) => {
-            // Get the submission at the current reveal index
-            let submission = state.get_current_reveal_submission(&round.id).await;
-            let submission_info = submission.map(|s| crate::protocol::SubmissionInfo::from(&s));
-
-            // Broadcast to all clients
-            state.broadcast_to_all(ServerMessage::RevealUpdate {
-                reveal_index,
-                submission: submission_info.clone(),
-            });
-
-            Some(ServerMessage::RevealUpdate {
-                reveal_index,
-                submission: submission_info,
-            })
-        }
-        Err(e) => Some(ServerMessage::Error {
-            code: "REVEAL_NEXT_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_reveal_prev(state: &Arc<AppState>) -> Option<ServerMessage> {
-    tracing::info!("Host going back in reveal");
-    let round = state.get_current_round().await?;
-
-    match state.reveal_prev(&round.id).await {
-        Ok(reveal_index) => {
-            // Get the submission at the current reveal index
-            let submission = state.get_current_reveal_submission(&round.id).await;
-            let submission_info = submission.map(|s| crate::protocol::SubmissionInfo::from(&s));
-
-            // Broadcast to all clients
-            state.broadcast_to_all(ServerMessage::RevealUpdate {
-                reveal_index,
-                submission: submission_info.clone(),
-            });
-
-            Some(ServerMessage::RevealUpdate {
-                reveal_index,
-                submission: submission_info,
-            })
-        }
-        Err(e) => Some(ServerMessage::Error {
-            code: "REVEAL_PREV_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_reset_game(state: &Arc<AppState>) -> Option<ServerMessage> {
-    tracing::info!("Host resetting game");
-    state.reset_game().await;
-
-    // Return game state after reset
-    let game = state.get_game().await?;
-    let valid_transitions = AppState::get_valid_transitions(&game.phase);
-    Some(ServerMessage::GameState {
-        game,
-        valid_transitions,
-    })
-}
-
-async fn handle_host_add_prompt(state: &Arc<AppState>, text: String) -> Option<ServerMessage> {
-    tracing::info!("Host adding prompt: {}", text);
-    let round = state.get_current_round().await?;
-
-    match state
-        .add_prompt(&round.id, text, crate::types::PromptSource::Host, None)
-        .await
-    {
-        Ok(prompt) => {
-            // Auto-select the prompt when added by host
-            let prompt_id = prompt.id.clone();
-            if let Err(e) = state.select_prompt(&round.id, &prompt_id).await {
-                tracing::warn!("Failed to auto-select prompt: {}", e);
-            }
-            Some(ServerMessage::PromptSelected { prompt })
-        }
-        Err(e) => Some(ServerMessage::Error {
-            code: "PROMPT_ADD_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_toggle_panic_mode(
-    state: &Arc<AppState>,
-    enabled: bool,
-) -> Option<ServerMessage> {
-    tracing::info!("Host toggling panic mode: {}", enabled);
-    state.set_panic_mode(enabled).await;
-    Some(ServerMessage::PanicModeUpdate { enabled })
-}
-
-async fn handle_host_set_manual_winner(
-    state: &Arc<AppState>,
-    winner_type: crate::protocol::ManualWinnerType,
-    submission_id: String,
-) -> Option<ServerMessage> {
-    tracing::info!(
-        "Host setting manual {:?} winner: {}",
-        winner_type,
-        submission_id
-    );
-
-    let round = match state.get_current_round().await {
-        Some(r) => r,
-        None => {
-            return Some(ServerMessage::Error {
-                code: "NO_ACTIVE_ROUND".to_string(),
-                msg: "No active round".to_string(),
-            });
-        }
-    };
-
-    let result = match winner_type {
-        crate::protocol::ManualWinnerType::Ai => {
-            state.set_manual_ai_winner(&round.id, submission_id).await
-        }
-        crate::protocol::ManualWinnerType::Funny => {
-            state
-                .set_manual_funny_winner(&round.id, submission_id)
-                .await
-        }
-    };
-
-    match result {
-        Ok(_) => None,
-        Err(e) => Some(ServerMessage::Error {
-            code: "SET_MANUAL_WINNER_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_mark_duplicate(
-    state: &Arc<AppState>,
-    submission_id: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Host marking submission as duplicate: {}", submission_id);
-
-    match state.mark_submission_duplicate(&submission_id).await {
-        Ok(player_id) => {
-            // If it was a player submission, notify the player via broadcast
-            // (players filter by their own ID)
-            if let Some(pid) = player_id {
-                state.broadcast_to_all(ServerMessage::SubmissionRejected {
-                    player_id: pid,
-                    reason: "duplicate".to_string(),
-                });
-            }
-            None
-        }
-        Err(e) => Some(ServerMessage::Error {
-            code: "MARK_DUPLICATE_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_extend_timer(state: &Arc<AppState>, seconds: u32) -> Option<ServerMessage> {
-    tracing::info!("Host extending timer by {} seconds", seconds);
-
-    match state.extend_deadline(seconds).await {
-        Ok(new_deadline) => {
-            let server_now = chrono::Utc::now().to_rfc3339();
-            // Broadcast to all clients
-            state.broadcast_to_all(ServerMessage::DeadlineUpdate {
-                deadline: new_deadline.clone(),
-                server_now: server_now.clone(),
-            });
-            Some(ServerMessage::DeadlineUpdate {
-                deadline: new_deadline,
-                server_now,
-            })
-        }
-        Err(e) => Some(ServerMessage::Error {
-            code: "EXTEND_TIMER_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_host_regenerate_ai(state: &Arc<AppState>) -> Option<ServerMessage> {
-    use crate::protocol::AiGenStatus;
-
-    tracing::info!("Host requesting AI regeneration");
-
-    let round = match state.get_current_round().await {
-        Some(r) => r,
-        None => {
-            return Some(ServerMessage::Error {
-                code: "NO_ACTIVE_ROUND".to_string(),
-                msg: "No active round".to_string(),
-            });
-        }
-    };
-
-    let prompt_text = match &round.selected_prompt {
-        Some(p) => match &p.text {
-            Some(t) => t.clone(),
-            None => {
-                return Some(ServerMessage::Error {
-                    code: "NO_PROMPT_TEXT".to_string(),
-                    msg: "Selected prompt has no text".to_string(),
-                });
-            }
-        },
-        None => {
-            return Some(ServerMessage::Error {
-                code: "NO_PROMPT_SELECTED".to_string(),
-                msg: "No prompt selected for this round".to_string(),
-            });
-        }
-    };
-
-    // Notify host that generation is starting
-    state.broadcast_to_host(ServerMessage::AiGenerationStatus {
-        status: AiGenStatus::Started,
-        provider: None,
-        message: Some("Generating AI submissions...".to_string()),
-    });
-
-    // Spawn generation in background
-    let state_clone = state.clone();
-    let round_id = round.id.clone();
-    tokio::spawn(async move {
-        match state_clone
-            .generate_ai_submissions(&round_id, &prompt_text)
-            .await
-        {
-            Ok(_) => {
-                state_clone.broadcast_to_host(ServerMessage::AiGenerationStatus {
-                    status: AiGenStatus::Completed,
-                    provider: None,
-                    message: Some("AI generation completed".to_string()),
-                });
-            }
-            Err(e) => {
-                state_clone.broadcast_to_host(ServerMessage::AiGenerationStatus {
-                    status: AiGenStatus::AllFailed,
-                    provider: None,
-                    message: Some(e),
-                });
-            }
-        }
-    });
-
-    None
-}
-
-async fn handle_host_write_ai_submission(
-    state: &Arc<AppState>,
-    text: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Host writing manual AI submission");
-
-    let round = match state.get_current_round().await {
-        Some(r) => r,
-        None => {
-            return Some(ServerMessage::Error {
-                code: "NO_ACTIVE_ROUND".to_string(),
-                msg: "No active round".to_string(),
-            });
-        }
-    };
-
-    // Create a manual AI submission
-    match state
-        .create_manual_ai_submission(&round.id, text.clone())
-        .await
-    {
-        Ok(submission) => {
-            // Broadcast updated submissions
-            state.broadcast_submissions(&round.id).await;
-            tracing::info!("Manual AI submission created: {}", submission.id);
-            None
-        }
-        Err(e) => Some(ServerMessage::Error {
-            code: "WRITE_AI_SUBMISSION_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-async fn handle_request_typo_check(
-    state: &Arc<AppState>,
-    player_token: String,
-    text: String,
-) -> Option<ServerMessage> {
-    tracing::info!(
-        "Typo check requested for text: {}",
-        &text[..text.len().min(50)]
-    );
-
-    // Validate player token
-    let player = match state.get_player_by_token(&player_token).await {
-        Some(p) => p,
-        None => {
-            return Some(ServerMessage::Error {
-                code: "INVALID_PLAYER_TOKEN".to_string(),
-                msg: "Invalid player token".to_string(),
-            });
-        }
-    };
-
-    // Set player status to checking typos
-    state
-        .set_player_status(
-            &player.id,
-            crate::protocol::PlayerSubmissionStatus::CheckingTypos,
-        )
-        .await;
-
-    // Broadcast player status update to host
-    broadcast_player_status_to_host(state).await;
-
-    // Check if we have an LLM provider
-    let llm = match &state.llm {
-        Some(llm) => llm,
-        None => {
-            tracing::warn!("No LLM provider available for typo check, returning original");
-            // Clear the checking status since we're done
-            state
-                .set_player_status(
-                    &player.id,
-                    crate::protocol::PlayerSubmissionStatus::NotSubmitted,
-                )
-                .await;
-            broadcast_player_status_to_host(state).await;
-            return Some(ServerMessage::TypoCheckResult {
-                original: text.clone(),
-                corrected: text,
-                has_changes: false,
-            });
-        }
-    };
-
-    // Use the first available provider for typo checking
-    // In the future we could make this configurable
-    let providers = &llm.providers;
-    if providers.is_empty() {
-        tracing::warn!("No LLM providers configured for typo check");
-        state
-            .set_player_status(
-                &player.id,
-                crate::protocol::PlayerSubmissionStatus::NotSubmitted,
-            )
-            .await;
-        broadcast_player_status_to_host(state).await;
-        return Some(ServerMessage::TypoCheckResult {
-            original: text.clone(),
-            corrected: text,
-            has_changes: false,
-        });
-    }
-
-    // Run typo check
-    let corrected = crate::llm::check_typos(providers[0].as_ref(), &text).await;
-
-    // Clear the checking status
-    state
-        .set_player_status(
-            &player.id,
-            crate::protocol::PlayerSubmissionStatus::NotSubmitted,
-        )
-        .await;
-    broadcast_player_status_to_host(state).await;
-
-    let has_changes = corrected != text;
-    tracing::info!(
-        "Typo check complete. Has changes: {}, original len: {}, corrected len: {}",
-        has_changes,
-        text.len(),
-        corrected.len()
-    );
-
-    Some(ServerMessage::TypoCheckResult {
-        original: text,
-        corrected,
-        has_changes,
-    })
-}
-
-async fn handle_update_submission(
-    state: &Arc<AppState>,
-    player_token: String,
-    submission_id: String,
-    new_text: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Submission update requested: {}", submission_id);
-
-    // Validate player token
-    let player = match state.get_player_by_token(&player_token).await {
-        Some(p) => p,
-        None => {
-            return Some(ServerMessage::Error {
-                code: "INVALID_PLAYER_TOKEN".to_string(),
-                msg: "Invalid player token".to_string(),
-            });
-        }
-    };
-
-    // Update the submission
-    match state
-        .update_player_submission(&submission_id, &player.id, new_text)
-        .await
-    {
-        Ok(_) => Some(ServerMessage::SubmissionConfirmed),
-        Err(e) => Some(ServerMessage::Error {
-            code: "UPDATE_SUBMISSION_FAILED".to_string(),
-            msg: e,
-        }),
-    }
-}
-
-/// Broadcast current player status to host
-async fn broadcast_player_status_to_host(state: &Arc<AppState>) {
-    let players = state.get_all_player_status().await;
-    state.broadcast_to_host(ServerMessage::HostPlayerStatus { players });
-}
-
-async fn handle_host_shadowban_audience(
-    state: &Arc<AppState>,
-    voter_id: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Host shadowbanning audience member: {}", voter_id);
-    state.shadowban_audience(voter_id.clone()).await;
-
-    // Re-broadcast prompts to host (now filtered)
-    if let Some(round) = state.get_current_round().await {
-        state.broadcast_prompts_to_host(&round.id).await;
-    }
-
-    None // Silent success (no confirmation message needed)
-}
-
-async fn handle_host_remove_player(
-    state: &Arc<AppState>,
-    player_id: String,
-) -> Option<ServerMessage> {
-    tracing::info!("Host removing player: {}", player_id);
-
-    match state.remove_player(&player_id).await {
-        Ok(_player) => {
-            // Broadcast player removal to all clients
-            state.broadcast_to_all(ServerMessage::PlayerRemoved {
-                player_id: player_id.clone(),
-            });
-
-            // Broadcast updated player status to host
-            broadcast_player_status_to_host(state).await;
-
-            None // Success broadcast handled above
-        }
-        Err(e) => Some(ServerMessage::Error {
-            code: "REMOVE_PLAYER_FAILED".to_string(),
-            msg: e,
-        }),
     }
 }
 
@@ -968,7 +219,6 @@ mod tests {
         state.create_game().await;
         let role = Role::Host;
 
-        // Test valid transition: Lobby -> PromptSelection
         let result = handle_message(
             ClientMessage::HostTransitionPhase {
                 phase: GamePhase::PromptSelection,
@@ -979,7 +229,6 @@ mod tests {
         .await;
 
         assert!(result.is_some());
-        // Phase transitions now return Phase message instead of GameState
         if let Some(ServerMessage::Phase { phase, .. }) = result {
             assert_eq!(phase, GamePhase::PromptSelection);
         } else {
