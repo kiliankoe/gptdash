@@ -1306,3 +1306,364 @@ async fn test_create_manual_ai_submission_invalid_round() {
 
     println!("✅ Create manual AI submission invalid round test passed!");
 }
+
+/// Test removing a player mid-round
+#[tokio::test]
+async fn test_remove_player_mid_round() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+    let player_role = Role::Player;
+    let audience_role = Role::Audience;
+
+    state.create_game().await;
+
+    // Create two players
+    let create_result = handle_message(
+        ClientMessage::HostCreatePlayers { count: 2 },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    let player_tokens = match create_result {
+        Some(ServerMessage::PlayersCreated { players }) => players,
+        _ => panic!("Expected PlayersCreated"),
+    };
+
+    // Register players
+    handle_message(
+        ClientMessage::RegisterPlayer {
+            player_token: player_tokens[0].token.clone(),
+            display_name: "Alice".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    handle_message(
+        ClientMessage::RegisterPlayer {
+            player_token: player_tokens[1].token.clone(),
+            display_name: "Bob".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    // Setup round
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt(
+            &round.id,
+            "Test prompt".to_string(),
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Both players submit
+    handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some(player_tokens[0].token.clone()),
+            text: "Alice's answer".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some(player_tokens[1].token.clone()),
+            text: "Bob's answer".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    // Add AI submission
+    let ai_sub = state
+        .submit_answer(&round.id, None, "AI answer".to_string())
+        .await
+        .unwrap();
+
+    // Verify we have 3 submissions
+    let submissions = state.get_submissions(&round.id).await;
+    assert_eq!(submissions.len(), 3);
+
+    // Set reveal order
+    let reveal_order: Vec<_> = submissions.iter().map(|s| s.id.clone()).collect();
+    handle_message(
+        ClientMessage::HostSetRevealOrder {
+            order: reveal_order.clone(),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Transition to Voting
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Reveal,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Voting,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Audience votes - voter picks Alice's submission as AI
+    let alice_sub = submissions
+        .iter()
+        .find(|s| s.author_ref.as_ref() == Some(&player_tokens[0].id))
+        .expect("Should find Alice's submission");
+
+    handle_message(
+        ClientMessage::Vote {
+            voter_token: "voter1".to_string(),
+            ai: alice_sub.id.clone(),
+            funny: alice_sub.id.clone(),
+            msg_id: "vote1".to_string(),
+        },
+        &audience_role,
+        &state,
+    )
+    .await;
+
+    // Verify vote exists
+    assert_eq!(state.votes.read().await.len(), 1);
+
+    // Now remove Alice mid-voting phase
+    let remove_result = handle_message(
+        ClientMessage::HostRemovePlayer {
+            player_id: player_tokens[0].id.clone(),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Should succeed
+    assert!(remove_result.is_none());
+
+    // Verify Alice is gone
+    assert!(state
+        .get_player_by_token(&player_tokens[0].token)
+        .await
+        .is_none());
+
+    // Verify Alice's submission is gone
+    let updated_submissions = state.get_submissions(&round.id).await;
+    assert_eq!(updated_submissions.len(), 2);
+
+    // Verify vote that referenced Alice's submission is cleared
+    // voter1 can now vote again
+    assert_eq!(state.votes.read().await.len(), 0);
+
+    // Verify reveal order is updated (doesn't contain Alice's submission anymore)
+    let updated_round = state.get_current_round().await.unwrap();
+    assert_eq!(updated_round.reveal_order.len(), 2);
+    assert!(
+        !updated_round.reveal_order.contains(&alice_sub.id),
+        "Alice's submission should be removed from reveal order"
+    );
+
+    // Bob should still be in the game
+    assert!(state
+        .get_player_by_token(&player_tokens[1].token)
+        .await
+        .is_some());
+
+    // Can still proceed to Results with remaining submissions
+    state
+        .set_ai_submission(&round.id, ai_sub.id.clone())
+        .await
+        .unwrap();
+
+    let result = handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Results,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    match result {
+        Some(ServerMessage::Phase { phase, .. }) => {
+            assert_eq!(phase, GamePhase::Results);
+        }
+        _ => panic!("Expected Phase message for Results"),
+    }
+
+    println!("✅ Remove player mid-round test passed!");
+}
+
+/// Test adding a new player mid-round
+#[tokio::test]
+async fn test_add_player_mid_round() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+    let player_role = Role::Player;
+
+    state.create_game().await;
+
+    // Create initial player
+    let create_result = handle_message(
+        ClientMessage::HostCreatePlayers { count: 1 },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    let initial_tokens = match create_result {
+        Some(ServerMessage::PlayersCreated { players }) => players,
+        _ => panic!("Expected PlayersCreated"),
+    };
+
+    // Setup round
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt(
+            &round.id,
+            "Test prompt".to_string(),
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Initial player submits
+    handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some(initial_tokens[0].token.clone()),
+            text: "First player's answer".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    // Now add a new player mid-round (late arrival)
+    let add_result = handle_message(
+        ClientMessage::HostCreatePlayers { count: 1 },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    let new_tokens = match add_result {
+        Some(ServerMessage::PlayersCreated { players }) => {
+            assert_eq!(players.len(), 1);
+            players
+        }
+        _ => panic!("Expected PlayersCreated for new player"),
+    };
+
+    // New player can register
+    let register_result = handle_message(
+        ClientMessage::RegisterPlayer {
+            player_token: new_tokens[0].token.clone(),
+            display_name: "Late Arrival".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    match register_result {
+        Some(ServerMessage::PlayerRegistered { display_name, .. }) => {
+            assert_eq!(display_name, "Late Arrival");
+        }
+        _ => panic!("Expected PlayerRegistered"),
+    }
+
+    // New player can submit (if still in Writing phase)
+    let submit_result = handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some(new_tokens[0].token.clone()),
+            text: "Late player's answer".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    match submit_result {
+        Some(ServerMessage::SubmissionConfirmed) => {}
+        _ => panic!("Expected SubmissionConfirmed for late player"),
+    }
+
+    // Verify we now have 2 player submissions
+    let submissions = state.get_submissions(&round.id).await;
+    let player_submissions: Vec<_> = submissions
+        .iter()
+        .filter(|s| s.author_kind == gptdash::types::AuthorKind::Player)
+        .collect();
+
+    assert_eq!(
+        player_submissions.len(),
+        2,
+        "Should have 2 player submissions"
+    );
+
+    // Verify player status shows both
+    let statuses = state.get_all_player_status().await;
+    assert_eq!(statuses.len(), 2, "Should have 2 players in status list");
+
+    println!("✅ Add player mid-round test passed!");
+}

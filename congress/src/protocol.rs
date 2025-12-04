@@ -84,6 +84,10 @@ pub enum ClientMessage {
     HostShadowbanAudience {
         voter_id: VoterId,
     },
+    /// Remove a player from the game (host only)
+    HostRemovePlayer {
+        player_id: PlayerId,
+    },
     /// Update an existing submission with corrected text (after typo check)
     UpdateSubmission {
         player_token: String,
@@ -202,6 +206,10 @@ pub enum ServerMessage {
     /// Prompt candidates sent to host (includes submitter info for moderation)
     HostPrompts {
         prompts: Vec<HostPromptInfo>,
+    },
+    /// Broadcast when a player is removed from the game
+    PlayerRemoved {
+        player_id: PlayerId,
     },
     Error {
         code: String,

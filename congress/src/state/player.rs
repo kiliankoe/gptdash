@@ -161,4 +161,104 @@ impl AppState {
     pub async fn clear_player_statuses(&self) {
         self.player_status.write().await.clear();
     }
+
+    /// Remove a player from the game and clean up associated data
+    /// Returns the removed player's submission IDs (for broadcasting updates)
+    pub async fn remove_player(&self, player_id: &PlayerId) -> Result<Player, String> {
+        // 1. Remove player from players HashMap
+        let player = {
+            let mut players = self.players.write().await;
+            players
+                .remove(player_id)
+                .ok_or_else(|| "Player not found".to_string())?
+        };
+
+        // 2. Get current round if any
+        let current_round = self.get_current_round().await;
+
+        if let Some(round) = current_round {
+            // 3. Find and remove player's submissions for this round
+            let removed_submission_ids: Vec<String> = {
+                let mut submissions = self.submissions.write().await;
+                let to_remove: Vec<_> = submissions
+                    .iter()
+                    .filter(|(_, s)| {
+                        s.round_id == round.id
+                            && s.author_kind == crate::types::AuthorKind::Player
+                            && s.author_ref.as_ref() == Some(player_id)
+                    })
+                    .map(|(id, _)| id.clone())
+                    .collect();
+
+                for id in &to_remove {
+                    submissions.remove(id);
+                }
+                to_remove
+            };
+
+            // 4. Remove submission IDs from reveal_order
+            if !removed_submission_ids.is_empty() {
+                let mut rounds = self.rounds.write().await;
+                if let Some(r) = rounds.get_mut(&round.id) {
+                    r.reveal_order
+                        .retain(|id| !removed_submission_ids.contains(id));
+
+                    // Adjust reveal_index if it's now out of bounds
+                    if !r.reveal_order.is_empty() && r.reveal_index >= r.reveal_order.len() {
+                        r.reveal_index = r.reveal_order.len() - 1;
+                    }
+                }
+            }
+
+            // 5. Clear any votes that referenced removed submissions
+            // (voters can re-vote since their picks are now invalid)
+            if !removed_submission_ids.is_empty() {
+                let voters_to_reset: Vec<String> = {
+                    let votes = self.votes.read().await;
+                    votes
+                        .values()
+                        .filter(|v| {
+                            v.round_id == round.id
+                                && (removed_submission_ids.contains(&v.ai_pick_submission_id)
+                                    || removed_submission_ids.contains(&v.funny_pick_submission_id))
+                        })
+                        .map(|v| v.voter_id.clone())
+                        .collect()
+                };
+
+                // Remove affected votes
+                {
+                    let mut votes = self.votes.write().await;
+                    votes.retain(|_, v| {
+                        !(v.round_id == round.id && voters_to_reset.contains(&v.voter_id))
+                    });
+                }
+
+                // Clear processed msg_ids for affected voters so they can re-vote
+                {
+                    let mut processed = self.processed_vote_msg_ids.write().await;
+                    for voter_id in &voters_to_reset {
+                        processed.remove(voter_id);
+                    }
+                }
+
+                tracing::info!(
+                    "Reset {} votes that referenced removed player's submissions",
+                    voters_to_reset.len()
+                );
+            }
+
+            // Broadcast updated submissions
+            if !removed_submission_ids.is_empty() {
+                self.broadcast_submissions(&round.id).await;
+            }
+        }
+
+        // 6. Clear player status
+        self.player_status.write().await.remove(player_id);
+
+        tracing::info!("Removed player {} (token: {})", player_id, player.token);
+
+        Ok(player)
+    }
 }

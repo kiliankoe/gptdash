@@ -145,6 +145,11 @@ function handleMessage(message) {
       updatePromptsList();
       break;
 
+    case "player_removed":
+      log(`Spieler ${message.player_id} entfernt`, "info");
+      // Player status update will come separately via host_player_status
+      break;
+
     case "error":
       showAlert(`Fehler: ${message.msg}`, "error");
       break;
@@ -582,6 +587,7 @@ function updatePlayersList() {
         statusClass = "waiting";
     }
 
+    const playerId = player.id || `unknown_${token}`;
     div.innerHTML = `
       <div class="player-info">
         <div class="player-header">
@@ -590,7 +596,8 @@ function updatePlayersList() {
         </div>
         <div class="player-token">
           <span class="token">${token}</span>
-          <button onclick="copyToClipboard('${token}')" class="copy-btn">📋</button>
+          <button onclick="copyToClipboard('${token}')" class="copy-btn" title="Token kopieren">📋</button>
+          <button onclick="removePlayer('${playerId}', '${escapeHtml(name).replace(/'/g, "\\'")}')" class="remove-btn" title="Spieler entfernen">🗑️</button>
         </div>
       </div>
     `;
@@ -658,6 +665,25 @@ function shadowbanAudience(voterId) {
       voter_id: voterId,
     });
     showAlert("Nutzer shadowbanned", "success");
+  }
+}
+
+function removePlayer(playerId, playerName) {
+  const displayName = playerName || `${playerId.substring(0, 8)}...`;
+  if (
+    confirm(
+      `Spieler "${displayName}" entfernen?\n\n` +
+        "- Der Spieler wird aus dem Spiel entfernt\n" +
+        "- Seine Antwort wird gelöscht (falls vorhanden)\n" +
+        "- Betroffene Stimmen werden zurückgesetzt\n\n" +
+        "Dies kann nicht rückgängig gemacht werden!",
+    )
+  ) {
+    wsConn.send({
+      t: "host_remove_player",
+      player_id: playerId,
+    });
+    showAlert(`Spieler ${displayName} wird entfernt...`, "info");
   }
 }
 
@@ -1145,6 +1171,7 @@ if (typeof window !== "undefined") {
     writeManualAiSubmission,
     selectAiSubmission,
     shadowbanAudience,
+    removePlayer,
     // State export/import
     refreshStateView,
     downloadStateExport,

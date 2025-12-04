@@ -380,6 +380,19 @@ select:focus {
   background: rgba(255, 255, 255, 0.2);
 }
 
+.player-token .remove-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  width: auto;
+  background: rgba(239, 68, 68, 0.2);
+  border: none;
+  color: #ef4444;
+}
+
+.player-token .remove-btn:hover {
+  background: rgba(239, 68, 68, 0.4);
+}
+
 /* AI Submission Management */
 .ai-submissions-grid {
   display: grid;

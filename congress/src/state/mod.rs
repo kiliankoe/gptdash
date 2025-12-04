@@ -975,4 +975,248 @@ mod tests {
             .unwrap();
         assert_eq!(stored_prompt.submitter_id, Some("voter123".to_string()));
     }
+
+    // Remove player tests
+
+    #[tokio::test]
+    async fn test_remove_player_basic() {
+        let state = AppState::new();
+        state.create_game().await;
+
+        // Create a player
+        let player = state.create_player().await;
+        let player_id = player.id.clone();
+
+        // Verify player exists
+        assert!(state.get_player_by_token(&player.token).await.is_some());
+        assert_eq!(state.players.read().await.len(), 1);
+
+        // Remove the player
+        let result = state.remove_player(&player_id).await;
+        assert!(result.is_ok());
+
+        // Verify player is gone
+        assert!(state.get_player_by_token(&player.token).await.is_none());
+        assert_eq!(state.players.read().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_remove_player_not_found() {
+        let state = AppState::new();
+        state.create_game().await;
+
+        let result = state.remove_player(&"nonexistent".to_string()).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn test_remove_player_removes_submission() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // Create player and submit answer
+        let player = state.create_player().await;
+        let player_id = player.id.clone();
+        state
+            .submit_answer(
+                &round.id,
+                Some(player_id.clone()),
+                "Test answer".to_string(),
+            )
+            .await
+            .unwrap();
+
+        // Verify submission exists
+        assert_eq!(state.get_submissions(&round.id).await.len(), 1);
+
+        // Remove player
+        state.remove_player(&player_id).await.unwrap();
+
+        // Verify submission is removed
+        assert_eq!(state.get_submissions(&round.id).await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_remove_player_updates_reveal_order() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // Create two players with submissions
+        let player1 = state.create_player().await;
+        let player2 = state.create_player().await;
+
+        let sub1 = state
+            .submit_answer(&round.id, Some(player1.id.clone()), "Answer 1".to_string())
+            .await
+            .unwrap();
+        let sub2 = state
+            .submit_answer(&round.id, Some(player2.id.clone()), "Answer 2".to_string())
+            .await
+            .unwrap();
+
+        // Set reveal order
+        state
+            .set_reveal_order(&round.id, vec![sub1.id.clone(), sub2.id.clone()])
+            .await
+            .unwrap();
+
+        // Verify reveal order has both
+        let round_data = state.get_current_round().await.unwrap();
+        assert_eq!(round_data.reveal_order.len(), 2);
+
+        // Remove player1
+        state.remove_player(&player1.id).await.unwrap();
+
+        // Verify reveal order only has player2's submission
+        let round_data = state.get_current_round().await.unwrap();
+        assert_eq!(round_data.reveal_order.len(), 1);
+        assert_eq!(round_data.reveal_order[0], sub2.id);
+    }
+
+    #[tokio::test]
+    async fn test_remove_player_resets_affected_votes() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // Create player with submission
+        let player = state.create_player().await;
+        let sub = state
+            .submit_answer(
+                &round.id,
+                Some(player.id.clone()),
+                "Player answer".to_string(),
+            )
+            .await
+            .unwrap();
+
+        // Create another submission (AI) to vote for funny
+        let ai_sub = state
+            .submit_answer(&round.id, None, "AI answer".to_string())
+            .await
+            .unwrap();
+
+        // Add a vote that references the player's submission
+        state
+            .submit_vote(
+                "voter1".to_string(),
+                sub.id.clone(), // AI pick points to player's submission
+                ai_sub.id.clone(),
+                "msg1".to_string(),
+            )
+            .await;
+
+        // Another vote that doesn't reference the player's submission
+        state
+            .submit_vote(
+                "voter2".to_string(),
+                ai_sub.id.clone(),
+                ai_sub.id.clone(),
+                "msg2".to_string(),
+            )
+            .await;
+
+        // Verify we have 2 votes
+        assert_eq!(state.votes.read().await.len(), 2);
+
+        // Remove player
+        state.remove_player(&player.id).await.unwrap();
+
+        // voter1's vote should be removed (referenced player's submission)
+        // voter2's vote should remain (only referenced AI submission)
+        assert_eq!(state.votes.read().await.len(), 1);
+
+        // voter1 should be able to vote again (msg_id cleared)
+        let processed = state.processed_vote_msg_ids.read().await;
+        assert!(!processed.contains_key("voter1"));
+        assert!(processed.contains_key("voter2"));
+    }
+
+    #[tokio::test]
+    async fn test_remove_player_adjusts_reveal_index() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // Create two players with submissions
+        let player1 = state.create_player().await;
+        let player2 = state.create_player().await;
+
+        let sub1 = state
+            .submit_answer(&round.id, Some(player1.id.clone()), "Answer 1".to_string())
+            .await
+            .unwrap();
+        let sub2 = state
+            .submit_answer(&round.id, Some(player2.id.clone()), "Answer 2".to_string())
+            .await
+            .unwrap();
+
+        // Set reveal order and advance reveal index to end
+        state
+            .set_reveal_order(&round.id, vec![sub1.id.clone(), sub2.id.clone()])
+            .await
+            .unwrap();
+
+        // Advance reveal to the second submission (index 1)
+        state.reveal_next(&round.id).await.unwrap();
+
+        // Verify reveal_index is 1
+        let round_data = state.get_current_round().await.unwrap();
+        assert_eq!(round_data.reveal_index, 1);
+
+        // Remove player2 (whose submission is at the current reveal index)
+        state.remove_player(&player2.id).await.unwrap();
+
+        // reveal_index should be adjusted to remain in bounds
+        let round_data = state.get_current_round().await.unwrap();
+        assert_eq!(round_data.reveal_order.len(), 1);
+        assert_eq!(round_data.reveal_index, 0); // Adjusted to last valid index
+    }
+
+    #[tokio::test]
+    async fn test_remove_player_clears_status() {
+        let state = AppState::new();
+        state.create_game().await;
+
+        // Create player and set status
+        let player = state.create_player().await;
+        state
+            .set_player_status(&player.id, PlayerSubmissionStatus::Submitted)
+            .await;
+
+        // Verify status is set
+        assert_eq!(
+            state.get_player_status(&player.id).await,
+            PlayerSubmissionStatus::Submitted
+        );
+
+        // Remove player
+        state.remove_player(&player.id).await.unwrap();
+
+        // Status should be cleared (returns default NotSubmitted for unknown player)
+        assert_eq!(
+            state.get_player_status(&player.id).await,
+            PlayerSubmissionStatus::NotSubmitted
+        );
+    }
+
+    #[tokio::test]
+    async fn test_remove_player_no_round() {
+        let state = AppState::new();
+        state.create_game().await;
+        // Don't start a round
+
+        // Create a player
+        let player = state.create_player().await;
+
+        // Remove should still work (no submissions to clean up)
+        let result = state.remove_player(&player.id).await;
+        assert!(result.is_ok());
+
+        // Player should be gone
+        assert_eq!(state.players.read().await.len(), 0);
+    }
 }

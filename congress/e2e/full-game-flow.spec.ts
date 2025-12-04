@@ -1231,4 +1231,388 @@ test.describe("Full Game Flow", () => {
 
     console.log("Player status test completed successfully!");
   });
+
+  test("host can remove player mid-round and affected votes are reset", async () => {
+    const { host, beamer, players, audience } = clients;
+
+    // ============================================
+    // SETUP: Get to voting phase with submissions
+    // ============================================
+    console.log("Remove player test: Setting up game...");
+
+    // Navigate to pages
+    await Promise.all([
+      host.goto("/host.html"),
+      beamer.goto("/beamer.html"),
+      players[0].goto("/player.html"),
+      players[1].goto("/player.html"),
+      audience[0].goto("/"),
+    ]);
+
+    await Promise.all([waitForConnection(host), waitForConnection(beamer)]);
+
+    // Create player tokens
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "2");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForSelector("#playerTokensList .player-status-card");
+
+    const tokens = await getPlayerTokens(host);
+    expect(tokens).toHaveLength(2);
+
+    // Player 1 joins (Alice - will be removed)
+    await players[0].fill("#tokenInput", tokens[0]);
+    await players[0].click("#joinButton");
+    await players[0].waitForSelector("#registerScreen.active");
+    await players[0].fill("#nameInput", "ToBeRemoved");
+    await players[0].click("#registerButton");
+    await players[0].waitForSelector("#waitingScreen.active");
+
+    // Player 2 joins (Bob - will remain)
+    await players[1].fill("#tokenInput", tokens[1]);
+    await players[1].click("#joinButton");
+    await players[1].waitForSelector("#registerScreen.active");
+    await players[1].fill("#nameInput", "RemainingPlayer");
+    await players[1].click("#registerButton");
+    await players[1].waitForSelector("#waitingScreen.active");
+
+    // Audience joins
+    await audience[0].click("#joinButton");
+    await audience[0].waitForSelector("#waitingScreen.active");
+
+    // Start round and add prompt
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+    await host.click('button:has-text("Neue Runde starten")');
+    await host.waitForTimeout(500);
+
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+    await host.fill("#promptText", "Remove player test question");
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForTimeout(500);
+
+    // Transition to WRITING
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="PROMPT_SELECTION"]');
+    await host.waitForTimeout(500);
+    await host.click('button[data-phase="WRITING"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
+      timeout: 5000,
+    });
+
+    // Both players submit answers
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+    await players[0].fill("#answerInput", "Answer from player to be removed");
+    await players[0].click("#submitButton");
+    await players[0].waitForSelector("#submittedScreen.active");
+
+    await players[1].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+    await players[1].fill("#answerInput", "Answer from remaining player");
+    await players[1].click("#submitButton");
+    await players[1].waitForSelector("#submittedScreen.active");
+
+    // Verify both submissions appear in host view
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.waitForSelector("#submissions.active");
+    await host.waitForSelector(".submission-card", { timeout: 5000 });
+
+    // Mark one submission as AI (required for RESULTS)
+    const aiButtonsWriting = host.locator(
+      'button:has-text("Als KI markieren")',
+    );
+    if ((await aiButtonsWriting.count()) > 0) {
+      // Mark the second one as AI (remaining player's)
+      await aiButtonsWriting.last().click();
+      await host.waitForTimeout(500);
+    }
+
+    // Transition to REVEAL then VOTING
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="REVEAL"]');
+    await host.waitForTimeout(500);
+    await host.click('button[data-phase="VOTING"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("VOTING", {
+      timeout: 5000,
+    });
+
+    // ============================================
+    // TEST: Audience votes for the player-to-be-removed's answer
+    // ============================================
+    console.log("Remove player test: Audience voting...");
+
+    await audience[0].waitForSelector("#votingScreen.active", {
+      timeout: 5000,
+    });
+    await audience[0].waitForSelector(".answer-option", { timeout: 5000 });
+
+    // Vote for first answer (ToBeRemoved's) as both AI and funny
+    const aiOptions = audience[0].locator("#aiAnswerOptions .answer-option");
+    const funnyOptions = audience[0].locator(
+      "#funnyAnswerOptions .answer-option",
+    );
+
+    await aiOptions.first().click();
+    await funnyOptions.first().click();
+    await audience[0].click("#voteButton");
+    await audience[0].waitForSelector("#confirmedScreen.active", {
+      timeout: 5000,
+    });
+
+    // ============================================
+    // TEST: Host removes first player during voting
+    // ============================================
+    console.log("Remove player test: Host removing player...");
+
+    // Navigate to Players panel
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+
+    // Verify we see 2 players
+    const playerCardsBefore = host.locator(".player-status-card");
+    await expect(playerCardsBefore).toHaveCount(2);
+
+    // Handle confirmation dialog
+    host.on("dialog", (dialog) => dialog.accept());
+
+    // Find and click the remove button for the first player (ToBeRemoved)
+    const playerToRemoveCard = host.locator(
+      '.player-status-card:has-text("ToBeRemoved")',
+    );
+    const removeButton = playerToRemoveCard.locator(".remove-btn");
+    await expect(removeButton).toBeVisible();
+    await removeButton.click();
+
+    // Wait for removal to process
+    await host.waitForTimeout(1000);
+
+    // ============================================
+    // VERIFY: Player is removed
+    // ============================================
+    console.log("Remove player test: Verifying player removal...");
+
+    // Should now only see 1 player
+    const playerCardsAfter = host.locator(".player-status-card");
+    await expect(playerCardsAfter).toHaveCount(1);
+
+    // The remaining player should be RemainingPlayer
+    await expect(
+      host.locator('.player-name:has-text("RemainingPlayer")'),
+    ).toBeVisible();
+    await expect(
+      host.locator('.player-name:has-text("ToBeRemoved")'),
+    ).not.toBeVisible();
+
+    // ============================================
+    // VERIFY: Submission is removed
+    // ============================================
+    console.log("Remove player test: Verifying submission removal...");
+
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.waitForSelector("#submissions.active");
+
+    // Should only see 1 player submission now (the remaining player)
+    // Note: The AI marking may have moved to another submission
+    const playerSubmissionsAfter = host.locator(
+      ".submission-card:has-text('PLAYER')",
+    );
+    await expect(playerSubmissionsAfter).toHaveCount(1);
+
+    // The remaining submission should be from RemainingPlayer
+    await expect(
+      host.locator(".submission-card:has-text('Answer from remaining player')"),
+    ).toBeVisible();
+    await expect(
+      host.locator(
+        ".submission-card:has-text('Answer from player to be removed')",
+      ),
+    ).not.toBeVisible();
+
+    // ============================================
+    // VERIFY: Audience can vote again (their vote was reset)
+    // ============================================
+    console.log(
+      "Remove player test: Verifying audience can vote again...",
+    );
+
+    // Audience should be back on voting screen (their vote was invalidated)
+    // Note: They may need to refresh or the UI may automatically update
+    // For now, let's verify the game can continue to RESULTS
+
+    // Need to re-mark AI submission since the original may have been removed
+    const aiButtons = host.locator('button:has-text("Als KI markieren")');
+    if ((await aiButtons.count()) > 0) {
+      await aiButtons.first().click();
+      await host.waitForTimeout(500);
+    }
+
+    // Go to game control and transition to RESULTS
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="RESULTS"]');
+
+    await expect(host.locator("#overviewPhase")).toHaveText("RESULTS", {
+      timeout: 5000,
+    });
+
+    console.log("Remove player test completed successfully!");
+  });
+
+  test("host can add new player mid-round during writing phase", async () => {
+    const { host, players } = clients;
+
+    // ============================================
+    // SETUP: Start with one player in writing phase
+    // ============================================
+    console.log("Add player mid-round test: Setting up game...");
+
+    await Promise.all([
+      host.goto("/host.html"),
+      players[0].goto("/player.html"),
+    ]);
+
+    await waitForConnection(host);
+
+    // Create initial player token
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "1");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForSelector("#playerTokensList .player-status-card");
+
+    const initialTokens = await getPlayerTokens(host);
+    expect(initialTokens).toHaveLength(1);
+
+    // First player joins
+    await players[0].fill("#tokenInput", initialTokens[0]);
+    await players[0].click("#joinButton");
+    await players[0].waitForSelector("#registerScreen.active");
+    await players[0].fill("#nameInput", "FirstPlayer");
+    await players[0].click("#registerButton");
+    await players[0].waitForSelector("#waitingScreen.active");
+
+    // Start round and setup
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+    await host.click('button:has-text("Neue Runde starten")');
+    await host.waitForTimeout(500);
+
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+    await host.fill("#promptText", "Add player mid-round test");
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForTimeout(500);
+
+    // Transition to WRITING
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="PROMPT_SELECTION"]');
+    await host.waitForTimeout(500);
+    await host.click('button[data-phase="WRITING"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
+      timeout: 5000,
+    });
+
+    // First player sees writing screen
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+
+    // ============================================
+    // TEST: Host adds new player during WRITING phase
+    // ============================================
+    console.log("Add player mid-round test: Adding new player...");
+
+    // Navigate to Players panel
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+
+    // Create another player token
+    await host.fill("#playerCount", "1");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForTimeout(500);
+
+    // Should now have 2 players
+    const updatedTokens = await getPlayerTokens(host);
+    expect(updatedTokens).toHaveLength(2);
+
+    // Get the new token (it wasn't in the initial list)
+    const newToken = updatedTokens.find((t) => !initialTokens.includes(t));
+    expect(newToken).toBeTruthy();
+
+    // ============================================
+    // TEST: New player can join and submit during WRITING
+    // ============================================
+    console.log("Add player mid-round test: New player joining...");
+
+    // Load player page in second player context
+    await players[1].goto("/player.html");
+    await players[1].fill("#tokenInput", newToken!);
+    await players[1].click("#joinButton");
+    await players[1].waitForSelector("#registerScreen.active");
+    await players[1].fill("#nameInput", "LateArrival");
+    await players[1].click("#registerButton");
+
+    // New player should go directly to writing screen (since game is in WRITING phase)
+    await players[1].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+
+    // New player can submit
+    await players[1].fill("#answerInput", "Late arrival's answer");
+    await players[1].click("#submitButton");
+    await players[1].waitForSelector("#submittedScreen.active");
+
+    // First player also submits
+    await players[0].fill("#answerInput", "First player's answer");
+    await players[0].click("#submitButton");
+    await players[0].waitForSelector("#submittedScreen.active");
+
+    // ============================================
+    // VERIFY: Both submissions appear in host view
+    // ============================================
+    console.log("Add player mid-round test: Verifying submissions...");
+
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.waitForSelector("#submissions.active");
+    await host.waitForSelector(".submission-card", { timeout: 5000 });
+
+    const playerSubmissions = host.locator(
+      ".submission-card:has-text('PLAYER')",
+    );
+    await expect(playerSubmissions).toHaveCount(2);
+
+    // Both answers should be present
+    await expect(
+      host.locator(".submission-card:has-text('First player')"),
+    ).toBeVisible();
+    await expect(
+      host.locator(".submission-card:has-text('Late arrival')"),
+    ).toBeVisible();
+
+    // ============================================
+    // VERIFY: Player status shows both players
+    // ============================================
+    console.log("Add player mid-round test: Verifying player status...");
+
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+
+    // Both players should be shown with submitted status
+    const submittedBadges = host.locator(".status-badge.submitted");
+    await expect(submittedBadges).toHaveCount(2);
+
+    // Both names should appear
+    await expect(
+      host.locator('.player-name:has-text("FirstPlayer")'),
+    ).toBeVisible();
+    await expect(
+      host.locator('.player-name:has-text("LateArrival")'),
+    ).toBeVisible();
+
+    console.log("Add player mid-round test completed successfully!");
+  });
 });

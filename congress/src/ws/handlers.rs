@@ -184,6 +184,13 @@ pub async fn handle_message(
             }
             handle_host_shadowban_audience(state, voter_id).await
         }
+
+        ClientMessage::HostRemovePlayer { player_id } => {
+            if *role != Role::Host {
+                return unauthorized("Only host can remove players");
+            }
+            handle_host_remove_player(state, player_id).await
+        }
     }
 }
 
@@ -895,6 +902,31 @@ async fn handle_host_shadowban_audience(
     None // Silent success (no confirmation message needed)
 }
 
+async fn handle_host_remove_player(
+    state: &Arc<AppState>,
+    player_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host removing player: {}", player_id);
+
+    match state.remove_player(&player_id).await {
+        Ok(_player) => {
+            // Broadcast player removal to all clients
+            state.broadcast_to_all(ServerMessage::PlayerRemoved {
+                player_id: player_id.clone(),
+            });
+
+            // Broadcast updated player status to host
+            broadcast_player_status_to_host(state).await;
+
+            None // Success broadcast handled above
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "REMOVE_PLAYER_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1298,5 +1330,122 @@ mod tests {
         let rounds = state.rounds.read().await;
         let round_data = rounds.get(&round.id).unwrap();
         assert_eq!(round_data.prompt_candidates.len(), 0);
+    }
+
+    // Remove player handler tests
+
+    #[tokio::test]
+    async fn test_remove_player_requires_host() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let player = state.create_player().await;
+        let role = Role::Audience;
+
+        let result = handle_message(
+            ClientMessage::HostRemovePlayer {
+                player_id: player.id.clone(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        assert!(result.is_some());
+        if let Some(ServerMessage::Error { code, .. }) = result {
+            assert_eq!(code, "UNAUTHORIZED");
+        } else {
+            panic!("Expected Error message");
+        }
+
+        // Player should still exist
+        assert!(state.get_player_by_token(&player.token).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_remove_player_success() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let player = state.create_player().await;
+        let role = Role::Host;
+
+        // Verify player exists
+        assert!(state.get_player_by_token(&player.token).await.is_some());
+
+        let result = handle_message(
+            ClientMessage::HostRemovePlayer {
+                player_id: player.id.clone(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        // Should return None (success, broadcast handled separately)
+        assert!(result.is_none());
+
+        // Player should be gone
+        assert!(state.get_player_by_token(&player.token).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_remove_player_not_found() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let role = Role::Host;
+
+        let result = handle_message(
+            ClientMessage::HostRemovePlayer {
+                player_id: "nonexistent".to_string(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        assert!(result.is_some());
+        if let Some(ServerMessage::Error { code, .. }) = result {
+            assert_eq!(code, "REMOVE_PLAYER_FAILED");
+        } else {
+            panic!("Expected Error message");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_remove_player_with_submission() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+        let player = state.create_player().await;
+        let role = Role::Host;
+
+        // Create submission for player
+        state
+            .submit_answer(
+                &round.id,
+                Some(player.id.clone()),
+                "Test answer".to_string(),
+            )
+            .await
+            .unwrap();
+
+        // Verify submission exists
+        assert_eq!(state.get_submissions(&round.id).await.len(), 1);
+
+        // Remove player
+        let result = handle_message(
+            ClientMessage::HostRemovePlayer {
+                player_id: player.id.clone(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        // Should succeed
+        assert!(result.is_none());
+
+        // Player and submission should be gone
+        assert!(state.get_player_by_token(&player.token).await.is_none());
+        assert_eq!(state.get_submissions(&round.id).await.len(), 0);
     }
 }
