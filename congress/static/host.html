@@ -232,17 +232,22 @@
                 </div>
 
                 <div class="card">
-                    <div class="card-header">Alle Antworten</div>
-                    <div id="submissionsList">
+                    <div class="card-header">Antworten-Reihenfolge</div>
+                    <div class="reorder-hint">
+                        <span class="icon">↕️</span>
+                        <span>Ziehe die Antworten per Drag &amp; Drop in die gewünschte Reihenfolge</span>
+                    </div>
+                    <div id="submissionsList" class="submissions-list">
                         <p style="opacity: 0.6;">Noch keine Antworten</p>
                     </div>
-                </div>
 
-                <div class="card">
-                    <div class="card-header">Reihenfolge der Antworten</div>
-                    <p style="opacity: 0.8; margin-bottom: 10px;">Lege die Reihenfolge fest, in der die Antworten gezeigt werden. Gib Antwort-IDs getrennt durch Kommas ein.</p>
-                    <textarea id="revealOrderInput" placeholder="sub_123, sub_456, sub_789"></textarea>
-                    <button onclick="setRevealOrder()">Reihenfolge festlegen</button>
+                    <details style="margin-top: 15px;">
+                        <summary style="cursor: pointer; opacity: 0.7; font-size: 13px;">Manuelle ID-Eingabe (Fallback)</summary>
+                        <div style="margin-top: 10px;">
+                            <textarea id="revealOrderInput" placeholder="sub_123, sub_456, sub_789" style="margin-bottom: 10px;"></textarea>
+                            <button onclick="setRevealOrder()" class="secondary">Reihenfolge festlegen</button>
+                        </div>
+                    </details>
                 </div>
 
                 <div class="card">

@@ -10,6 +10,7 @@ const gameState = {
   players: [], // Legacy: just tokens
   playerStatus: [], // New: full player status with names
   submissions: [],
+  revealOrder: [], // Current reveal order (submission IDs)
   prompts: [], // Prompt candidates from audience (filtered by shadowban)
   scores: { players: [], audience_top: [] },
   validTransitions: [], // Populated by server
@@ -17,6 +18,12 @@ const gameState = {
   deadline: null,
   selectedAiSubmissionId: null, // Currently selected AI submission
   aiGenerationStatus: "idle", // idle, generating, completed, failed
+};
+
+// Drag-and-drop state
+const dragState = {
+  draggedId: null,
+  draggedElement: null,
 };
 
 // Initialize
@@ -664,15 +671,41 @@ function updateSubmissionsList() {
 
   if (gameState.submissions.length === 0) {
     container.innerHTML = '<p style="opacity: 0.6;">Noch keine Antworten</p>';
+    gameState.revealOrder = [];
     return;
   }
 
+  // Build reveal order: use existing order, add new submissions at end
+  const existingIds = new Set(gameState.revealOrder);
+  const currentIds = new Set(gameState.submissions.map((s) => s.id));
+
+  // Remove IDs that no longer exist
+  gameState.revealOrder = gameState.revealOrder.filter((id) =>
+    currentIds.has(id),
+  );
+
+  // Add new submissions at the end
   gameState.submissions.forEach((sub) => {
+    if (!existingIds.has(sub.id)) {
+      gameState.revealOrder.push(sub.id);
+    }
+  });
+
+  // Create a map for quick submission lookup
+  const submissionMap = new Map(gameState.submissions.map((s) => [s.id, s]));
+
+  // Render submissions in reveal order
+  gameState.revealOrder.forEach((subId, index) => {
+    const sub = submissionMap.get(subId);
+    if (!sub) return;
+
     const div = document.createElement("div");
     const authorKind = sub.author_kind || "unknown";
     const isSelectedAi =
       authorKind === "ai" && gameState.selectedAiSubmissionId === sub.id;
-    div.className = `submission-card${authorKind === "ai" ? " ai" : ""}${isSelectedAi ? " selected-ai" : ""}`;
+    div.className = `submission-card draggable${authorKind === "ai" ? " ai" : ""}${isSelectedAi ? " selected-ai" : ""}`;
+    div.dataset.submissionId = sub.id;
+    div.draggable = true;
 
     // Show provider info for AI submissions
     const providerInfo =
@@ -681,22 +714,131 @@ function updateSubmissionsList() {
         : "";
 
     div.innerHTML = `
-            <div class="header">
-                <span>${sub.id}</span>
-                <span class="badge ${authorKind}">${authorKind.toUpperCase()}</span>
-                ${providerInfo}
-                ${isSelectedAi ? '<span class="badge selected">AUSGEWÄHLT</span>' : ""}
-            </div>
-            <div class="text">${escapeHtml(sub.display_text)}</div>
-            <div class="actions">
-                ${authorKind === "player" ? `<button onclick="setAiSubmission('${sub.id}')">Als KI markieren</button>` : ""}
-                ${authorKind === "ai" && !isSelectedAi ? `<button onclick="selectAiSubmission('${sub.id}')">Als KI auswählen</button>` : ""}
-                ${authorKind === "player" ? `<button class="danger" onclick="markDuplicate('${sub.id}')">Dupe</button>` : ""}
-                <button class="secondary">Bearbeiten</button>
-            </div>
-        `;
+      <div class="header">
+        <div class="drag-handle">
+          <span class="order-number">${index + 1}</span>
+          <span class="drag-icon">⋮⋮</span>
+        </div>
+        <div class="header-content">
+          <span style="font-size: 12px; opacity: 0.6;">${sub.id.substring(0, 12)}...</span>
+          <div>
+            <span class="badge ${authorKind}">${authorKind.toUpperCase()}</span>
+            ${providerInfo}
+            ${isSelectedAi ? '<span class="badge selected">AUSGEWÄHLT</span>' : ""}
+          </div>
+        </div>
+      </div>
+      <div class="text">${escapeHtml(sub.display_text)}</div>
+      <div class="actions">
+        ${authorKind === "player" ? `<button onclick="setAiSubmission('${sub.id}')">Als KI markieren</button>` : ""}
+        ${authorKind === "ai" && !isSelectedAi ? `<button onclick="selectAiSubmission('${sub.id}')">Als KI auswählen</button>` : ""}
+        ${authorKind === "player" ? `<button class="danger" onclick="markDuplicate('${sub.id}')">Dupe</button>` : ""}
+        <button class="secondary">Bearbeiten</button>
+      </div>
+    `;
+
+    // Add drag event listeners
+    div.addEventListener("dragstart", handleDragStart);
+    div.addEventListener("dragend", handleDragEnd);
+    div.addEventListener("dragover", handleDragOver);
+    div.addEventListener("dragenter", handleDragEnter);
+    div.addEventListener("dragleave", handleDragLeave);
+    div.addEventListener("drop", handleDrop);
+
     container.appendChild(div);
   });
+
+  // Update the manual input field with current order
+  const revealOrderInput = document.getElementById("revealOrderInput");
+  if (revealOrderInput) {
+    revealOrderInput.value = gameState.revealOrder.join(", ");
+  }
+}
+
+// Drag-and-drop handlers
+function handleDragStart(e) {
+  const card = e.target.closest(".submission-card");
+  if (!card) return;
+
+  dragState.draggedId = card.dataset.submissionId;
+  dragState.draggedElement = card;
+  card.classList.add("dragging");
+
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", dragState.draggedId);
+}
+
+function handleDragEnd(e) {
+  const card = e.target.closest(".submission-card");
+  if (card) {
+    card.classList.remove("dragging");
+  }
+
+  // Remove all drag-over indicators
+  document.querySelectorAll(".submission-card.drag-over").forEach((el) => {
+    el.classList.remove("drag-over");
+  });
+
+  dragState.draggedId = null;
+  dragState.draggedElement = null;
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+}
+
+function handleDragEnter(e) {
+  e.preventDefault();
+  const card = e.target.closest(".submission-card");
+  if (card && card !== dragState.draggedElement) {
+    card.classList.add("drag-over");
+  }
+}
+
+function handleDragLeave(e) {
+  const card = e.target.closest(".submission-card");
+  if (card && !card.contains(e.relatedTarget)) {
+    card.classList.remove("drag-over");
+  }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  const targetCard = e.target.closest(".submission-card");
+  if (!targetCard || !dragState.draggedId) return;
+
+  const targetId = targetCard.dataset.submissionId;
+  if (targetId === dragState.draggedId) return;
+
+  targetCard.classList.remove("drag-over");
+
+  // Reorder the reveal order array
+  const fromIndex = gameState.revealOrder.indexOf(dragState.draggedId);
+  const toIndex = gameState.revealOrder.indexOf(targetId);
+
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  // Remove from old position and insert at new position
+  gameState.revealOrder.splice(fromIndex, 1);
+  gameState.revealOrder.splice(toIndex, 0, dragState.draggedId);
+
+  // Re-render the list
+  updateSubmissionsList();
+
+  // Send the new order to the server
+  sendRevealOrder();
+}
+
+function sendRevealOrder() {
+  if (gameState.revealOrder.length === 0) return;
+
+  wsConn.send({
+    t: "host_set_reveal_order",
+    order: gameState.revealOrder,
+  });
+
+  showAlert("Reihenfolge aktualisiert", "success");
 }
 
 function updateScores() {

@@ -572,3 +572,109 @@ select:focus {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* Drag-and-Drop Submission Reordering */
+.submissions-list {
+  min-height: 50px;
+}
+
+.submission-card.draggable {
+  cursor: grab;
+  user-select: none;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.submission-card.draggable:active {
+  cursor: grabbing;
+}
+
+.submission-card.dragging {
+  opacity: 0.5;
+  transform: scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}
+
+.submission-card.drag-over {
+  border-color: #fbbf24;
+  border-style: dashed;
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.submission-card .drag-handle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: grab;
+  padding: 4px 8px;
+  margin-right: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+
+.submission-card .drag-handle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.submission-card .drag-handle:active {
+  cursor: grabbing;
+}
+
+.submission-card .order-number {
+  font-weight: 700;
+  font-size: 16px;
+  color: #fbbf24;
+  min-width: 24px;
+  text-align: center;
+}
+
+.submission-card .drag-icon {
+  font-size: 18px;
+  opacity: 0.6;
+}
+
+.submission-card .header {
+  display: flex;
+  align-items: center;
+}
+
+.submission-card .header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 1;
+}
+
+/* Drop indicator line */
+.drop-indicator {
+  height: 4px;
+  background: #fbbf24;
+  border-radius: 2px;
+  margin: 4px 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.drop-indicator.active {
+  opacity: 1;
+}
+
+/* Reorder info text */
+.reorder-hint {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reorder-hint .icon {
+  font-size: 16px;
+}
