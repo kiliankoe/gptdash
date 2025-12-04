@@ -1418,8 +1418,9 @@ test.describe("Full Game Flow", () => {
 
     // Should only see 1 player submission now (the remaining player)
     // Note: The AI marking may have moved to another submission
+    // Use .badge.player selector to avoid matching "openai" which contains "PLAYER"
     const playerSubmissionsAfter = host.locator(
-      ".submission-card:has-text('PLAYER')",
+      ".submission-card:has(.badge.player)",
     );
     await expect(playerSubmissionsAfter).toHaveCount(1);
 

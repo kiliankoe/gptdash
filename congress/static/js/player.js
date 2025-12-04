@@ -279,8 +279,12 @@ function registerName() {
   updateConnectionStatus(true, `Beigetreten als ${name}`);
   hideError("registerError");
 
-  // Show waiting screen
-  showScreen("waitingScreen");
+  // Show appropriate screen based on current game phase
+  if (currentPhase === "WRITING") {
+    showWritingScreen();
+  } else {
+    showScreen("waitingScreen");
+  }
 }
 
 function submitAnswer() {
