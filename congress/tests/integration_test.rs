@@ -112,6 +112,7 @@ async fn test_full_game_flow() {
             &round.id,
             "What is the meaning of life?".to_string(),
             PromptSource::Host,
+            None,
         )
         .await
         .expect("Should add prompt");
@@ -687,7 +688,12 @@ async fn test_player_status_tracking() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+        .add_prompt(
+            &round.id,
+            "Test prompt".to_string(),
+            PromptSource::Host,
+            None,
+        )
         .await
         .unwrap();
     state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -767,7 +773,12 @@ async fn test_submission_update() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+        .add_prompt(
+            &round.id,
+            "Test prompt".to_string(),
+            PromptSource::Host,
+            None,
+        )
         .await
         .unwrap();
     state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -875,7 +886,12 @@ async fn test_submission_update_unauthorized() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+        .add_prompt(
+            &round.id,
+            "Test prompt".to_string(),
+            PromptSource::Host,
+            None,
+        )
         .await
         .unwrap();
     state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -967,7 +983,12 @@ async fn test_host_write_ai_submission() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+        .add_prompt(
+            &round.id,
+            "Test prompt".to_string(),
+            PromptSource::Host,
+            None,
+        )
         .await
         .unwrap();
     state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -1158,7 +1179,12 @@ async fn test_select_ai_submission() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+        .add_prompt(
+            &round.id,
+            "Test prompt".to_string(),
+            PromptSource::Host,
+            None,
+        )
         .await
         .unwrap();
     state.select_prompt(&round.id, &prompt.id).await.unwrap();

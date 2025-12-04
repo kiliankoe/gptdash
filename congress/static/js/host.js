@@ -10,6 +10,7 @@ const gameState = {
   players: [], // Legacy: just tokens
   playerStatus: [], // New: full player status with names
   submissions: [],
+  prompts: [], // Prompt candidates from audience (filtered by shadowban)
   scores: { players: [], audience_top: [] },
   validTransitions: [], // Populated by server
   panicMode: false,
@@ -130,6 +131,11 @@ function handleMessage(message) {
 
     case "ai_generation_status":
       handleAiGenerationStatus(message);
+      break;
+
+    case "host_prompts":
+      gameState.prompts = message.prompts || [];
+      updatePromptsList();
       break;
 
     case "error":
@@ -591,6 +597,63 @@ function updatePlayersList() {
   }
 }
 
+function updatePromptsList() {
+  const container = document.getElementById("promptsList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (gameState.prompts.length === 0) {
+    container.innerHTML =
+      '<p style="opacity: 0.6;">Keine Prompts von Publikum verfügbar</p>';
+    return;
+  }
+
+  gameState.prompts.forEach((prompt) => {
+    const div = document.createElement("div");
+    div.className = "prompt-card";
+
+    const isAudience = prompt.source === "audience";
+    const shortId = prompt.submitter_id
+      ? `${prompt.submitter_id.substring(0, 8)}...`
+      : "";
+
+    div.innerHTML = `
+      <div class="prompt-header">
+        <span class="prompt-id">${prompt.id.substring(0, 12)}...</span>
+        <span class="badge ${isAudience ? "audience" : "host"}">${isAudience ? "Publikum" : "Host"}</span>
+        ${shortId ? `<span class="submitter-id" title="${escapeHtml(prompt.submitter_id)}">${shortId}</span>` : ""}
+      </div>
+      <div class="prompt-text">${escapeHtml(prompt.text || "(Kein Text)")}</div>
+      <div class="prompt-actions">
+        <button class="secondary" onclick="selectPromptById('${prompt.id}')">Auswählen</button>
+        ${isAudience && prompt.submitter_id ? `<button class="danger" onclick="shadowbanAudience('${prompt.submitter_id}')" title="Diesen Nutzer shadowbannen (ignoriert zukünftige Prompts)">🚫 Shadowban</button>` : ""}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function selectPromptById(promptId) {
+  wsConn.send({
+    t: "host_select_prompt",
+    prompt_id: promptId,
+  });
+}
+
+function shadowbanAudience(voterId) {
+  if (
+    confirm(
+      "Diesen Nutzer shadowbannen?\n\nAlle zukünftigen Prompts von diesem Nutzer werden ignoriert. Der Nutzer erfährt davon nichts.",
+    )
+  ) {
+    wsConn.send({
+      t: "host_shadowban_audience",
+      voter_id: voterId,
+    });
+    showAlert("Nutzer shadowbanned", "success");
+  }
+}
+
 function updateSubmissionsList() {
   const container = document.getElementById("submissionsList");
   if (!container) return;
@@ -925,6 +988,7 @@ if (typeof window !== "undefined") {
     hostStartRound,
     addPrompt,
     selectPrompt,
+    selectPromptById,
     setAiSubmission,
     setRevealOrder,
     resetGame,
@@ -938,6 +1002,7 @@ if (typeof window !== "undefined") {
     regenerateAi,
     writeManualAiSubmission,
     selectAiSubmission,
+    shadowbanAudience,
     // State export/import
     refreshStateView,
     downloadStateExport,

@@ -31,7 +31,9 @@ pub async fn handle_message(
             msg_id,
         } => handle_vote(state, voter_token, ai, funny, msg_id).await,
 
-        ClientMessage::SubmitPrompt { text } => handle_submit_prompt(state, text).await,
+        ClientMessage::SubmitPrompt { voter_token, text } => {
+            handle_submit_prompt(state, voter_token, text).await
+        }
 
         ClientMessage::AckNeeded {
             last_seen_server_seq,
@@ -175,6 +177,13 @@ pub async fn handle_message(
             submission_id,
             new_text,
         } => handle_update_submission(state, player_token, submission_id, new_text).await,
+
+        ClientMessage::HostShadowbanAudience { voter_id } => {
+            if *role != Role::Host {
+                return unauthorized("Only host can shadowban audience members");
+            }
+            handle_host_shadowban_audience(state, voter_id).await
+        }
     }
 }
 
@@ -281,15 +290,41 @@ async fn handle_vote(
     }
 }
 
-async fn handle_submit_prompt(state: &Arc<AppState>, text: String) -> Option<ServerMessage> {
+async fn handle_submit_prompt(
+    state: &Arc<AppState>,
+    voter_token: Option<String>,
+    text: String,
+) -> Option<ServerMessage> {
     tracing::info!("Prompt submitted: {}", text);
     let round = state.get_current_round().await?;
 
+    // Check if this voter is shadowbanned
+    if let Some(ref token) = voter_token {
+        if state.is_shadowbanned(token).await {
+            tracing::info!(
+                "Shadowbanned voter {} submitted prompt, silently ignoring",
+                token
+            );
+            // Return success to the user so they don't know they're shadowbanned
+            return None;
+        }
+    }
+
     match state
-        .add_prompt(&round.id, text, crate::types::PromptSource::Audience)
+        .add_prompt(
+            &round.id,
+            text,
+            crate::types::PromptSource::Audience,
+            voter_token.clone(),
+        )
         .await
     {
-        Ok(_) => None,
+        Ok(prompt) => {
+            // Broadcast updated prompts to host
+            state.broadcast_prompts_to_host(&round.id).await;
+            tracing::info!("Prompt added: {}", prompt.id);
+            None
+        }
         Err(e) => Some(ServerMessage::Error {
             code: "PROMPT_FAILED".to_string(),
             msg: e,
@@ -490,7 +525,7 @@ async fn handle_host_add_prompt(state: &Arc<AppState>, text: String) -> Option<S
     let round = state.get_current_round().await?;
 
     match state
-        .add_prompt(&round.id, text, crate::types::PromptSource::Host)
+        .add_prompt(&round.id, text, crate::types::PromptSource::Host, None)
         .await
     {
         Ok(prompt) => {
@@ -845,6 +880,21 @@ async fn broadcast_player_status_to_host(state: &Arc<AppState>) {
     state.broadcast_to_host(ServerMessage::HostPlayerStatus { players });
 }
 
+async fn handle_host_shadowban_audience(
+    state: &Arc<AppState>,
+    voter_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host shadowbanning audience member: {}", voter_id);
+    state.shadowban_audience(voter_id.clone()).await;
+
+    // Re-broadcast prompts to host (now filtered)
+    if let Some(round) = state.get_current_round().await {
+        state.broadcast_prompts_to_host(&round.id).await;
+    }
+
+    None // Silent success (no confirmation message needed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1138,5 +1188,115 @@ mod tests {
         } else {
             panic!("Expected Error message");
         }
+    }
+
+    #[tokio::test]
+    async fn test_shadowban_requires_host() {
+        let state = Arc::new(AppState::new());
+        let role = Role::Audience;
+
+        let result = handle_message(
+            ClientMessage::HostShadowbanAudience {
+                voter_id: "voter1".to_string(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        assert!(result.is_some());
+        if let Some(ServerMessage::Error { code, .. }) = result {
+            assert_eq!(code, "UNAUTHORIZED");
+        } else {
+            panic!("Expected Error message");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_shadowban_success() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let role = Role::Host;
+
+        // Verify not shadowbanned initially
+        assert!(!state.is_shadowbanned("voter1").await);
+
+        // Shadowban the voter
+        let result = handle_message(
+            ClientMessage::HostShadowbanAudience {
+                voter_id: "voter1".to_string(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        // Should return None (silent success)
+        assert!(result.is_none());
+
+        // Verify voter is now shadowbanned
+        assert!(state.is_shadowbanned("voter1").await);
+    }
+
+    #[tokio::test]
+    async fn test_submit_prompt_with_voter_token() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let _round = state.start_round().await.unwrap();
+        let role = Role::Audience;
+
+        let result = handle_message(
+            ClientMessage::SubmitPrompt {
+                voter_token: Some("voter123".to_string()),
+                text: "My prompt suggestion".to_string(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        // Should return None (silent success)
+        assert!(result.is_none());
+
+        // Verify prompt was added with submitter_id
+        let round = state.get_current_round().await.unwrap();
+        let rounds = state.rounds.read().await;
+        let round_data = rounds.get(&round.id).unwrap();
+        assert_eq!(round_data.prompt_candidates.len(), 1);
+        assert_eq!(
+            round_data.prompt_candidates[0].submitter_id,
+            Some("voter123".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_shadowbanned_user_prompt_silently_ignored() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let _round = state.start_round().await.unwrap();
+        let role = Role::Audience;
+
+        // First, shadowban the voter
+        state.shadowban_audience("spammer".to_string()).await;
+
+        // Try to submit a prompt as shadowbanned user
+        let result = handle_message(
+            ClientMessage::SubmitPrompt {
+                voter_token: Some("spammer".to_string()),
+                text: "Spam prompt".to_string(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        // Should return None (user thinks it succeeded)
+        assert!(result.is_none());
+
+        // But prompt was NOT actually added
+        let round = state.get_current_round().await.unwrap();
+        let rounds = state.rounds.read().await;
+        let round_data = rounds.get(&round.id).unwrap();
+        assert_eq!(round_data.prompt_candidates.len(), 0);
     }
 }

@@ -69,6 +69,8 @@ pub struct Prompt {
     pub text: Option<String>,
     pub image_url: Option<String>,
     pub source: PromptSource,
+    /// ID of the audience member who submitted this prompt (None for host-submitted)
+    pub submitter_id: Option<VoterId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

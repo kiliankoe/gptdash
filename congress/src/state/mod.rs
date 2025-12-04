@@ -10,7 +10,7 @@ use crate::llm::{LlmConfig, LlmManager};
 use crate::protocol::{PlayerSubmissionStatus, ServerMessage};
 use crate::types::*;
 use export::GameStateExport;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 
@@ -27,6 +27,8 @@ pub struct AppState {
     pub processed_vote_msg_ids: Arc<RwLock<HashMap<VoterId, String>>>,
     /// Player submission status tracking (player_id -> status)
     pub player_status: Arc<RwLock<HashMap<PlayerId, PlayerSubmissionStatus>>>,
+    /// Shadowbanned audience member IDs (their prompts are silently ignored)
+    pub shadowbanned_audience: Arc<RwLock<HashSet<VoterId>>>,
     /// LLM manager for generating AI answers
     pub llm: Option<Arc<LlmManager>>,
     /// LLM configuration (timeout, max tokens, etc.)
@@ -57,6 +59,7 @@ impl AppState {
             scores: Arc::new(RwLock::new(Vec::new())),
             processed_vote_msg_ids: Arc::new(RwLock::new(HashMap::new())),
             player_status: Arc::new(RwLock::new(HashMap::new())),
+            shadowbanned_audience: Arc::new(RwLock::new(HashSet::new())),
             llm: llm.map(Arc::new),
             llm_config,
             broadcast: broadcast_tx,
@@ -75,6 +78,58 @@ impl AppState {
         let _ = self.host_broadcast.send(msg);
     }
 
+    /// Check if a voter is shadowbanned
+    pub async fn is_shadowbanned(&self, voter_id: &str) -> bool {
+        self.shadowbanned_audience.read().await.contains(voter_id)
+    }
+
+    /// Shadowban an audience member
+    pub async fn shadowban_audience(&self, voter_id: String) {
+        self.shadowbanned_audience.write().await.insert(voter_id);
+    }
+
+    /// Get all shadowbanned audience member IDs
+    pub async fn get_shadowbanned_audience(&self) -> Vec<String> {
+        self.shadowbanned_audience
+            .read()
+            .await
+            .iter()
+            .cloned()
+            .collect()
+    }
+
+    /// Broadcast prompt candidates to host (filtered by shadowban status)
+    pub async fn broadcast_prompts_to_host(&self, round_id: &str) {
+        let rounds = self.rounds.read().await;
+        let round = match rounds.get(round_id) {
+            Some(r) => r,
+            None => return,
+        };
+
+        let shadowbanned = self.shadowbanned_audience.read().await;
+
+        // Filter out prompts from shadowbanned users
+        let prompts: Vec<crate::protocol::HostPromptInfo> = round
+            .prompt_candidates
+            .iter()
+            .filter(|p| {
+                // Keep prompts from non-shadowbanned users or prompts without submitter_id
+                match &p.submitter_id {
+                    Some(id) => !shadowbanned.contains(id),
+                    None => true,
+                }
+            })
+            .map(|p| crate::protocol::HostPromptInfo {
+                id: p.id.clone(),
+                text: p.text.clone(),
+                source: p.source.clone(),
+                submitter_id: p.submitter_id.clone(),
+            })
+            .collect();
+
+        self.broadcast_to_host(ServerMessage::HostPrompts { prompts });
+    }
+
     /// Export the entire game state as a serializable snapshot.
     ///
     /// Acquires all locks to ensure a consistent snapshot.
@@ -88,6 +143,7 @@ impl AppState {
         let scores = self.scores.read().await.clone();
         let processed_vote_msg_ids = self.processed_vote_msg_ids.read().await.clone();
         let player_status = self.player_status.read().await.clone();
+        let shadowbanned_audience = self.shadowbanned_audience.read().await.clone();
 
         GameStateExport::new(
             game,
@@ -98,6 +154,7 @@ impl AppState {
             scores,
             processed_vote_msg_ids,
             player_status,
+            shadowbanned_audience,
         )
     }
 
@@ -118,6 +175,7 @@ impl AppState {
         *self.scores.write().await = export.scores;
         *self.processed_vote_msg_ids.write().await = export.processed_vote_msg_ids;
         *self.player_status.write().await = export.player_status;
+        *self.shadowbanned_audience.write().await = export.shadowbanned_audience;
 
         // Broadcast state refresh to all clients
         if let Some(ref game) = export.game {
@@ -271,7 +329,12 @@ mod tests {
 
         // Add and select a prompt
         let prompt = state
-            .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+            .add_prompt(
+                &round.id,
+                "Test prompt".to_string(),
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -291,7 +354,12 @@ mod tests {
 
         let round = state.start_round().await.unwrap();
         let prompt = state
-            .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+            .add_prompt(
+                &round.id,
+                "Test prompt".to_string(),
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -314,7 +382,12 @@ mod tests {
 
         let round = state.start_round().await.unwrap();
         let prompt = state
-            .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+            .add_prompt(
+                &round.id,
+                "Test prompt".to_string(),
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -350,7 +423,12 @@ mod tests {
 
         // Add prompt candidates and select one
         let prompt = state
-            .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+            .add_prompt(
+                &round.id,
+                "Test prompt".to_string(),
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -397,7 +475,12 @@ mod tests {
         let round = state.start_round().await.unwrap();
 
         let prompt = state
-            .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+            .add_prompt(
+                &round.id,
+                "Test prompt".to_string(),
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -417,7 +500,12 @@ mod tests {
         let round = state.start_round().await.unwrap();
 
         let prompt = state
-            .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+            .add_prompt(
+                &round.id,
+                "Test prompt".to_string(),
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
 
@@ -426,7 +514,12 @@ mod tests {
 
         // Try to select again when not in Setup
         let prompt2 = state
-            .add_prompt(&round.id, "Test prompt 2".to_string(), PromptSource::Host)
+            .add_prompt(
+                &round.id,
+                "Test prompt 2".to_string(),
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
 
@@ -450,7 +543,7 @@ mod tests {
             .unwrap();
         let round = state.get_current_round().await.unwrap();
         let prompt = state
-            .add_prompt(&round.id, "Test".to_string(), PromptSource::Host)
+            .add_prompt(&round.id, "Test".to_string(), PromptSource::Host, None)
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -557,7 +650,12 @@ mod tests {
 
         // Add and select prompt
         let prompt = state
-            .add_prompt(&round.id, "Test prompt".to_string(), PromptSource::Host)
+            .add_prompt(
+                &round.id,
+                "Test prompt".to_string(),
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -607,7 +705,7 @@ mod tests {
 
         // Setup full round
         let prompt = state
-            .add_prompt(&round.id, "Test".to_string(), PromptSource::Host)
+            .add_prompt(&round.id, "Test".to_string(), PromptSource::Host, None)
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -772,5 +870,109 @@ mod tests {
         let result = state.mark_submission_duplicate("nonexistent").await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));
+    }
+
+    // Shadowban tests
+
+    #[tokio::test]
+    async fn test_shadowban_audience() {
+        let state = AppState::new();
+
+        // Initially not shadowbanned
+        assert!(!state.is_shadowbanned("voter1").await);
+
+        // Shadowban the voter
+        state.shadowban_audience("voter1".to_string()).await;
+
+        // Now should be shadowbanned
+        assert!(state.is_shadowbanned("voter1").await);
+
+        // Other voters unaffected
+        assert!(!state.is_shadowbanned("voter2").await);
+    }
+
+    #[tokio::test]
+    async fn test_shadowban_filters_prompts() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // Add prompts from different audience members
+        state
+            .add_prompt(
+                &round.id,
+                "Prompt from voter1".to_string(),
+                PromptSource::Audience,
+                Some("voter1".to_string()),
+            )
+            .await
+            .unwrap();
+        state
+            .add_prompt(
+                &round.id,
+                "Prompt from voter2".to_string(),
+                PromptSource::Audience,
+                Some("voter2".to_string()),
+            )
+            .await
+            .unwrap();
+        state
+            .add_prompt(
+                &round.id,
+                "Host prompt".to_string(),
+                PromptSource::Host,
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Before shadowban: all 3 prompts should be visible
+        let rounds = state.rounds.read().await;
+        let round_data = rounds.get(&round.id).unwrap();
+        assert_eq!(round_data.prompt_candidates.len(), 3);
+        drop(rounds);
+
+        // Shadowban voter1
+        state.shadowban_audience("voter1".to_string()).await;
+
+        // The prompts are still stored, but the broadcast filters them
+        // Let's verify the shadowban set contains voter1
+        assert!(state.is_shadowbanned("voter1").await);
+
+        // Get shadowbanned list
+        let shadowbanned = state.get_shadowbanned_audience().await;
+        assert_eq!(shadowbanned.len(), 1);
+        assert!(shadowbanned.contains(&"voter1".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_prompt_submitter_id_tracked() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // Add a prompt with submitter_id
+        let prompt = state
+            .add_prompt(
+                &round.id,
+                "Test prompt".to_string(),
+                PromptSource::Audience,
+                Some("voter123".to_string()),
+            )
+            .await
+            .unwrap();
+
+        // Verify submitter_id was stored
+        assert_eq!(prompt.submitter_id, Some("voter123".to_string()));
+
+        // Verify it's in the round's prompt_candidates
+        let rounds = state.rounds.read().await;
+        let round_data = rounds.get(&round.id).unwrap();
+        let stored_prompt = round_data
+            .prompt_candidates
+            .iter()
+            .find(|p| p.id == prompt.id)
+            .unwrap();
+        assert_eq!(stored_prompt.submitter_id, Some("voter123".to_string()));
     }
 }

@@ -23,6 +23,7 @@ pub enum ClientMessage {
         msg_id: String,
     },
     SubmitPrompt {
+        voter_token: Option<String>,
         text: String,
     },
     AckNeeded {
@@ -78,6 +79,10 @@ pub enum ClientMessage {
     RequestTypoCheck {
         player_token: String,
         text: String,
+    },
+    /// Shadowban an audience member (host only)
+    HostShadowbanAudience {
+        voter_id: VoterId,
     },
     /// Update an existing submission with corrected text (after typo check)
     UpdateSubmission {
@@ -194,6 +199,10 @@ pub enum ServerMessage {
         provider: Option<String>,
         message: Option<String>,
     },
+    /// Prompt candidates sent to host (includes submitter info for moderation)
+    HostPrompts {
+        prompts: Vec<HostPromptInfo>,
+    },
     Error {
         code: String,
         msg: String,
@@ -285,4 +294,13 @@ pub struct PlayerStatusInfo {
     pub token: String,
     pub display_name: Option<String>,
     pub status: PlayerSubmissionStatus,
+}
+
+/// Prompt info sent to host (includes submitter ID for shadowban functionality)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostPromptInfo {
+    pub id: PromptId,
+    pub text: Option<String>,
+    pub source: PromptSource,
+    pub submitter_id: Option<VoterId>,
 }

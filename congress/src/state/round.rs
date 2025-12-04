@@ -173,12 +173,14 @@ impl AppState {
         round_id: &str,
         text: String,
         source: PromptSource,
+        submitter_id: Option<String>,
     ) -> Result<Prompt, String> {
         let prompt = Prompt {
             id: ulid::Ulid::new().to_string(),
             text: Some(text),
             image_url: None,
             source,
+            submitter_id,
         };
 
         let mut rounds = self.rounds.write().await;

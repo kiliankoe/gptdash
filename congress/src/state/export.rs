@@ -6,7 +6,7 @@
 use crate::protocol::PlayerSubmissionStatus;
 use crate::types::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Schema version for export format compatibility
 pub const EXPORT_SCHEMA_VERSION: u32 = 1;
@@ -39,6 +39,9 @@ pub struct GameStateExport {
     pub processed_vote_msg_ids: HashMap<VoterId, String>,
     /// Player submission status tracking
     pub player_status: HashMap<PlayerId, PlayerSubmissionStatus>,
+    /// Shadowbanned audience member IDs
+    #[serde(default)]
+    pub shadowbanned_audience: HashSet<VoterId>,
 }
 
 impl GameStateExport {
@@ -52,6 +55,7 @@ impl GameStateExport {
         scores: Vec<Score>,
         processed_vote_msg_ids: HashMap<VoterId, String>,
         player_status: HashMap<PlayerId, PlayerSubmissionStatus>,
+        shadowbanned_audience: HashSet<VoterId>,
     ) -> Self {
         Self {
             schema_version: EXPORT_SCHEMA_VERSION,
@@ -64,6 +68,7 @@ impl GameStateExport {
             scores,
             processed_vote_msg_ids,
             player_status,
+            shadowbanned_audience,
         }
     }
 
@@ -139,6 +144,7 @@ mod tests {
             Vec::new(),
             HashMap::new(),
             HashMap::new(),
+            HashSet::new(),
         );
 
         let json = serde_json::to_string_pretty(&export).unwrap();
@@ -170,6 +176,7 @@ mod tests {
             scores: Vec::new(),
             processed_vote_msg_ids: HashMap::new(),
             player_status: HashMap::new(),
+            shadowbanned_audience: HashSet::new(),
         };
 
         let result = export.validate();
@@ -190,6 +197,7 @@ mod tests {
             scores: Vec::new(),
             processed_vote_msg_ids: HashMap::new(),
             player_status: HashMap::new(),
+            shadowbanned_audience: HashSet::new(),
         };
 
         let result = export.validate();
