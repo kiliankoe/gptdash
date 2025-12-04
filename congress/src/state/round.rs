@@ -167,18 +167,24 @@ impl AppState {
         }
     }
 
-    /// Add a prompt candidate
+    /// Add a prompt candidate (text and/or image)
     pub async fn add_prompt(
         &self,
         round_id: &str,
-        text: String,
+        text: Option<String>,
+        image_url: Option<String>,
         source: PromptSource,
         submitter_id: Option<String>,
     ) -> Result<Prompt, String> {
+        // Validate at least one of text or image_url is provided
+        if text.is_none() && image_url.is_none() {
+            return Err("Prompt must have either text or image_url".to_string());
+        }
+
         let prompt = Prompt {
             id: ulid::Ulid::new().to_string(),
-            text: Some(text),
-            image_url: None,
+            text,
+            image_url,
             source,
             submitter_id,
         };
@@ -194,7 +200,7 @@ impl AppState {
 
     /// Select a prompt for the round and transition to Collecting
     pub async fn select_prompt(&self, round_id: &str, prompt_id: &str) -> Result<(), String> {
-        let prompt_text = {
+        let selected_prompt = {
             let mut rounds = self.rounds.write().await;
             if let Some(round) = rounds.get_mut(round_id) {
                 // Validate current state
@@ -211,10 +217,9 @@ impl AppState {
                     .find(|p| p.id == prompt_id)
                     .cloned()
                 {
-                    let text = prompt.text.clone();
-                    round.selected_prompt = Some(prompt);
+                    round.selected_prompt = Some(prompt.clone());
                     round.state = RoundState::Collecting;
-                    text
+                    prompt
                 } else {
                     return Err("Prompt not found".to_string());
                 }
@@ -224,11 +229,15 @@ impl AppState {
         };
 
         // Kick off LLM generation in the background (don't block)
-        if let Some(text) = prompt_text {
+        // Only generate if there's text or an image to work with
+        if selected_prompt.text.is_some() || selected_prompt.image_url.is_some() {
             let state = self.clone();
             let round_id = round_id.to_string();
             tokio::spawn(async move {
-                if let Err(e) = state.generate_ai_submissions(&round_id, &text).await {
+                if let Err(e) = state
+                    .generate_ai_submissions(&round_id, &selected_prompt)
+                    .await
+                {
                     tracing::error!("Failed to generate AI submissions: {}", e);
                 }
             });
@@ -241,7 +250,7 @@ impl AppState {
     pub async fn generate_ai_submissions(
         &self,
         round_id: &str,
-        prompt_text: &str,
+        prompt: &Prompt,
     ) -> Result<(), String> {
         let llm = match &self.llm {
             Some(manager) => manager,
@@ -251,7 +260,14 @@ impl AppState {
             }
         };
 
-        tracing::info!("Generating AI submissions for prompt: {}", prompt_text);
+        let prompt_text = prompt.text.as_deref().unwrap_or("");
+        let is_multimodal = prompt.image_url.is_some();
+
+        tracing::info!(
+            "Generating AI submissions for prompt: {} (multimodal: {})",
+            prompt_text,
+            is_multimodal
+        );
 
         // Get game config for max_answer_chars
         let max_chars = {
@@ -263,7 +279,7 @@ impl AppState {
 
         let request = GenerateRequest {
             prompt: prompt_text.to_string(),
-            image_url: None,
+            image_url: prompt.image_url.clone(),
             max_tokens: Some(self.llm_config.default_max_tokens),
             timeout: self.llm_config.default_timeout,
         };

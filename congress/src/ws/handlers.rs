@@ -128,9 +128,9 @@ pub async fn handle_message(
             host::handle_reset_game(state).await
         }
 
-        ClientMessage::HostAddPrompt { text } => {
+        ClientMessage::HostAddPrompt { text, image_url } => {
             check_host!(role, "add prompts");
-            host::handle_add_prompt(state, text).await
+            host::handle_add_prompt(state, text, image_url).await
         }
 
         ClientMessage::HostTogglePanicMode { enabled } => {

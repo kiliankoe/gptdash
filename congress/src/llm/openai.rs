@@ -2,8 +2,10 @@ use super::*;
 use async_openai::{
     config::OpenAIConfig,
     types::{
-        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
-        CreateChatCompletionRequestArgs,
+        ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
+        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessage,
+        ChatCompletionRequestUserMessageContent, ChatCompletionRequestUserMessageContentPart,
+        CreateChatCompletionRequestArgs, ImageDetail, ImageUrl,
     },
     Client,
 };
@@ -37,18 +39,52 @@ impl LlmProvider for OpenAiProvider {
             Be funny, clever, and slightly irreverent. Don't be too formal or robotic. \
             Keep your answer concise and entertaining.";
 
-        // Build user prompt
-        let user_content = format!(
-            "Prompt: {}\n\nProvide your 2-3 sentence answer:",
-            request.prompt
-        );
+        // Build user message - either text-only or multimodal with image
+        let user_message: ChatCompletionRequestUserMessage = if let Some(ref image_url) =
+            request.image_url
+        {
+            // Multimodal request with image
+            let mut content_parts: Vec<ChatCompletionRequestUserMessageContentPart> = Vec::new();
 
-        // TODO: Handle image_url for multimodal prompts when needed
-        if request.image_url.is_some() {
-            return Err(LlmError::ConfigError(
-                "Multimodal prompts not yet implemented for OpenAI".to_string(),
+            // Add image part
+            content_parts.push(ChatCompletionRequestUserMessageContentPart::ImageUrl(
+                ChatCompletionRequestMessageContentPartImage {
+                    image_url: ImageUrl {
+                        url: image_url.clone(),
+                        detail: Some(ImageDetail::Auto),
+                    },
+                },
             ));
-        }
+
+            // Add text prompt if present
+            let text_prompt = if request.prompt.is_empty() {
+                "Look at this image. Provide your 2-3 sentence answer as if you were a human player:".to_string()
+            } else {
+                format!(
+                    "Look at this image. Prompt: {}\n\nProvide your 2-3 sentence answer:",
+                    request.prompt
+                )
+            };
+            content_parts.push(ChatCompletionRequestUserMessageContentPart::Text(
+                ChatCompletionRequestMessageContentPartText { text: text_prompt },
+            ));
+
+            ChatCompletionRequestUserMessage {
+                content: ChatCompletionRequestUserMessageContent::Array(content_parts),
+                name: None,
+            }
+        } else {
+            // Text-only request
+            let user_content = format!(
+                "Prompt: {}\n\nProvide your 2-3 sentence answer:",
+                request.prompt
+            );
+
+            ChatCompletionRequestUserMessage {
+                content: ChatCompletionRequestUserMessageContent::Text(user_content),
+                name: None,
+            }
+        };
 
         // Create the chat completion request
         let mut req_builder = CreateChatCompletionRequestArgs::default();
@@ -58,11 +94,7 @@ impl LlmProvider for OpenAiProvider {
                 .build()
                 .map_err(|e| LlmError::ApiError(e.to_string()))?
                 .into(),
-            ChatCompletionRequestUserMessageArgs::default()
-                .content(user_content)
-                .build()
-                .map_err(|e| LlmError::ApiError(e.to_string()))?
-                .into(),
+            user_message.into(),
         ]);
 
         // Set max tokens if provided
@@ -106,6 +138,12 @@ impl LlmProvider for OpenAiProvider {
 
     fn name(&self) -> &str {
         "openai"
+    }
+
+    fn supports_vision(&self) -> bool {
+        // Most modern OpenAI models support vision (gpt-4o, gpt-4o-mini, gpt-5, gpt-5.1, etc.)
+        // Models that don't support vision will return an API error
+        true
     }
 }
 

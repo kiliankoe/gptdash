@@ -36,6 +36,9 @@ function init() {
 
   // Generate QR codes for joining
   generateJoinQRCodes();
+
+  // Setup image preview for multimodal prompts
+  setupImagePreview();
 }
 
 function handleMessage(message) {
@@ -239,17 +242,64 @@ function hostStartRound() {
 
 function addPrompt() {
   const text = document.getElementById("promptText").value.trim();
-  if (!text) {
-    alert("Bitte gib einen Prompt ein");
+  const imageUrl =
+    document.getElementById("promptImageUrl")?.value.trim() || null;
+
+  // Require at least text or image
+  if (!text && !imageUrl) {
+    alert("Bitte gib einen Prompt-Text oder eine Bild-URL ein");
     return;
   }
 
   wsConn.send({
     t: "host_add_prompt",
-    text: text,
+    text: text || null,
+    image_url: imageUrl || null,
   });
 
   document.getElementById("promptText").value = "";
+  if (document.getElementById("promptImageUrl")) {
+    document.getElementById("promptImageUrl").value = "";
+  }
+  // Clear image preview
+  const preview = document.getElementById("promptImagePreview");
+  if (preview) {
+    preview.innerHTML = "";
+  }
+}
+
+// Preview image when URL is entered
+function setupImagePreview() {
+  const imageUrlInput = document.getElementById("promptImageUrl");
+  if (!imageUrlInput) return;
+
+  imageUrlInput.addEventListener(
+    "input",
+    debounce((e) => {
+      const url = e.target.value.trim();
+      const preview = document.getElementById("promptImagePreview");
+      if (!preview) return;
+
+      if (!url) {
+        preview.innerHTML = "";
+        return;
+      }
+
+      // Show loading state
+      preview.innerHTML = '<p style="opacity: 0.6;">Lade Vorschau...</p>';
+
+      // Create image element to test URL
+      const img = new Image();
+      img.onload = () => {
+        preview.innerHTML = `<img src="${escapeHtml(url)}" style="max-width: 300px; max-height: 200px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);" alt="Prompt-Bild Vorschau">`;
+      };
+      img.onerror = () => {
+        preview.innerHTML =
+          '<p style="color: #ff6b6b;">Bild konnte nicht geladen werden</p>';
+      };
+      img.src = url;
+    }, 500),
+  );
 }
 
 function selectPrompt() {
@@ -630,14 +680,29 @@ function updatePromptsList() {
     const shortId = prompt.submitter_id
       ? `${prompt.submitter_id.substring(0, 8)}...`
       : "";
+    const hasImage = !!prompt.image_url;
+    const hasText = !!prompt.text;
+
+    // Build content based on what's available
+    let contentHtml = "";
+    if (hasImage) {
+      contentHtml += `<div class="prompt-image"><img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" style="max-width: 200px; max-height: 150px; border-radius: 4px;"></div>`;
+    }
+    if (hasText) {
+      contentHtml += `<div class="prompt-text">${escapeHtml(prompt.text)}</div>`;
+    }
+    if (!hasImage && !hasText) {
+      contentHtml = '<div class="prompt-text">(Leerer Prompt)</div>';
+    }
 
     div.innerHTML = `
       <div class="prompt-header">
         <span class="prompt-id">${prompt.id.substring(0, 12)}...</span>
         <span class="badge ${isAudience ? "audience" : "host"}">${isAudience ? "Publikum" : "Host"}</span>
+        ${hasImage ? '<span class="badge multimodal">Bild</span>' : ""}
         ${shortId ? `<span class="submitter-id" title="${escapeHtml(prompt.submitter_id)}">${shortId}</span>` : ""}
       </div>
-      <div class="prompt-text">${escapeHtml(prompt.text || "(Kein Text)")}</div>
+      ${contentHtml}
       <div class="prompt-actions">
         <button class="secondary" onclick="selectPromptById('${prompt.id}')">Auswählen</button>
         ${isAudience && prompt.submitter_id ? `<button class="danger" onclick="shadowbanAudience('${prompt.submitter_id}')" title="Diesen Nutzer shadowbannen (ignoriert zukünftige Prompts)">🚫 Shadowban</button>` : ""}

@@ -110,7 +110,8 @@ async fn test_full_game_flow() {
     let prompt = state
         .add_prompt(
             &round.id,
-            "What is the meaning of life?".to_string(),
+            Some("What is the meaning of life?".to_string()),
+            None,
             PromptSource::Host,
             None,
         )
@@ -690,7 +691,8 @@ async fn test_player_status_tracking() {
     let prompt = state
         .add_prompt(
             &round.id,
-            "Test prompt".to_string(),
+            Some("Test prompt".to_string()),
+            None,
             PromptSource::Host,
             None,
         )
@@ -775,7 +777,8 @@ async fn test_submission_update() {
     let prompt = state
         .add_prompt(
             &round.id,
-            "Test prompt".to_string(),
+            Some("Test prompt".to_string()),
+            None,
             PromptSource::Host,
             None,
         )
@@ -888,7 +891,8 @@ async fn test_submission_update_unauthorized() {
     let prompt = state
         .add_prompt(
             &round.id,
-            "Test prompt".to_string(),
+            Some("Test prompt".to_string()),
+            None,
             PromptSource::Host,
             None,
         )
@@ -985,7 +989,8 @@ async fn test_host_write_ai_submission() {
     let prompt = state
         .add_prompt(
             &round.id,
-            "Test prompt".to_string(),
+            Some("Test prompt".to_string()),
+            None,
             PromptSource::Host,
             None,
         )
@@ -1181,7 +1186,8 @@ async fn test_select_ai_submission() {
     let prompt = state
         .add_prompt(
             &round.id,
-            "Test prompt".to_string(),
+            Some("Test prompt".to_string()),
+            None,
             PromptSource::Host,
             None,
         )
@@ -1367,7 +1373,8 @@ async fn test_remove_player_mid_round() {
     let prompt = state
         .add_prompt(
             &round.id,
-            "Test prompt".to_string(),
+            Some("Test prompt".to_string()),
+            None,
             PromptSource::Host,
             None,
         )
@@ -1570,7 +1577,8 @@ async fn test_add_player_mid_round() {
     let prompt = state
         .add_prompt(
             &round.id,
-            "Test prompt".to_string(),
+            Some("Test prompt".to_string()),
+            None,
             PromptSource::Host,
             None,
         )
@@ -1666,4 +1674,239 @@ async fn test_add_player_mid_round() {
     assert_eq!(statuses.len(), 2, "Should have 2 players in status list");
 
     println!("✅ Add player mid-round test passed!");
+}
+
+// ============================================================================
+// Multimodal Prompts Tests
+// ============================================================================
+
+/// Test adding a prompt with only an image URL (no text)
+#[tokio::test]
+async fn test_multimodal_prompt_image_only() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Transition to PromptSelection and start round
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+
+    // Add a prompt with only image URL
+    let image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
+    let prompt = state
+        .add_prompt(
+            &round.id,
+            None, // No text
+            Some(image_url.to_string()),
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .expect("Should add image-only prompt");
+
+    // Verify prompt was created with image URL
+    assert!(prompt.text.is_none());
+    assert_eq!(prompt.image_url, Some(image_url.to_string()));
+
+    // Verify prompt can be selected
+    let select_result = state.select_prompt(&round.id, &prompt.id).await;
+    assert!(select_result.is_ok());
+
+    // Verify selected prompt has image URL
+    let current_round = state.get_current_round().await.unwrap();
+    let selected = current_round.selected_prompt.expect("Should have selected prompt");
+    assert_eq!(selected.image_url, Some(image_url.to_string()));
+
+    println!("✅ Multimodal image-only prompt test passed!");
+}
+
+/// Test adding a prompt with both text and image URL
+#[tokio::test]
+async fn test_multimodal_prompt_text_and_image() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+
+    // Add a prompt with both text and image
+    let image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
+    let text = "What is this rocket called and what organization does it represent?";
+    let prompt = state
+        .add_prompt(
+            &round.id,
+            Some(text.to_string()),
+            Some(image_url.to_string()),
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .expect("Should add multimodal prompt");
+
+    // Verify both fields are set
+    assert_eq!(prompt.text, Some(text.to_string()));
+    assert_eq!(prompt.image_url, Some(image_url.to_string()));
+
+    println!("✅ Multimodal text+image prompt test passed!");
+}
+
+/// Test that prompts with neither text nor image are rejected
+#[tokio::test]
+async fn test_multimodal_prompt_requires_content() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+
+    // Try to add a prompt with neither text nor image - should fail
+    let result = state
+        .add_prompt(
+            &round.id,
+            None,
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await;
+
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("must have either text or image_url"));
+
+    println!("✅ Multimodal prompt validation test passed!");
+}
+
+/// Test multimodal prompt through the handler (HostAddPrompt message)
+#[tokio::test]
+async fn test_multimodal_prompt_via_handler() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    // Add prompt via handler with image URL
+    let image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
+    let result = handle_message(
+        ClientMessage::HostAddPrompt {
+            text: Some("Describe this image".to_string()),
+            image_url: Some(image_url.to_string()),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Handler auto-selects prompt, so we get PromptSelected
+    match result {
+        Some(ServerMessage::PromptSelected { prompt }) => {
+            assert_eq!(prompt.text, Some("Describe this image".to_string()));
+            assert_eq!(prompt.image_url, Some(image_url.to_string()));
+        }
+        _ => panic!("Expected PromptSelected message, got {:?}", result),
+    }
+
+    println!("✅ Multimodal prompt via handler test passed!");
+}
+
+/// Test multimodal prompt is included in PromptSelected message
+#[tokio::test]
+async fn test_multimodal_prompt_selected_includes_image() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+
+    // Add multimodal prompt
+    let image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
+    let prompt = state
+        .add_prompt(
+            &round.id,
+            Some("What do you see?".to_string()),
+            Some(image_url.to_string()),
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Select the prompt via handler
+    let result = handle_message(
+        ClientMessage::HostSelectPrompt {
+            prompt_id: prompt.id.clone(),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Verify PromptSelected includes image_url
+    match result {
+        Some(ServerMessage::PromptSelected { prompt: selected }) => {
+            assert_eq!(selected.id, prompt.id);
+            assert_eq!(selected.text, Some("What do you see?".to_string()));
+            assert_eq!(selected.image_url, Some(image_url.to_string()));
+        }
+        _ => panic!("Expected PromptSelected message, got {:?}", result),
+    }
+
+    println!("✅ Multimodal PromptSelected includes image test passed!");
 }

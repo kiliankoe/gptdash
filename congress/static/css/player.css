@@ -87,6 +87,18 @@ textarea {
   margin-bottom: 10px;
 }
 
+.prompt-image {
+  margin-bottom: 15px;
+}
+
+.prompt-image img,
+.prompt-image-display {
+  max-width: 100%;
+  max-height: 40vh;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
 /* Success/Waiting messages */
 .success-message,
 .waiting-message {

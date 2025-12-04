@@ -1437,9 +1437,7 @@ test.describe("Full Game Flow", () => {
     // ============================================
     // VERIFY: Audience can vote again (their vote was reset)
     // ============================================
-    console.log(
-      "Remove player test: Verifying audience can vote again...",
-    );
+    console.log("Remove player test: Verifying audience can vote again...");
 
     // Audience should be back on voting screen (their vote was invalidated)
     // Note: They may need to refresh or the UI may automatically update
@@ -1615,5 +1613,209 @@ test.describe("Full Game Flow", () => {
     ).toBeVisible();
 
     console.log("Add player mid-round test completed successfully!");
+  });
+
+  test("multimodal prompt with image displays on beamer and player screens", async () => {
+    const { host, beamer, players } = clients;
+
+    // Setup: Navigate to host page (game already reset by beforeEach)
+    await host.goto("/host.html");
+    await waitForConnection(host);
+
+    // Create player
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "1");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForTimeout(500);
+
+    const tokens = await getPlayerTokens(host);
+    expect(tokens).toHaveLength(1);
+
+    // Register player
+    await players[0].goto("/player.html");
+    await players[0].fill("#tokenInput", tokens[0]);
+    await players[0].click("#joinButton");
+    await players[0].waitForSelector("#registerScreen.active");
+    await players[0].fill("#nameInput", "ImageTester");
+    await players[0].click("#registerButton");
+    await players[0].waitForSelector("#waitingScreen.active");
+
+    // Connect beamer
+    await beamer.goto("/beamer.html");
+    await waitForConnection(beamer);
+
+    // Navigate to game control and start round
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+    await host.click('button:has-text("Neue Runde starten")');
+    await host.waitForTimeout(500);
+
+    // ============================================
+    // TEST: Add multimodal prompt with image URL
+    // ============================================
+    console.log("Multimodal prompt test: Adding prompt with image...");
+
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+
+    // Fill in both text and image URL (using the Fairydust rocket from 30C3)
+    const imageUrl =
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
+    await host.fill("#promptText", "Was siehst du auf diesem Bild?");
+
+    // Expand the multimodal image details section
+    await host.click('summary:has-text("Bild hinzufügen")');
+    await host.waitForSelector("#promptImageUrl", { state: "visible" });
+    await host.fill("#promptImageUrl", imageUrl);
+
+    // Add prompt (auto-selects when added by host)
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForTimeout(500);
+
+    // Transition to Writing phase (via PROMPT_SELECTION first)
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+    await host.click('button[data-phase="PROMPT_SELECTION"]');
+    await host.waitForTimeout(500);
+    await host.click('button[data-phase="WRITING"]');
+    await host.waitForTimeout(500);
+
+    // ============================================
+    // VERIFY: Beamer shows the image in writing scene
+    // ============================================
+    console.log("Multimodal prompt test: Verifying beamer displays image...");
+
+    await waitForBeamerScene(beamer, "sceneWriting", 10000);
+
+    // Check that the prompt image is visible
+    const beamerImage = beamer.locator("#writingPromptImage img");
+    await expect(beamerImage).toBeVisible({ timeout: 5000 });
+
+    // Verify the image URL is correct
+    const beamerImageSrc = await beamerImage.getAttribute("src");
+    expect(beamerImageSrc).toBe(imageUrl);
+
+    // Verify text prompt is also shown
+    const beamerPromptText = beamer.locator("#writingPromptText");
+    await expect(beamerPromptText).toContainText(
+      "Was siehst du auf diesem Bild?",
+    );
+
+    // ============================================
+    // VERIFY: Player sees the image in writing screen
+    // ============================================
+    console.log("Multimodal prompt test: Verifying player displays image...");
+
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+
+    // Check that the prompt image is visible on player screen
+    const playerImage = players[0].locator("#promptImage img");
+    await expect(playerImage).toBeVisible({ timeout: 5000 });
+
+    // Verify the image URL is correct
+    const playerImageSrc = await playerImage.getAttribute("src");
+    expect(playerImageSrc).toBe(imageUrl);
+
+    // Verify text prompt is also shown
+    const playerPromptText = players[0].locator("#promptText");
+    await expect(playerPromptText).toContainText(
+      "Was siehst du auf diesem Bild?",
+    );
+
+    console.log("Multimodal prompt test completed successfully!");
+  });
+
+  test("image-only prompt (no text) displays correctly", async () => {
+    const { host, beamer, players } = clients;
+
+    // Setup: Navigate to host page (game already reset by beforeEach)
+    await host.goto("/host.html");
+    await waitForConnection(host);
+
+    // Create player
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "1");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForTimeout(500);
+
+    const tokens = await getPlayerTokens(host);
+    expect(tokens).toHaveLength(1);
+
+    // Register player
+    await players[0].goto("/player.html");
+    await players[0].fill("#tokenInput", tokens[0]);
+    await players[0].click("#joinButton");
+    await players[0].waitForSelector("#registerScreen.active");
+    await players[0].fill("#nameInput", "ImageOnlyTester");
+    await players[0].click("#registerButton");
+    await players[0].waitForSelector("#waitingScreen.active");
+
+    // Connect beamer
+    await beamer.goto("/beamer.html");
+    await waitForConnection(beamer);
+
+    // Navigate to game control and start round
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+    await host.click('button:has-text("Neue Runde starten")');
+    await host.waitForTimeout(500);
+
+    // ============================================
+    // TEST: Add image-only prompt (no text)
+    // ============================================
+    console.log("Image-only prompt test: Adding prompt with image only...");
+
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+
+    // Clear any existing text, only fill image URL
+    await host.fill("#promptText", "");
+
+    // Expand the multimodal image details section
+    await host.click('summary:has-text("Bild hinzufügen")');
+    await host.waitForSelector("#promptImageUrl", { state: "visible" });
+    const imageUrl =
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
+    await host.fill("#promptImageUrl", imageUrl);
+
+    // Add prompt
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForTimeout(500);
+
+    // Transition to Writing phase (via PROMPT_SELECTION first)
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+    await host.click('button[data-phase="PROMPT_SELECTION"]');
+    await host.waitForTimeout(500);
+    await host.click('button[data-phase="WRITING"]');
+    await host.waitForTimeout(500);
+
+    // ============================================
+    // VERIFY: Beamer shows the image
+    // ============================================
+    console.log("Image-only prompt test: Verifying beamer displays image...");
+
+    await waitForBeamerScene(beamer, "sceneWriting", 10000);
+
+    const beamerImage = beamer.locator("#writingPromptImage img");
+    await expect(beamerImage).toBeVisible({ timeout: 5000 });
+
+    // ============================================
+    // VERIFY: Player sees the image
+    // ============================================
+    console.log("Image-only prompt test: Verifying player displays image...");
+
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+
+    const playerImage = players[0].locator("#promptImage img");
+    await expect(playerImage).toBeVisible({ timeout: 5000 });
+
+    console.log("Image-only prompt test completed successfully!");
   });
 });

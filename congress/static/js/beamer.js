@@ -185,14 +185,36 @@ function handleRoundStarted(msg) {
 
 function handlePromptSelected(msg) {
   if (msg.prompt) {
-    const writingPrompt = document.getElementById("writingPromptText");
-    if (writingPrompt) {
-      writingPrompt.textContent = msg.prompt.text || "(Bildfrage)";
-    }
-
     // Also update the round state
     if (gameState.currentRound) {
       gameState.currentRound.selected_prompt = msg.prompt;
+    }
+
+    // Update display with text and/or image
+    updatePromptDisplay(msg.prompt);
+  }
+}
+
+/**
+ * Update the prompt display with text and/or image
+ */
+function updatePromptDisplay(prompt) {
+  const promptText = document.getElementById("writingPromptText");
+  const promptImage = document.getElementById("writingPromptImage");
+
+  if (promptText) {
+    promptText.textContent = prompt.text || "(Bildfrage)";
+    // If image-only, hide the text element
+    promptText.style.display = prompt.text ? "block" : "none";
+  }
+
+  if (promptImage) {
+    if (prompt.image_url) {
+      promptImage.innerHTML = `<img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" class="prompt-image-display">`;
+      promptImage.style.display = "block";
+    } else {
+      promptImage.innerHTML = "";
+      promptImage.style.display = "none";
     }
   }
 }
@@ -335,11 +357,7 @@ function updatePromptCandidates(candidates) {
 
 function updateWritingScene() {
   if (gameState.currentRound?.selected_prompt) {
-    const promptText = document.getElementById("writingPromptText");
-    if (promptText) {
-      promptText.textContent =
-        gameState.currentRound.selected_prompt.text || "(Bildfrage)";
-    }
+    updatePromptDisplay(gameState.currentRound.selected_prompt);
   }
 }
 

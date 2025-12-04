@@ -54,7 +54,8 @@ pub enum ClientMessage {
     HostRevealPrev,
     HostResetGame,
     HostAddPrompt {
-        text: String,
+        text: Option<String>,
+        image_url: Option<String>,
     },
     HostTogglePanicMode {
         enabled: bool,
@@ -309,6 +310,7 @@ pub struct PlayerStatusInfo {
 pub struct HostPromptInfo {
     pub id: PromptId,
     pub text: Option<String>,
+    pub image_url: Option<String>,
     pub source: PromptSource,
     pub submitter_id: Option<VoterId>,
 }

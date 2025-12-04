@@ -122,6 +122,7 @@ impl AppState {
             .map(|p| crate::protocol::HostPromptInfo {
                 id: p.id.clone(),
                 text: p.text.clone(),
+                image_url: p.image_url.clone(),
                 source: p.source.clone(),
                 submitter_id: p.submitter_id.clone(),
             })
@@ -331,7 +332,8 @@ mod tests {
         let prompt = state
             .add_prompt(
                 &round.id,
-                "Test prompt".to_string(),
+                Some("Test prompt".to_string()),
+                None,
                 PromptSource::Host,
                 None,
             )
@@ -356,7 +358,8 @@ mod tests {
         let prompt = state
             .add_prompt(
                 &round.id,
-                "Test prompt".to_string(),
+                Some("Test prompt".to_string()),
+                None,
                 PromptSource::Host,
                 None,
             )
@@ -384,7 +387,8 @@ mod tests {
         let prompt = state
             .add_prompt(
                 &round.id,
-                "Test prompt".to_string(),
+                Some("Test prompt".to_string()),
+                None,
                 PromptSource::Host,
                 None,
             )
@@ -425,7 +429,8 @@ mod tests {
         let prompt = state
             .add_prompt(
                 &round.id,
-                "Test prompt".to_string(),
+                Some("Test prompt".to_string()),
+                None,
                 PromptSource::Host,
                 None,
             )
@@ -477,7 +482,8 @@ mod tests {
         let prompt = state
             .add_prompt(
                 &round.id,
-                "Test prompt".to_string(),
+                Some("Test prompt".to_string()),
+                None,
                 PromptSource::Host,
                 None,
             )
@@ -502,7 +508,8 @@ mod tests {
         let prompt = state
             .add_prompt(
                 &round.id,
-                "Test prompt".to_string(),
+                Some("Test prompt".to_string()),
+                None,
                 PromptSource::Host,
                 None,
             )
@@ -516,7 +523,8 @@ mod tests {
         let prompt2 = state
             .add_prompt(
                 &round.id,
-                "Test prompt 2".to_string(),
+                Some("Test prompt 2".to_string()),
+                None,
                 PromptSource::Host,
                 None,
             )
@@ -543,7 +551,13 @@ mod tests {
             .unwrap();
         let round = state.get_current_round().await.unwrap();
         let prompt = state
-            .add_prompt(&round.id, "Test".to_string(), PromptSource::Host, None)
+            .add_prompt(
+                &round.id,
+                Some("Test".to_string()),
+                None,
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -652,7 +666,8 @@ mod tests {
         let prompt = state
             .add_prompt(
                 &round.id,
-                "Test prompt".to_string(),
+                Some("Test prompt".to_string()),
+                None,
                 PromptSource::Host,
                 None,
             )
@@ -705,7 +720,13 @@ mod tests {
 
         // Setup full round
         let prompt = state
-            .add_prompt(&round.id, "Test".to_string(), PromptSource::Host, None)
+            .add_prompt(
+                &round.id,
+                Some("Test".to_string()),
+                None,
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -901,7 +922,8 @@ mod tests {
         state
             .add_prompt(
                 &round.id,
-                "Prompt from voter1".to_string(),
+                Some("Prompt from voter1".to_string()),
+                None,
                 PromptSource::Audience,
                 Some("voter1".to_string()),
             )
@@ -910,7 +932,8 @@ mod tests {
         state
             .add_prompt(
                 &round.id,
-                "Prompt from voter2".to_string(),
+                Some("Prompt from voter2".to_string()),
+                None,
                 PromptSource::Audience,
                 Some("voter2".to_string()),
             )
@@ -919,7 +942,8 @@ mod tests {
         state
             .add_prompt(
                 &round.id,
-                "Host prompt".to_string(),
+                Some("Host prompt".to_string()),
+                None,
                 PromptSource::Host,
                 None,
             )
@@ -955,7 +979,8 @@ mod tests {
         let prompt = state
             .add_prompt(
                 &round.id,
-                "Test prompt".to_string(),
+                Some("Test prompt".to_string()),
+                None,
                 PromptSource::Audience,
                 Some("voter123".to_string()),
             )

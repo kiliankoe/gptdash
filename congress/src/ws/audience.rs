@@ -65,7 +65,8 @@ pub async fn handle_submit_prompt(
     match state
         .add_prompt(
             &round.id,
-            text,
+            Some(text),
+            None, // Audience prompts don't support images
             crate::types::PromptSource::Audience,
             voter_token.clone(),
         )

@@ -190,6 +190,16 @@
                 <div class="card">
                     <div class="card-header">Prompt hinzufügen</div>
                     <textarea id="promptText" placeholder="Gib hier deinen Prompt ein..."></textarea>
+                    <details style="margin: 10px 0;">
+                        <summary style="cursor: pointer; opacity: 0.8;">Bild hinzufügen (Multimodal)</summary>
+                        <div style="margin-top: 10px;">
+                            <p style="opacity: 0.7; font-size: 0.9em; margin-bottom: 10px;">
+                                Füge eine Bild-URL hinzu für eine multimodale Runde. Das Bild wird auf Beamer und Player-Geräten angezeigt.
+                            </p>
+                            <input type="url" id="promptImageUrl" placeholder="https://example.com/image.png" style="width: 100%; margin-bottom: 10px;">
+                            <div id="promptImagePreview" style="margin-bottom: 10px; text-align: center;"></div>
+                        </div>
+                    </details>
                     <button onclick="addPrompt()">Prompt hinzufügen</button>
                 </div>
 

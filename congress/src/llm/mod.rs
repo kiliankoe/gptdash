@@ -75,6 +75,11 @@ pub trait LlmProvider: Send + Sync {
 
     /// Get the name of this provider
     fn name(&self) -> &str;
+
+    /// Whether this provider supports vision/image inputs
+    fn supports_vision(&self) -> bool {
+        false
+    }
 }
 
 /// Manager for multiple LLM providers
@@ -90,13 +95,24 @@ impl LlmManager {
 
     /// Generate answers from all available providers concurrently
     /// Returns (provider_name, response) pairs for successful generations
+    /// For multimodal requests (with image_url), only vision-capable providers are used
     pub async fn generate_from_all(
         &self,
         request: GenerateRequest,
     ) -> Vec<(String, GenerateResponse)> {
         let mut tasks = Vec::new();
+        let is_multimodal = request.image_url.is_some();
 
         for provider in &self.providers {
+            // Skip providers that don't support vision for multimodal requests
+            if is_multimodal && !provider.supports_vision() {
+                tracing::info!(
+                    "Skipping provider {} for multimodal request (no vision support)",
+                    provider.name()
+                );
+                continue;
+            }
+
             let req = request.clone();
             let provider_name = provider.name().to_string();
             let provider_ref = provider.as_ref();
@@ -106,11 +122,15 @@ impl LlmManager {
                 match provider_ref.generate(req).await {
                     Ok(response) => Some((provider_name, response)),
                     Err(e) => {
-                        eprintln!("Provider {} failed: {}", provider_name, e);
+                        tracing::error!("Provider {} failed: {}", provider_name, e);
                         None
                     }
                 }
             });
+        }
+
+        if tasks.is_empty() && is_multimodal {
+            tracing::warn!("No vision-capable providers available for multimodal request");
         }
 
         // Wait for all to complete and collect successes

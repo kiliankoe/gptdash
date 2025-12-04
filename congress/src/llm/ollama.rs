@@ -7,11 +7,16 @@ pub struct OllamaProvider {
     base_url: String,
     model: String,
     client: reqwest::Client,
+    /// Whether this model supports vision (e.g., llava, bakllava, moondream)
+    supports_vision: bool,
 }
 
 impl OllamaProvider {
     /// Create a new Ollama provider with the given base URL and model
     pub fn new(base_url: String, model: String) -> Self {
+        // Check if the model is a known vision model
+        let supports_vision = Self::is_vision_model(&model);
+
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(60))
             .build()
@@ -21,7 +26,45 @@ impl OllamaProvider {
             base_url,
             model,
             client,
+            supports_vision,
         }
+    }
+
+    /// Check if a model name indicates vision support
+    fn is_vision_model(model: &str) -> bool {
+        let model_lower = model.to_lowercase();
+        // Known vision models in Ollama
+        model_lower.contains("llava")
+            || model_lower.contains("bakllava")
+            || model_lower.contains("moondream")
+            || model_lower.contains("minicpm-v")
+            || model_lower.contains("qwen2-vl")
+            || model_lower.contains("qwen2.5-vl")
+    }
+
+    /// Fetch image from URL and encode as base64
+    async fn fetch_image_as_base64(&self, url: &str) -> Result<String, LlmError> {
+        let response = self
+            .client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| LlmError::ApiError(format!("Failed to fetch image: {}", e)))?;
+
+        if !response.status().is_success() {
+            return Err(LlmError::ApiError(format!(
+                "Failed to fetch image, status: {}",
+                response.status()
+            )));
+        }
+
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| LlmError::ApiError(format!("Failed to read image bytes: {}", e)))?;
+
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        Ok(STANDARD.encode(&bytes))
     }
 }
 
@@ -32,6 +75,8 @@ struct OllamaGenerateRequest {
     stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     options: Option<OllamaOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    images: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -54,22 +99,49 @@ impl LlmProvider for OllamaProvider {
         let start = Instant::now();
 
         // Build the prompt with game context
-        let full_prompt = format!(
-            "You are playing a party game where you impersonate a human player. \
-            The host will give you a prompt, and you must provide a witty, creative, and entertaining \
-            2-3 sentence answer that sounds like it could have been written by a real person. \
-            Be funny, clever, and slightly irreverent. Don't be too formal or robotic.\n\n\
-            Prompt: {}\n\n\
-            Provide your 2-3 sentence answer:",
-            request.prompt
-        );
+        let full_prompt = if request.image_url.is_some() {
+            // For multimodal, adjust the prompt to reference the image
+            if request.prompt.is_empty() {
+                "You are playing a party game where you impersonate a human player. \
+                Look at this image. Provide a witty, creative, and entertaining \
+                2-3 sentence answer that sounds like it could have been written by a real person. \
+                Be funny, clever, and slightly irreverent. Don't be too formal or robotic."
+                    .to_string()
+            } else {
+                format!(
+                    "You are playing a party game where you impersonate a human player. \
+                    Look at this image. The host asks: {}\n\n\
+                    Provide your witty, creative 2-3 sentence answer that sounds human:",
+                    request.prompt
+                )
+            }
+        } else {
+            format!(
+                "You are playing a party game where you impersonate a human player. \
+                The host will give you a prompt, and you must provide a witty, creative, and entertaining \
+                2-3 sentence answer that sounds like it could have been written by a real person. \
+                Be funny, clever, and slightly irreverent. Don't be too formal or robotic.\n\n\
+                Prompt: {}\n\n\
+                Provide your 2-3 sentence answer:",
+                request.prompt
+            )
+        };
 
-        // TODO: Handle image_url for multimodal prompts when needed
-        if request.image_url.is_some() {
-            return Err(LlmError::ConfigError(
-                "Multimodal prompts not yet implemented for Ollama".to_string(),
-            ));
-        }
+        // Handle image if present
+        let images = if let Some(ref image_url) = request.image_url {
+            if !self.supports_vision {
+                return Err(LlmError::ConfigError(format!(
+                    "Model {} does not support vision. Use a vision model like llava or moondream.",
+                    self.model
+                )));
+            }
+
+            // Ollama requires base64-encoded images
+            let base64_image = self.fetch_image_as_base64(image_url).await?;
+            Some(vec![base64_image])
+        } else {
+            None
+        };
 
         let ollama_request = OllamaGenerateRequest {
             model: self.model.clone(),
@@ -78,6 +150,7 @@ impl LlmProvider for OllamaProvider {
             options: request.max_tokens.map(|num_predict| OllamaOptions {
                 num_predict: Some(num_predict),
             }),
+            images,
         };
 
         let url = format!("{}/api/generate", self.base_url);
@@ -118,6 +191,10 @@ impl LlmProvider for OllamaProvider {
 
     fn name(&self) -> &str {
         "ollama"
+    }
+
+    fn supports_vision(&self) -> bool {
+        self.supports_vision
     }
 }
 

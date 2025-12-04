@@ -357,8 +357,26 @@ function updateScreen(phase) {
 function showWritingScreen() {
   if (currentPrompt) {
     const promptEl = document.getElementById("promptText");
+    const promptImageEl = document.getElementById("promptImage");
+
+    // Handle text
     if (promptEl) {
-      promptEl.textContent = currentPrompt.text || currentPrompt;
+      const text =
+        currentPrompt.text ||
+        (typeof currentPrompt === "string" ? currentPrompt : "");
+      promptEl.textContent = text || "(Bildfrage - siehe Bild oben)";
+      promptEl.style.display = text ? "block" : "none";
+    }
+
+    // Handle image
+    if (promptImageEl) {
+      if (currentPrompt.image_url) {
+        promptImageEl.innerHTML = `<img src="${escapeHtml(currentPrompt.image_url)}" alt="Prompt-Bild" class="prompt-image-display">`;
+        promptImageEl.style.display = "block";
+      } else {
+        promptImageEl.innerHTML = "";
+        promptImageEl.style.display = "none";
+      }
     }
   }
   showScreen("writingScreen");

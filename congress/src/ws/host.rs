@@ -72,9 +72,13 @@ pub async fn handle_select_prompt(
     match state.select_prompt(&round.id, &prompt_id).await {
         Ok(_) => {
             let updated_round = state.get_current_round().await?;
-            updated_round
-                .selected_prompt
-                .map(|prompt| ServerMessage::PromptSelected { prompt })
+            updated_round.selected_prompt.map(|prompt| {
+                // Broadcast to all clients so beamer and players can update their displays
+                state.broadcast_to_all(ServerMessage::PromptSelected {
+                    prompt: prompt.clone(),
+                });
+                ServerMessage::PromptSelected { prompt }
+            })
         }
         Err(e) => Some(ServerMessage::Error {
             code: "PROMPT_SELECT_FAILED".to_string(),
@@ -196,12 +200,27 @@ pub async fn handle_reset_game(state: &Arc<AppState>) -> Option<ServerMessage> {
     })
 }
 
-pub async fn handle_add_prompt(state: &Arc<AppState>, text: String) -> Option<ServerMessage> {
-    tracing::info!("Host adding prompt: {}", text);
+pub async fn handle_add_prompt(
+    state: &Arc<AppState>,
+    text: Option<String>,
+    image_url: Option<String>,
+) -> Option<ServerMessage> {
+    let is_multimodal = image_url.is_some();
+    tracing::info!(
+        "Host adding prompt: {:?} (multimodal: {})",
+        text.as_deref().unwrap_or("(image only)"),
+        is_multimodal
+    );
     let round = state.get_current_round().await?;
 
     match state
-        .add_prompt(&round.id, text, crate::types::PromptSource::Host, None)
+        .add_prompt(
+            &round.id,
+            text,
+            image_url,
+            crate::types::PromptSource::Host,
+            None,
+        )
         .await
     {
         Ok(prompt) => {
@@ -210,6 +229,10 @@ pub async fn handle_add_prompt(state: &Arc<AppState>, text: String) -> Option<Se
             if let Err(e) = state.select_prompt(&round.id, &prompt_id).await {
                 tracing::warn!("Failed to auto-select prompt: {}", e);
             }
+            // Broadcast to all clients so beamer and players can update their displays
+            state.broadcast_to_all(ServerMessage::PromptSelected {
+                prompt: prompt.clone(),
+            });
             Some(ServerMessage::PromptSelected { prompt })
         }
         Err(e) => Some(ServerMessage::Error {
@@ -325,16 +348,17 @@ pub async fn handle_regenerate_ai(state: &Arc<AppState>) -> Option<ServerMessage
         }
     };
 
-    let prompt_text = match &round.selected_prompt {
-        Some(p) => match &p.text {
-            Some(t) => t.clone(),
-            None => {
+    let prompt = match &round.selected_prompt {
+        Some(p) => {
+            // Validate prompt has either text or image
+            if p.text.is_none() && p.image_url.is_none() {
                 return Some(ServerMessage::Error {
-                    code: "NO_PROMPT_TEXT".to_string(),
-                    msg: "Selected prompt has no text".to_string(),
+                    code: "INVALID_PROMPT".to_string(),
+                    msg: "Selected prompt has neither text nor image".to_string(),
                 });
             }
-        },
+            p.clone()
+        }
         None => {
             return Some(ServerMessage::Error {
                 code: "NO_PROMPT_SELECTED".to_string(),
@@ -344,10 +368,15 @@ pub async fn handle_regenerate_ai(state: &Arc<AppState>) -> Option<ServerMessage
     };
 
     // Notify host that generation is starting
+    let is_multimodal = prompt.image_url.is_some();
     state.broadcast_to_host(ServerMessage::AiGenerationStatus {
         status: AiGenStatus::Started,
         provider: None,
-        message: Some("Generating AI submissions...".to_string()),
+        message: Some(if is_multimodal {
+            "Generating AI submissions (multimodal)...".to_string()
+        } else {
+            "Generating AI submissions...".to_string()
+        }),
     });
 
     // Spawn generation in background
@@ -355,7 +384,7 @@ pub async fn handle_regenerate_ai(state: &Arc<AppState>) -> Option<ServerMessage
     let round_id = round.id.clone();
     tokio::spawn(async move {
         match state_clone
-            .generate_ai_submissions(&round_id, &prompt_text)
+            .generate_ai_submissions(&round_id, &prompt)
             .await
         {
             Ok(_) => {
