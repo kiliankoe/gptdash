@@ -65,13 +65,18 @@ async fn main() {
 
     // Protected host routes (with HTTP Basic Auth)
     let host_routes = Router::new()
-        .route("/host.html", get(auth::serve_host_html))
+        .route("/host", get(auth::serve_host))
         .route("/api/state/export", get(api::export_state))
         .route("/api/state/import", post(api::import_state))
         .layer(middleware::from_fn_with_state(
             auth_config.clone(),
             auth::host_auth_middleware,
         ));
+
+    // Public page routes (beamer and player)
+    let page_routes = Router::new()
+        .route("/beamer", get(auth::serve_beamer))
+        .route("/player", get(auth::serve_player));
 
     // WebSocket route with anti-abuse protection
     let ws_routes =
@@ -85,6 +90,7 @@ async fn main() {
     let app = Router::new()
         .merge(ws_routes)
         .merge(host_routes)
+        .merge(page_routes)
         .fallback_service(ServeDir::new("static"))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())

@@ -147,7 +147,7 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, ()> {
 }
 
 /// Handler to serve host.html (used with auth middleware)
-pub async fn serve_host_html() -> impl IntoResponse {
+pub async fn serve_host() -> impl IntoResponse {
     match tokio::fs::read_to_string("static/host.html").await {
         Ok(content) => Response::builder()
             .status(StatusCode::OK)
@@ -157,6 +157,36 @@ pub async fn serve_host_html() -> impl IntoResponse {
         Err(_) => Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(Body::from("Host page not found"))
+            .unwrap(),
+    }
+}
+
+/// Handler to serve beamer.html
+pub async fn serve_beamer() -> impl IntoResponse {
+    match tokio::fs::read_to_string("static/beamer.html").await {
+        Ok(content) => Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+            .body(Body::from(content))
+            .unwrap(),
+        Err(_) => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from("Beamer page not found"))
+            .unwrap(),
+    }
+}
+
+/// Handler to serve player.html
+pub async fn serve_player() -> impl IntoResponse {
+    match tokio::fs::read_to_string("static/player.html").await {
+        Ok(content) => Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+            .body(Body::from(content))
+            .unwrap(),
+        Err(_) => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from("Player page not found"))
             .unwrap(),
     }
 }
