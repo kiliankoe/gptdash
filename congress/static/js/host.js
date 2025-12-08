@@ -374,13 +374,6 @@ function selectPrompt() {
   }
 }
 
-function setAiSubmission(submissionId) {
-  wsConn.send({
-    t: "host_set_ai_submission",
-    submission_id: submissionId,
-  });
-}
-
 function setRevealOrder() {
   const input = document.getElementById("revealOrderInput").value.trim();
   if (!input) {
@@ -987,7 +980,6 @@ function updateSubmissionsList() {
       </div>
       <div class="text">${escapeHtml(sub.display_text)}</div>
       <div class="actions">
-        ${authorKind === "player" ? `<button onclick="setAiSubmission('${sub.id}')">Als KI markieren</button>` : ""}
         ${authorKind === "ai" && !isSelectedAi ? `<button onclick="selectAiSubmission('${sub.id}')">Als KI auswählen</button>` : ""}
         ${authorKind === "player" ? `<button class="danger" onclick="markDuplicate('${sub.id}')">Dupe</button>` : ""}
         <button class="secondary">Bearbeiten</button>
@@ -1391,7 +1383,6 @@ if (typeof window !== "undefined") {
     queuePrompt,
     unqueuePrompt,
     startPromptSelection,
-    setAiSubmission,
     setRevealOrder,
     resetGame,
     closeWriting,

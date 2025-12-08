@@ -273,12 +273,28 @@ impl AppState {
                         let mut rounds = self.rounds.write().await;
                         if let Some(round) = rounds.get_mut(rid) {
                             // Auto-populate reveal_order if empty
+                            // Filter to include: all player submissions + only the selected AI submission
                             if round.reveal_order.is_empty() && !submissions.is_empty() {
-                                round.reveal_order =
-                                    submissions.iter().map(|s| s.id.clone()).collect();
+                                let selected_ai_id = round.ai_submission_id.clone();
+                                round.reveal_order = submissions
+                                    .iter()
+                                    .filter(|s| {
+                                        // Include player submissions
+                                        if s.author_kind == AuthorKind::Player {
+                                            return true;
+                                        }
+                                        // For AI submissions, only include the selected one
+                                        if s.author_kind == AuthorKind::Ai {
+                                            return selected_ai_id.as_ref() == Some(&s.id);
+                                        }
+                                        false
+                                    })
+                                    .map(|s| s.id.clone())
+                                    .collect();
                                 tracing::info!(
-                                    "Auto-populated reveal_order with {} submissions",
-                                    round.reveal_order.len()
+                                    "Auto-populated reveal_order with {} submissions (filtered from {} total)",
+                                    round.reveal_order.len(),
+                                    submissions.len()
                                 );
                             }
                             round.reveal_index = 0; // Reset to first submission

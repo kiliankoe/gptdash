@@ -367,15 +367,24 @@ impl AppState {
     }
 
     /// Set which submission is the AI submission for scoring
+    /// Only AI-authored submissions can be selected (not player submissions)
     pub async fn set_ai_submission(
         &self,
         round_id: &str,
         submission_id: SubmissionId,
     ) -> Result<(), String> {
-        // Validate submission exists and belongs to this round
+        // Validate submission exists, belongs to this round, and is AI-authored
         let submissions = self.submissions.read().await;
         match submissions.get(&submission_id) {
-            Some(sub) if sub.round_id == round_id => {}
+            Some(sub) if sub.round_id == round_id => {
+                // Must be an AI-authored submission
+                if sub.author_kind != AuthorKind::Ai {
+                    return Err(
+                        "Only AI-generated submissions can be selected as the AI answer"
+                            .to_string(),
+                    );
+                }
+            }
             Some(_) => {
                 return Err(format!(
                     "Submission {} does not belong to round {}",
