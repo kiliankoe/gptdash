@@ -98,18 +98,18 @@ impl AppState {
             .collect()
     }
 
-    /// Broadcast prompt candidates to host (filtered by shadowban status)
-    pub async fn broadcast_prompts_to_host(&self, round_id: &str) {
+    /// Get prompt candidates for host (filtered by shadowban status)
+    pub async fn get_prompts_for_host(&self, round_id: &str) -> Vec<crate::protocol::HostPromptInfo> {
         let rounds = self.rounds.read().await;
         let round = match rounds.get(round_id) {
             Some(r) => r,
-            None => return,
+            None => return Vec::new(),
         };
 
         let shadowbanned = self.shadowbanned_audience.read().await;
 
         // Filter out prompts from shadowbanned users
-        let prompts: Vec<crate::protocol::HostPromptInfo> = round
+        round
             .prompt_candidates
             .iter()
             .filter(|p| {
@@ -126,8 +126,12 @@ impl AppState {
                 source: p.source.clone(),
                 submitter_id: p.submitter_id.clone(),
             })
-            .collect();
+            .collect()
+    }
 
+    /// Broadcast prompt candidates to host (filtered by shadowban status)
+    pub async fn broadcast_prompts_to_host(&self, round_id: &str) {
+        let prompts = self.get_prompts_for_host(round_id).await;
         self.broadcast_to_host(ServerMessage::HostPrompts { prompts });
     }
 

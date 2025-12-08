@@ -14,7 +14,7 @@ use futures::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
 use std::sync::Arc;
 
-use crate::protocol::{AudienceVoteInfo, ClientMessage, ServerMessage, SubmissionInfo};
+use crate::protocol::{AudienceVoteInfo, ClientMessage, HostSubmissionInfo, ServerMessage, SubmissionInfo};
 use crate::state::AppState;
 use crate::types::Role;
 
@@ -116,6 +116,41 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
             }
             _ => {}
         }
+    }
+
+    // Send host-specific state recovery
+    if role == Role::Host {
+        // Send current prompts list
+        if let Some(round) = state.get_current_round().await {
+            let prompts = state.get_prompts_for_host(&round.id).await;
+            let host_prompts = ServerMessage::HostPrompts { prompts };
+            if let Ok(msg) = serde_json::to_string(&host_prompts) {
+                let _ = sender.send(Message::Text(msg.into())).await;
+            }
+
+            // Send current submissions list
+            let submissions = state.get_submissions(&round.id).await;
+            let host_submissions = ServerMessage::HostSubmissions {
+                list: submissions
+                    .iter()
+                    .map(HostSubmissionInfo::from)
+                    .collect(),
+            };
+            if let Ok(msg) = serde_json::to_string(&host_submissions) {
+                let _ = sender.send(Message::Text(msg.into())).await;
+            }
+        }
+
+        // Send current player status
+        let player_status = state.get_all_player_status().await;
+        let status_msg = ServerMessage::HostPlayerStatus {
+            players: player_status,
+        };
+        if let Ok(msg) = serde_json::to_string(&status_msg) {
+            let _ = sender.send(Message::Text(msg.into())).await;
+        }
+
+        tracing::info!("Sent host state recovery");
     }
 
     // Subscribe to general broadcast (all clients)

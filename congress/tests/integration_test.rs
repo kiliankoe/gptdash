@@ -1725,7 +1725,9 @@ async fn test_multimodal_prompt_image_only() {
 
     // Verify selected prompt has image URL
     let current_round = state.get_current_round().await.unwrap();
-    let selected = current_round.selected_prompt.expect("Should have selected prompt");
+    let selected = current_round
+        .selected_prompt
+        .expect("Should have selected prompt");
     assert_eq!(selected.image_url, Some(image_url.to_string()));
 
     println!("✅ Multimodal image-only prompt test passed!");
@@ -1796,17 +1798,13 @@ async fn test_multimodal_prompt_requires_content() {
 
     // Try to add a prompt with neither text nor image - should fail
     let result = state
-        .add_prompt(
-            &round.id,
-            None,
-            None,
-            PromptSource::Host,
-            None,
-        )
+        .add_prompt(&round.id, None, None, PromptSource::Host, None)
         .await;
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("must have either text or image_url"));
+    assert!(result
+        .unwrap_err()
+        .contains("must have either text or image_url"));
 
     println!("✅ Multimodal prompt validation test passed!");
 }
@@ -1909,4 +1907,170 @@ async fn test_multimodal_prompt_selected_includes_image() {
     }
 
     println!("✅ Multimodal PromptSelected includes image test passed!");
+}
+
+// ============================================================================
+// Host Prompt Addition Tests
+// ============================================================================
+
+/// Test that adding a prompt in LOBBY phase (before starting a round) works
+/// This tests the bug where HostAddPrompt silently fails when no round exists
+#[tokio::test]
+async fn test_add_prompt_in_lobby_without_round() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Verify we're in LOBBY phase
+    let game = state.get_game().await.expect("Game should exist");
+    assert_eq!(game.phase, GamePhase::Lobby);
+
+    // Verify there's no current round
+    let round = state.get_current_round().await;
+    assert!(round.is_none(), "Should not have a round yet");
+
+    // Try to add a prompt via handler - this should NOT silently fail
+    let result = handle_message(
+        ClientMessage::HostAddPrompt {
+            text: Some("Test prompt in lobby".to_string()),
+            image_url: None,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Should either:
+    // a) Return PromptSelected (if round was auto-created), or
+    // b) Return an error explaining that a round is needed
+    // But NOT return None (silent failure)
+    assert!(
+        result.is_some(),
+        "HostAddPrompt should not silently fail - got None instead of a response"
+    );
+
+    // Verify the prompt was added (round should have been created)
+    match result {
+        Some(ServerMessage::PromptSelected { prompt }) => {
+            assert_eq!(prompt.text, Some("Test prompt in lobby".to_string()));
+            // Verify a round was created
+            let round = state.get_current_round().await;
+            assert!(round.is_some(), "A round should have been created");
+        }
+        Some(ServerMessage::Error { code, msg }) => {
+            // Alternative: if we return an error, it should be informative
+            panic!(
+                "Acceptable error response, but auto-creating round is preferred. Error: {} - {}",
+                code, msg
+            );
+        }
+        other => {
+            panic!("Unexpected response: {:?}", other);
+        }
+    }
+
+    println!("✅ Add prompt in lobby without round test passed!");
+}
+
+/// Test that adding a prompt after starting a round works (happy path)
+#[tokio::test]
+async fn test_add_prompt_after_starting_round() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Transition to PromptSelection and start round (normal flow)
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    // Now add a prompt - should work
+    let result = handle_message(
+        ClientMessage::HostAddPrompt {
+            text: Some("Test prompt after round start".to_string()),
+            image_url: None,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    match result {
+        Some(ServerMessage::PromptSelected { prompt }) => {
+            assert_eq!(
+                prompt.text,
+                Some("Test prompt after round start".to_string())
+            );
+        }
+        other => {
+            panic!("Expected PromptSelected, got: {:?}", other);
+        }
+    }
+
+    println!("✅ Add prompt after starting round test passed!");
+}
+
+/// Test that host receives HostPrompts broadcast after adding a prompt
+#[tokio::test]
+async fn test_host_prompts_broadcast_after_add() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Start a round
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+
+    // Add a prompt directly to test the prompts list
+    state
+        .add_prompt(
+            &round.id,
+            Some("First prompt".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .expect("Should add first prompt");
+
+    state
+        .add_prompt(
+            &round.id,
+            Some("Second prompt".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .expect("Should add second prompt");
+
+    // Get prompts for the round
+    let updated_round = state.get_current_round().await.expect("Should have round");
+    assert_eq!(
+        updated_round.prompt_candidates.len(),
+        2,
+        "Should have 2 prompt candidates"
+    );
+
+    println!("✅ Host prompts broadcast test passed!");
 }

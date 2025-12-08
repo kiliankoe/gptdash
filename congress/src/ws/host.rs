@@ -211,7 +211,24 @@ pub async fn handle_add_prompt(
         text.as_deref().unwrap_or("(image only)"),
         is_multimodal
     );
-    let round = state.get_current_round().await?;
+
+    // Get or create a round - auto-create if none exists
+    let round = match state.get_current_round().await {
+        Some(r) => r,
+        None => {
+            // Auto-create a round so host can add prompts without explicitly starting one
+            tracing::info!("No current round, auto-creating one for prompt addition");
+            match state.start_round().await {
+                Ok(r) => r,
+                Err(e) => {
+                    return Some(ServerMessage::Error {
+                        code: "PROMPT_ADD_FAILED".to_string(),
+                        msg: format!("Failed to create round for prompt: {}", e),
+                    });
+                }
+            }
+        }
+    };
 
     match state
         .add_prompt(
@@ -224,6 +241,9 @@ pub async fn handle_add_prompt(
         .await
     {
         Ok(prompt) => {
+            // Broadcast updated prompts list to host so UI updates
+            state.broadcast_prompts_to_host(&round.id).await;
+
             // Auto-select the prompt when added by host
             let prompt_id = prompt.id.clone();
             if let Err(e) = state.select_prompt(&round.id, &prompt_id).await {
