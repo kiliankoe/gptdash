@@ -98,33 +98,27 @@ impl LlmProvider for OllamaProvider {
     async fn generate(&self, request: GenerateRequest) -> LlmResult<GenerateResponse> {
         let start = Instant::now();
 
-        // Build the prompt with game context
+        // Build the prompt with game context (German)
+        let system_prompt = "Bitte antworte in drei sehr kurzen Sätzen auf die folgende Frage oder Aufforderung. \
+            Nur drei sehr kurze Sätze, keine Stichpunkte, bitte nur in Fließtext und nicht lang oder umschweifend. \
+            Formuliere die kurzen Sätze bitte so wie ein Mensch, der die Antwort innerhalb von 2 Minuten selbst schreibt. \
+            Vermeide komplexe Ausdrücke und Formulierungen. Einfach nur drei normale kurze Sätze.";
+
         let full_prompt = if request.image_url.is_some() {
             // For multimodal, adjust the prompt to reference the image
             if request.prompt.is_empty() {
-                "You are playing a party game where you impersonate a human player. \
-                Look at this image. Provide a witty, creative, and entertaining \
-                2-3 sentence answer that sounds like it could have been written by a real person. \
-                Be funny, clever, and slightly irreverent. Don't be too formal or robotic."
-                    .to_string()
+                format!(
+                    "{} Schau dir dieses Bild an und beschreibe es:",
+                    system_prompt
+                )
             } else {
                 format!(
-                    "You are playing a party game where you impersonate a human player. \
-                    Look at this image. The host asks: {}\n\n\
-                    Provide your witty, creative 2-3 sentence answer that sounds human:",
-                    request.prompt
+                    "{} Schau dir dieses Bild an. Die Frage lautet: {}",
+                    system_prompt, request.prompt
                 )
             }
         } else {
-            format!(
-                "You are playing a party game where you impersonate a human player. \
-                The host will give you a prompt, and you must provide a witty, creative, and entertaining \
-                2-3 sentence answer that sounds like it could have been written by a real person. \
-                Be funny, clever, and slightly irreverent. Don't be too formal or robotic.\n\n\
-                Prompt: {}\n\n\
-                Provide your 2-3 sentence answer:",
-                request.prompt
-            )
+            format!("{} Die Frage lautet: {}", system_prompt, request.prompt)
         };
 
         // Handle image if present
