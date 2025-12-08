@@ -99,7 +99,10 @@ impl AppState {
     }
 
     /// Get prompt candidates for host (filtered by shadowban status)
-    pub async fn get_prompts_for_host(&self, round_id: &str) -> Vec<crate::protocol::HostPromptInfo> {
+    pub async fn get_prompts_for_host(
+        &self,
+        round_id: &str,
+    ) -> Vec<crate::protocol::HostPromptInfo> {
         let rounds = self.rounds.read().await;
         let round = match rounds.get(round_id) {
             Some(r) => r,

@@ -14,7 +14,9 @@ use futures::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
 use std::sync::Arc;
 
-use crate::protocol::{AudienceVoteInfo, ClientMessage, HostSubmissionInfo, ServerMessage, SubmissionInfo};
+use crate::protocol::{
+    AudienceVoteInfo, ClientMessage, HostSubmissionInfo, ServerMessage, SubmissionInfo,
+};
 use crate::state::AppState;
 use crate::types::Role;
 
@@ -131,10 +133,7 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
             // Send current submissions list
             let submissions = state.get_submissions(&round.id).await;
             let host_submissions = ServerMessage::HostSubmissions {
-                list: submissions
-                    .iter()
-                    .map(HostSubmissionInfo::from)
-                    .collect(),
+                list: submissions.iter().map(HostSubmissionInfo::from).collect(),
             };
             if let Ok(msg) = serde_json::to_string(&host_submissions) {
                 let _ = sender.send(Message::Text(msg.into())).await;
