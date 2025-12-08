@@ -139,6 +139,7 @@ pub struct Score {
     pub id: String,
     pub kind: ScoreKind,
     pub ref_id: String,
+    pub display_name: Option<String>,
     pub ai_detect_points: u32,
     pub funny_points: u32,
     pub total: u32,

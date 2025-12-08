@@ -624,7 +624,7 @@ function updateLeaderboard() {
             : index === 2
               ? "bronze"
               : "";
-      const displayName = player.ref_id || `Spieler ${index + 1}`;
+      const displayName = player.display_name || `Spieler ${index + 1}`;
       return `
             <div class="leaderboard-row" style="animation-delay: ${index * 0.1}s">
                 <div class="leaderboard-rank ${rankClass}">${index + 1}</div>
@@ -705,7 +705,7 @@ function updatePodium() {
   if (sorted[0]) {
     const name1 = document.getElementById("podiumFirstName");
     const score1 = document.getElementById("podiumFirstScore");
-    if (name1) name1.textContent = sorted[0].ref_id || "Spieler 1";
+    if (name1) name1.textContent = sorted[0].display_name || "Spieler 1";
     if (score1) score1.textContent = `${sorted[0].total} Punkte`;
   }
 
@@ -714,7 +714,7 @@ function updatePodium() {
   if (sorted[1]) {
     const name2 = document.getElementById("podiumSecondName");
     const score2 = document.getElementById("podiumSecondScore");
-    if (name2) name2.textContent = sorted[1].ref_id || "Spieler 2";
+    if (name2) name2.textContent = sorted[1].display_name || "Spieler 2";
     if (score2) score2.textContent = `${sorted[1].total} Punkte`;
     if (podiumSecond) podiumSecond.style.visibility = "visible";
   } else if (podiumSecond) {
@@ -726,7 +726,7 @@ function updatePodium() {
   if (sorted[2]) {
     const name3 = document.getElementById("podiumThirdName");
     const score3 = document.getElementById("podiumThirdScore");
-    if (name3) name3.textContent = sorted[2].ref_id || "Spieler 3";
+    if (name3) name3.textContent = sorted[2].display_name || "Spieler 3";
     if (score3) score3.textContent = `${sorted[2].total} Punkte`;
     if (podiumThird) podiumThird.style.visibility = "visible";
   } else if (podiumThird) {

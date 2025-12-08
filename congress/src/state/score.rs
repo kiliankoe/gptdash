@@ -32,6 +32,9 @@ impl AppState {
         // Aggregate votes to get counts
         let (ai_counts, funny_counts) = self.aggregate_votes(round_id).await;
 
+        // Get players for display name lookup
+        let players = self.players.read().await;
+
         // Compute player scores
         let mut player_scores = Vec::new();
         for submission in round_submissions.iter() {
@@ -40,10 +43,14 @@ impl AppState {
                     let ai_votes = ai_counts.get(&submission.id).copied().unwrap_or(0);
                     let funny_votes = funny_counts.get(&submission.id).copied().unwrap_or(0);
 
+                    // Look up player's display name
+                    let display_name = players.get(player_id).and_then(|p| p.display_name.clone());
+
                     let score = Score {
                         id: ulid::Ulid::new().to_string(),
                         kind: ScoreKind::Player,
                         ref_id: player_id.clone(),
+                        display_name,
                         ai_detect_points: ai_votes,
                         funny_points: funny_votes,
                         total: ai_votes + funny_votes,
@@ -52,6 +59,7 @@ impl AppState {
                 }
             }
         }
+        drop(players);
 
         // Compute audience scores
         let votes = self.votes.read().await;
@@ -65,6 +73,7 @@ impl AppState {
                         id: ulid::Ulid::new().to_string(),
                         kind: ScoreKind::Audience,
                         ref_id: vote.voter_id.clone(),
+                        display_name: None,
                         ai_detect_points: 0,
                         funny_points: 0,
                         total: 0,
@@ -104,10 +113,15 @@ impl AppState {
                             id: score.ref_id.clone(),
                             kind: ScoreKind::Player,
                             ref_id: score.ref_id.clone(),
+                            display_name: score.display_name.clone(),
                             ai_detect_points: 0,
                             funny_points: 0,
                             total: 0,
                         });
+                    // Update display_name if we get a newer one (in case player changed name)
+                    if score.display_name.is_some() {
+                        entry.display_name = score.display_name.clone();
+                    }
                     entry.ai_detect_points += score.ai_detect_points;
                     entry.funny_points += score.funny_points;
                     entry.total += score.total;
@@ -119,6 +133,7 @@ impl AppState {
                             id: score.ref_id.clone(),
                             kind: ScoreKind::Audience,
                             ref_id: score.ref_id.clone(),
+                            display_name: None,
                             ai_detect_points: 0,
                             funny_points: 0,
                             total: 0,
