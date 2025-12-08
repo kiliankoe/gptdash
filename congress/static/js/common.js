@@ -55,7 +55,7 @@ class WSConnection {
     this.ws.onclose = () => {
       console.log("Disconnected from game server");
       if (this.onStatusChange) {
-        this.onStatusChange(false, "Disconnected");
+        this.onStatusChange(false, "disconnected");
       }
       // Auto-reconnect
       setTimeout(() => this.connect(), this.reconnectDelay);

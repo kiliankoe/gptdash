@@ -37,7 +37,7 @@
                     <p>Du bist gleich bei GPTDash dabei, dem Spiel, bei dem Spieler versuchen, eine KI zu imitieren.</p>
                     <p>Deine Aufgabe: Finde heraus, welche Antwort die echte KI ist!</p>
 
-                    <button onclick="joinAudience()" id="joinButton">Als Publikum mitmachen</button>
+                    <button onclick="joinAudience()" id="joinButton">Mitmachen</button>
 
                     <div id="welcomeError" class="error-message" style="display: none;"></div>
 
@@ -61,9 +61,9 @@
                 <div class="card prompt-submission-card" id="promptSubmissionCard">
                     <div class="prompt-submission-header" onclick="togglePromptSubmission()">
                         <h3>&#x1F4A1; Prompt vorschlagen</h3>
-                        <span class="toggle-icon" id="promptToggleIcon">&#x25BC;</span>
+                        <span class="toggle-icon collapsed" id="promptToggleIcon">&#x25BC;</span>
                     </div>
-                    <div class="prompt-submission-content" id="promptSubmissionContent">
+                    <div class="prompt-submission-content collapsed" id="promptSubmissionContent">
                         <p>Schlage eine Prompt vor!</p>
                         <textarea id="promptInput" placeholder="" maxlength="200" rows="3"></textarea>
                         <div class="prompt-char-count">

@@ -11,7 +11,7 @@ let selectedFunnyAnswer = null;
 let hasVoted = false;
 let panicMode = false;
 let audienceTimer = null;
-let promptSubmissionExpanded = true;
+let promptSubmissionExpanded = false;
 const STORAGE_KEY = "gptdash_voter_token";
 
 // Prompt voting state
@@ -84,7 +84,7 @@ function handleMessage(message) {
       }
       // Auto-join if we have a token
       if (voterToken) {
-        updateConnectionStatus(true, "Als Publikum beigetreten");
+        updateConnectionStatus(true, "connected");
         if (currentPhase !== "VOTING" || !hasVoted) {
           showScreen("waitingScreen");
         }
@@ -182,7 +182,7 @@ function joinAudience() {
     return;
   }
 
-  updateConnectionStatus(true, "Als Publikum beigetreten");
+  updateConnectionStatus(true, "connected");
   hideError("welcomeError");
   showScreen("waitingScreen");
 }
@@ -197,7 +197,7 @@ function updatePhase(phase) {
         updateWaitingMessage(
           "&#x23F3;",
           "Willkommen!",
-          "Die Show beginnt in Kürze. Schlage schon mal einen Prompt vor!",
+          "Die Show beginnt in Kürze!",
         );
         showScreen("waitingScreen");
       }
