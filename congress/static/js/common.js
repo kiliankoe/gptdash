@@ -19,6 +19,19 @@ class WSConnection {
     this.token = token;
   }
 
+  /**
+   * Force reconnect with current token
+   * Useful when token changes and we need to re-validate
+   */
+  reconnect() {
+    if (this.ws) {
+      // Prevent auto-reconnect from firing
+      this.ws.onclose = null;
+      this.ws.close();
+    }
+    this.connect();
+  }
+
   connect() {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const host = window.location.host || window.location.hostname;

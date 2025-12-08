@@ -84,7 +84,7 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
     if let Some(token) = &params.token {
         match role {
             Role::Player => {
-                // Try to recover player state
+                // Try to recover player state - validate token exists
                 if let Some(player) = state.get_player_by_token(token).await {
                     let submission = state
                         .get_player_submission_for_current_round(&player.id)
@@ -105,6 +105,17 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                         let _ = sender.send(Message::Text(msg.into())).await;
                     }
                     tracing::info!("Sent player state recovery for token");
+                } else {
+                    // Invalid player token - send error message
+                    tracing::warn!("Invalid player token attempted: {}", token);
+                    let error = ServerMessage::Error {
+                        code: "INVALID_PLAYER_TOKEN".to_string(),
+                        msg: "Invalid player token. Please get a valid token from the host."
+                            .to_string(),
+                    };
+                    if let Ok(msg) = serde_json::to_string(&error) {
+                        let _ = sender.send(Message::Text(msg.into())).await;
+                    }
                 }
             }
             Role::Audience => {

@@ -199,12 +199,27 @@ function handleMessage(message) {
       break;
 
     case "error":
-      // Check for duplicate error from automatic detection
-      if (message.msg === "DUPLICATE_EXACT") {
+      // Check for specific error codes
+      if (message.code === "INVALID_PLAYER_TOKEN") {
+        // Invalid token - go back to join screen and show error
+        playerToken = null;
+        localStorage.removeItem(STORAGE_KEY);
+        showScreen("joinScreen");
+        showError(
+          "joinError",
+          "Ungültiger Token. Bitte frag den Host nach einem gültigen Token.",
+        );
+      } else if (message.msg === "DUPLICATE_EXACT") {
         showError(
           "submitError",
           "Diese Antwort existiert schon. Bitte gib eine andere Antwort ein.",
         );
+      } else if (message.code === "REGISTRATION_FAILED") {
+        // Registration failed - likely invalid token, go back to join screen
+        playerToken = null;
+        localStorage.removeItem(STORAGE_KEY);
+        showScreen("joinScreen");
+        showError("joinError", message.msg);
       } else {
         handleError(message.msg);
       }
@@ -221,33 +236,26 @@ function joinGame() {
     return;
   }
 
-  playerToken = token;
-  // Store token for reconnection
-  localStorage.setItem(STORAGE_KEY, token);
-  // Update connection with token for future reconnects
-  wsConn.setToken(token);
-
   if (!requireConnection("joinError")) {
     return;
   }
 
-  // Send join message
-  const sent = wsConn.send({
-    t: "join",
-    room_token: token,
-  });
+  // Store token temporarily - will be cleared if invalid
+  playerToken = token;
+  localStorage.setItem(STORAGE_KEY, token);
 
-  if (!sent) {
-    showError(
-      "joinError",
-      "Server nicht erreichbar. Versuch's gleich nochmal.",
-    );
-    return;
-  }
+  // Reconnect with the token to validate it
+  // The server will send either player_state (valid) or error (invalid)
+  wsConn.setToken(token);
+  wsConn.reconnect();
 
   hideError("joinError");
 
-  // Move to register screen
+  // Show a loading state - the actual screen transition happens
+  // when we receive player_state (valid token -> register screen)
+  // or error with INVALID_PLAYER_TOKEN (invalid -> back to join with error)
+  // For now, optimistically move to register screen
+  // If token is invalid, error handler will redirect back
   showScreen("registerScreen");
 }
 

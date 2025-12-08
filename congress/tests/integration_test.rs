@@ -2063,3 +2063,217 @@ async fn test_host_prompts_broadcast_after_add() {
 
     println!("✅ Host prompts broadcast test passed!");
 }
+
+// ============================================================================
+// Player Token Validation Tests
+// ============================================================================
+
+/// Test that registering with an invalid player token returns an error
+#[tokio::test]
+async fn test_register_player_invalid_token() {
+    let state = Arc::new(AppState::new());
+    let player_role = Role::Player;
+
+    state.create_game().await;
+
+    // Try to register with a token that doesn't exist
+    let result = handle_message(
+        ClientMessage::RegisterPlayer {
+            player_token: "INVALID_TOKEN".to_string(),
+            display_name: "Hacker".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    match result {
+        Some(ServerMessage::Error { code, msg }) => {
+            assert_eq!(code, "REGISTRATION_FAILED");
+            assert!(msg.contains("Invalid player token"));
+        }
+        _ => panic!("Expected error for invalid player token, got: {:?}", result),
+    }
+
+    println!("✅ Register player invalid token test passed!");
+}
+
+/// Test that submitting answers with an invalid player token returns an error
+#[tokio::test]
+async fn test_submit_answer_invalid_token() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+    let player_role = Role::Player;
+
+    state.create_game().await;
+
+    // Setup a round with prompt so submissions are allowed
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt_to_pool(
+            Some("Test prompt".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Try to submit an answer with an invalid token
+    let result = handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some("INVALID_TOKEN".to_string()),
+            text: "My cheating answer".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    match result {
+        Some(ServerMessage::Error { code, msg }) => {
+            assert_eq!(code, "INVALID_PLAYER_TOKEN");
+            assert!(msg.contains("Invalid player token"));
+        }
+        _ => panic!(
+            "Expected INVALID_PLAYER_TOKEN error for invalid token, got: {:?}",
+            result
+        ),
+    }
+
+    // Verify no submission was created
+    let submissions = state.get_submissions(&round.id).await;
+    assert!(
+        submissions.is_empty(),
+        "No submissions should exist from invalid token"
+    );
+
+    println!("✅ Submit answer invalid token test passed!");
+}
+
+/// Test that a valid player token works for registration and submission
+#[tokio::test]
+async fn test_valid_player_token_flow() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+    let player_role = Role::Player;
+
+    state.create_game().await;
+
+    // Create a valid player
+    let create_result = handle_message(
+        ClientMessage::HostCreatePlayers { count: 1 },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    let player_token = match create_result {
+        Some(ServerMessage::PlayersCreated { players }) => {
+            assert_eq!(players.len(), 1);
+            players[0].token.clone()
+        }
+        _ => panic!("Expected PlayersCreated"),
+    };
+
+    // Register with valid token - should succeed
+    let register_result = handle_message(
+        ClientMessage::RegisterPlayer {
+            player_token: player_token.clone(),
+            display_name: "ValidPlayer".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    match register_result {
+        Some(ServerMessage::PlayerRegistered { display_name, .. }) => {
+            assert_eq!(display_name, "ValidPlayer");
+        }
+        _ => panic!(
+            "Expected PlayerRegistered for valid token, got: {:?}",
+            register_result
+        ),
+    }
+
+    // Setup round for submission
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt_to_pool(
+            Some("Test prompt".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Submit with valid token - should succeed
+    let submit_result = handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some(player_token),
+            text: "My valid answer".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    match submit_result {
+        Some(ServerMessage::SubmissionConfirmed) => {}
+        _ => panic!(
+            "Expected SubmissionConfirmed for valid token, got: {:?}",
+            submit_result
+        ),
+    }
+
+    // Verify submission was created
+    let submissions = state.get_submissions(&round.id).await;
+    assert_eq!(submissions.len(), 1, "Should have 1 submission");
+    assert_eq!(submissions[0].display_text, "My valid answer");
+
+    println!("✅ Valid player token flow test passed!");
+}
