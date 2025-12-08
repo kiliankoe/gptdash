@@ -191,6 +191,11 @@ pub async fn handle_message(
             host::handle_unqueue_prompt(state, prompt_id).await
         }
 
+        ClientMessage::HostDeletePrompt { prompt_id } => {
+            check_host!(role, "delete prompts");
+            host::handle_delete_prompt(state, prompt_id).await
+        }
+
         ClientMessage::PromptVote {
             voter_token,
             prompt_id,

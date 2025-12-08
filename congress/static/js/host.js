@@ -788,6 +788,7 @@ function updatePromptsList() {
       <div class="prompt-actions">
         ${queueBtn}
         ${isAudience && prompt.submitter_id ? `<button class="danger" onclick="shadowbanAudience('${prompt.submitter_id}')" title="Diesen Nutzer shadowbannen (ignoriert zukünftige Prompts)">🚫 Shadowban</button>` : ""}
+        <button class="danger small" onclick="deletePrompt('${prompt.id}')" title="Prompt löschen">🗑️</button>
       </div>
     `;
     container.appendChild(div);
@@ -840,7 +841,8 @@ function updateQueuedPromptsList() {
       </div>
       ${contentHtml}
       <div class="prompt-actions">
-        <button class="danger small" onclick="unqueuePrompt('${prompt.id}')">Entfernen</button>
+        <button class="secondary small" onclick="unqueuePrompt('${prompt.id}')" title="Zurück in den Pool">↩ Pool</button>
+        <button class="danger small" onclick="deletePrompt('${prompt.id}')" title="Prompt löschen">🗑️</button>
       </div>
     `;
     container.appendChild(div);
@@ -857,6 +859,14 @@ function queuePrompt(promptId) {
 function unqueuePrompt(promptId) {
   wsConn.send({
     t: "host_unqueue_prompt",
+    prompt_id: promptId,
+  });
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: Called from HTML onclick
+function deletePrompt(promptId) {
+  wsConn.send({
+    t: "host_delete_prompt",
     prompt_id: promptId,
   });
 }

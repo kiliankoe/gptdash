@@ -105,6 +105,10 @@ pub enum ClientMessage {
     HostUnqueuePrompt {
         prompt_id: PromptId,
     },
+    /// Delete a prompt from pool or queue (host only)
+    HostDeletePrompt {
+        prompt_id: PromptId,
+    },
     /// Vote for a prompt during PROMPT_SELECTION phase (audience)
     PromptVote {
         voter_token: String,

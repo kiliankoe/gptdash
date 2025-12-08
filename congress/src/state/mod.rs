@@ -230,6 +230,30 @@ impl AppState {
         Ok(prompt)
     }
 
+    /// Delete a prompt permanently from either pool or queue
+    /// Returns true if the prompt was found and deleted
+    pub async fn delete_prompt(&self, prompt_id: &str) -> bool {
+        // Try to remove from queue first
+        {
+            let mut queue = self.queued_prompts.write().await;
+            if let Some(pos) = queue.iter().position(|p| p.id == prompt_id) {
+                queue.remove(pos);
+                return true;
+            }
+        }
+
+        // Try to remove from pool
+        {
+            let mut pool = self.prompt_pool.write().await;
+            if let Some(pos) = pool.iter().position(|p| p.id == prompt_id) {
+                pool.remove(pos);
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Get all queued prompts
     pub async fn get_queued_prompts(&self) -> Vec<Prompt> {
         self.queued_prompts.read().await.clone()
@@ -285,16 +309,17 @@ impl AppState {
         };
         drop(queue);
 
-        // Remove winner from queue
+        // Remove winner from queue, return losers to pool
         let mut queue = self.queued_prompts.write().await;
         queue.retain(|p| p.id != winner.id);
 
-        // Move remaining prompts back to pool
-        let remaining: Vec<Prompt> = queue.drain(..).collect();
+        // Move remaining (non-winning) prompts back to pool for reuse
+        let losers: Vec<Prompt> = queue.drain(..).collect();
         drop(queue);
 
-        let mut pool = self.prompt_pool.write().await;
-        pool.extend(remaining);
+        if !losers.is_empty() {
+            self.prompt_pool.write().await.extend(losers);
+        }
 
         // Clear prompt votes for next round
         self.prompt_votes.write().await.clear();

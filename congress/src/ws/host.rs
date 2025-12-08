@@ -561,3 +561,22 @@ pub async fn handle_unqueue_prompt(
         }),
     }
 }
+
+pub async fn handle_delete_prompt(
+    state: &Arc<AppState>,
+    prompt_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host deleting prompt: {}", prompt_id);
+
+    if state.delete_prompt(&prompt_id).await {
+        // Broadcast updated pool and queue to host
+        state.broadcast_prompts_to_host().await;
+        state.broadcast_queued_prompts_to_host().await;
+        None
+    } else {
+        Some(ServerMessage::Error {
+            code: "DELETE_PROMPT_FAILED".to_string(),
+            msg: "Prompt not found".to_string(),
+        })
+    }
+}
