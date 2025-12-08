@@ -124,8 +124,10 @@ function showScreen(screenId) {
 
 /**
  * Show/hide panels (for multi-panel layouts)
+ * @param {string} panelId - ID of the panel to show
+ * @param {boolean} updateUrl - Whether to update the URL search params (default: true)
  */
-function showPanel(panelId) {
+function showPanel(panelId, updateUrl = true) {
   // Hide all panels
   document.querySelectorAll(".panel").forEach((panel) => {
     panel.classList.remove("active");
@@ -151,6 +153,30 @@ function showPanel(panelId) {
       item.classList.add("active");
     }
   });
+
+  // Update URL search params for persistence across reloads
+  if (updateUrl && panel) {
+    const url = new URL(window.location);
+    url.searchParams.set("panel", panelId);
+    window.history.replaceState({}, "", url);
+  }
+}
+
+/**
+ * Restore panel from URL search params (call on page load)
+ * @returns {boolean} true if a panel was restored from URL
+ */
+function restorePanelFromUrl() {
+  const url = new URL(window.location);
+  const panelId = url.searchParams.get("panel");
+  if (panelId) {
+    const panel = document.getElementById(panelId);
+    if (panel) {
+      showPanel(panelId, false); // Don't update URL again
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -230,6 +256,19 @@ function copyToClipboard(text) {
  */
 function formatTime(date = new Date()) {
   return date.toLocaleTimeString();
+}
+
+/**
+ * Debounce a function
+ * @param {Function} fn - Function to debounce
+ * @param {number} delay - Delay in milliseconds
+ */
+function debounce(fn, delay) {
+  let timeoutId;
+  return function (...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), delay);
+  };
 }
 
 /**
@@ -491,12 +530,14 @@ if (typeof window !== "undefined") {
     updateConnectionStatus,
     showScreen,
     showPanel,
+    restorePanelFromUrl,
     showError,
     hideError,
     escapeHtml,
     generateId,
     copyToClipboard,
     formatTime,
+    debounce,
     CountdownTimer,
     QRCodeManager,
     TTSManager,

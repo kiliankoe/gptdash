@@ -39,6 +39,9 @@ function init() {
 
   // Setup image preview for multimodal prompts
   setupImagePreview();
+
+  // Restore panel from URL if present (allows reload to stay on same panel)
+  restorePanelFromUrl();
 }
 
 function handleMessage(message) {
