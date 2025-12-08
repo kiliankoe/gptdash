@@ -109,6 +109,19 @@ impl AppState {
 
         (ai_counts, funny_counts)
     }
+
+    /// Get vote counts for a specific round (alias for aggregate_votes for clarity)
+    pub async fn get_vote_counts_for_round(
+        &self,
+        round_id: &RoundId,
+    ) -> (HashMap<SubmissionId, u32>, HashMap<SubmissionId, u32>) {
+        self.aggregate_votes(round_id).await
+    }
+
+    /// Get a voter's prompt vote for the current prompt selection phase
+    pub async fn get_audience_prompt_vote(&self, voter_id: &str) -> Option<String> {
+        self.prompt_votes.read().await.get(voter_id).cloned()
+    }
 }
 
 #[cfg(test)]

@@ -18,7 +18,7 @@ use crate::protocol::{
     AudienceVoteInfo, ClientMessage, HostSubmissionInfo, ServerMessage, SubmissionInfo,
 };
 use crate::state::AppState;
-use crate::types::Role;
+use crate::types::{GamePhase, Role};
 
 #[derive(Debug, Deserialize)]
 pub struct WsQuery {
@@ -68,7 +68,7 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
     let welcome = ServerMessage::Welcome {
         protocol: "1.0".to_string(),
         role: role.clone(),
-        game,
+        game: game.clone(),
         server_now: chrono::Utc::now().to_rfc3339(),
         valid_transitions,
     };
@@ -121,6 +121,169 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                     let _ = sender.send(Message::Text(msg.into())).await;
                 }
                 tracing::info!("Sent audience state recovery for token");
+
+                // Send phase-specific state for audience
+                match game.phase {
+                    GamePhase::PromptSelection => {
+                        // Send prompt candidates for voting
+                        let queued = state.get_queued_prompts().await;
+                        if !queued.is_empty() {
+                            let candidates_msg =
+                                ServerMessage::PromptCandidates { prompts: queued };
+                            if let Ok(msg) = serde_json::to_string(&candidates_msg) {
+                                let _ = sender.send(Message::Text(msg.into())).await;
+                            }
+                            tracing::info!("Sent prompt candidates for audience state recovery");
+                        }
+
+                        // Send audience prompt vote state if they've voted
+                        if let Some(prompt_vote) = state.get_audience_prompt_vote(token).await {
+                            let prompt_vote_state = ServerMessage::AudiencePromptVoteState {
+                                has_voted: true,
+                                voted_prompt_id: Some(prompt_vote),
+                            };
+                            if let Ok(msg) = serde_json::to_string(&prompt_vote_state) {
+                                let _ = sender.send(Message::Text(msg.into())).await;
+                            }
+                            tracing::info!("Sent audience prompt vote state recovery");
+                        }
+                    }
+                    GamePhase::Voting => {
+                        // Send submissions list for voting
+                        if let Some(round) = state.get_current_round().await {
+                            let submissions = state.get_submissions(&round.id).await;
+                            let submissions_msg = ServerMessage::Submissions {
+                                list: submissions.iter().map(SubmissionInfo::from).collect(),
+                            };
+                            if let Ok(msg) = serde_json::to_string(&submissions_msg) {
+                                let _ = sender.send(Message::Text(msg.into())).await;
+                            }
+                            tracing::info!("Sent submissions for audience voting state recovery");
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Send Beamer-specific state recovery
+    if role == Role::Beamer {
+        match game.phase {
+            GamePhase::PromptSelection => {
+                // Send prompt candidates for display
+                let queued = state.get_queued_prompts().await;
+                if !queued.is_empty() {
+                    let candidates_msg = ServerMessage::PromptCandidates { prompts: queued };
+                    if let Ok(msg) = serde_json::to_string(&candidates_msg) {
+                        let _ = sender.send(Message::Text(msg.into())).await;
+                    }
+
+                    // Also send current vote counts
+                    let counts = state.get_prompt_vote_counts().await;
+                    let counts_msg = ServerMessage::BeamerPromptVoteCounts { counts };
+                    if let Ok(msg) = serde_json::to_string(&counts_msg) {
+                        let _ = sender.send(Message::Text(msg.into())).await;
+                    }
+                    tracing::info!("Sent prompt candidates and vote counts for beamer recovery");
+                }
+            }
+            GamePhase::Voting => {
+                // Send submissions list and current vote counts
+                if let Some(round) = state.get_current_round().await {
+                    let submissions = state.get_submissions(&round.id).await;
+                    let submissions_msg = ServerMessage::Submissions {
+                        list: submissions.iter().map(SubmissionInfo::from).collect(),
+                    };
+                    if let Ok(msg) = serde_json::to_string(&submissions_msg) {
+                        let _ = sender.send(Message::Text(msg.into())).await;
+                    }
+
+                    // Send current vote counts
+                    let (ai_counts, funny_counts) =
+                        state.get_vote_counts_for_round(&round.id).await;
+                    let vote_counts_msg = ServerMessage::BeamerVoteCounts {
+                        ai: ai_counts,
+                        funny: funny_counts,
+                        seq: 0,
+                    };
+                    if let Ok(msg) = serde_json::to_string(&vote_counts_msg) {
+                        let _ = sender.send(Message::Text(msg.into())).await;
+                    }
+                    tracing::info!("Sent submissions and vote counts for beamer voting recovery");
+                }
+            }
+            GamePhase::Writing => {
+                // Send current prompt for display
+                if let Some(round) = state.get_current_round().await {
+                    if let Some(prompt) = round.selected_prompt {
+                        let prompt_msg = ServerMessage::PromptSelected { prompt };
+                        if let Ok(msg) = serde_json::to_string(&prompt_msg) {
+                            let _ = sender.send(Message::Text(msg.into())).await;
+                        }
+                        tracing::info!("Sent prompt for beamer writing phase recovery");
+                    }
+                }
+            }
+            GamePhase::Reveal => {
+                // Send submissions and current reveal state
+                if let Some(round) = state.get_current_round().await {
+                    let submissions = state.get_submissions(&round.id).await;
+                    let submissions_msg = ServerMessage::Submissions {
+                        list: submissions.iter().map(SubmissionInfo::from).collect(),
+                    };
+                    if let Ok(msg) = serde_json::to_string(&submissions_msg) {
+                        let _ = sender.send(Message::Text(msg.into())).await;
+                    }
+
+                    // Send current reveal position
+                    if let Some(submission) = state.get_current_reveal_submission(&round.id).await {
+                        let reveal_msg = ServerMessage::RevealUpdate {
+                            reveal_index: round.reveal_index,
+                            submission: Some(SubmissionInfo::from(&submission)),
+                        };
+                        if let Ok(msg) = serde_json::to_string(&reveal_msg) {
+                            let _ = sender.send(Message::Text(msg.into())).await;
+                        }
+                    }
+                    tracing::info!("Sent reveal state for beamer recovery");
+                }
+            }
+            GamePhase::Results | GamePhase::Podium => {
+                // Send scores and submissions
+                if let Some(round) = state.get_current_round().await {
+                    let submissions = state.get_submissions(&round.id).await;
+                    let submissions_msg = ServerMessage::Submissions {
+                        list: submissions.iter().map(SubmissionInfo::from).collect(),
+                    };
+                    if let Ok(msg) = serde_json::to_string(&submissions_msg) {
+                        let _ = sender.send(Message::Text(msg.into())).await;
+                    }
+
+                    // Send vote counts for results display
+                    let (ai_counts, funny_counts) =
+                        state.get_vote_counts_for_round(&round.id).await;
+                    let vote_counts_msg = ServerMessage::BeamerVoteCounts {
+                        ai: ai_counts,
+                        funny: funny_counts,
+                        seq: 0,
+                    };
+                    if let Ok(msg) = serde_json::to_string(&vote_counts_msg) {
+                        let _ = sender.send(Message::Text(msg.into())).await;
+                    }
+                }
+
+                // Send scores
+                let (all_players, top_audience) = state.get_leaderboards().await;
+                let scores_msg = ServerMessage::Scores {
+                    players: all_players,
+                    audience_top: top_audience.into_iter().take(10).collect(),
+                };
+                if let Ok(msg) = serde_json::to_string(&scores_msg) {
+                    let _ = sender.send(Message::Text(msg.into())).await;
+                }
+                tracing::info!("Sent results/podium state for beamer recovery");
             }
             _ => {}
         }

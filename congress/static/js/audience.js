@@ -152,6 +152,20 @@ function handleMessage(message) {
       updatePromptVoteSummary();
       break;
 
+    case "audience_prompt_vote_state":
+      // State recovery for prompt voting on reconnect
+      console.log("Audience prompt vote state recovery:", message);
+      if (message.has_voted && message.voted_prompt_id) {
+        hasPromptVoted = true;
+        selectedPrompt = message.voted_prompt_id;
+        // If we're in prompt selection phase, show confirmed screen
+        if (currentPhase === "PROMPT_SELECTION") {
+          showScreen("promptVoteConfirmedScreen");
+          updatePromptVoteSummary();
+        }
+      }
+      break;
+
     case "error":
       handleError(message.code, message.msg);
       break;

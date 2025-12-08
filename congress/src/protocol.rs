@@ -247,6 +247,11 @@ pub enum ServerMessage {
     },
     /// Acknowledge a prompt vote
     PromptVoteAck,
+    /// Sent to audience on reconnect with their prompt vote state during PROMPT_SELECTION
+    AudiencePromptVoteState {
+        has_voted: bool,
+        voted_prompt_id: Option<PromptId>,
+    },
     Error {
         code: String,
         msg: String,
