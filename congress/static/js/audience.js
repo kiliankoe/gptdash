@@ -11,6 +11,7 @@ let selectedFunnyAnswer = null;
 let hasVoted = false;
 let panicMode = false;
 let audienceTimer = null;
+let promptSubmissionExpanded = true;
 const STORAGE_KEY = "gptdash_voter_token";
 
 // Initialize
@@ -20,6 +21,9 @@ function init() {
 
   // Initialize timer
   audienceTimer = new CountdownTimer("audienceTimer");
+
+  // Initialize prompt input event listener
+  initPromptInput();
 
   // Connect to WebSocket with token for state recovery
   wsConn = new WSConnection(
@@ -367,11 +371,90 @@ function updatePanicModeUI() {
   }
 }
 
+// Prompt submission functions
+function togglePromptSubmission() {
+  promptSubmissionExpanded = !promptSubmissionExpanded;
+  const content = document.getElementById("promptSubmissionContent");
+  const icon = document.getElementById("promptToggleIcon");
+
+  if (content) {
+    content.classList.toggle("collapsed", !promptSubmissionExpanded);
+  }
+  if (icon) {
+    icon.classList.toggle("collapsed", !promptSubmissionExpanded);
+  }
+}
+
+function updatePromptCharCount() {
+  const input = document.getElementById("promptInput");
+  const counter = document.getElementById("promptCharCount");
+  if (input && counter) {
+    counter.textContent = input.value.length;
+  }
+}
+
+function submitPrompt() {
+  const input = document.getElementById("promptInput");
+  const text = input?.value?.trim();
+
+  if (!text) {
+    showError("promptError", "Bitte gib einen Prompt ein");
+    return;
+  }
+
+  if (text.length < 10) {
+    showError("promptError", "Der Prompt sollte mindestens 10 Zeichen haben");
+    return;
+  }
+
+  if (!requireConnection("promptError")) {
+    return;
+  }
+
+  // Send prompt submission
+  const sent = wsConn.send({
+    t: "submit_prompt",
+    voter_token: voterToken,
+    text: text,
+  });
+
+  if (!sent) {
+    showError("promptError", "Verbindung verloren. Versuch's nochmal.");
+    return;
+  }
+
+  // Show success feedback
+  hideError("promptError");
+  const successEl = document.getElementById("promptSuccess");
+  if (successEl) {
+    successEl.style.display = "block";
+    // Hide after 3 seconds
+    setTimeout(() => {
+      successEl.style.display = "none";
+    }, 3000);
+  }
+
+  // Clear input
+  if (input) {
+    input.value = "";
+    updatePromptCharCount();
+  }
+}
+
+function initPromptInput() {
+  const input = document.getElementById("promptInput");
+  if (input) {
+    input.addEventListener("input", updatePromptCharCount);
+  }
+}
+
 if (typeof window !== "undefined") {
   Object.assign(window, {
     joinAudience,
     submitVote,
     changeVote,
+    togglePromptSubmission,
+    submitPrompt,
   });
 }
 

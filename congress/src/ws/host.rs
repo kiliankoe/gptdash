@@ -67,18 +67,51 @@ pub async fn handle_select_prompt(
     prompt_id: String,
 ) -> Option<ServerMessage> {
     tracing::info!("Host selecting prompt: {}", prompt_id);
-    let round = state.get_current_round().await?;
 
+    // Ensure we have a round to select the prompt for
+    let round = match state.get_current_round().await {
+        Some(r) => {
+            // Check if round is in Setup state, if not start a new one
+            if r.state != crate::types::RoundState::Setup {
+                tracing::info!("Current round not in Setup state, starting new round");
+                match state.start_round().await {
+                    Ok(new_round) => new_round,
+                    Err(e) => {
+                        return Some(ServerMessage::Error {
+                            code: "PROMPT_SELECT_FAILED".to_string(),
+                            msg: format!("Failed to start new round: {}", e),
+                        });
+                    }
+                }
+            } else {
+                r
+            }
+        }
+        None => {
+            // No round exists, create one
+            tracing::info!("No current round, creating one for prompt selection");
+            match state.start_round().await {
+                Ok(new_round) => new_round,
+                Err(e) => {
+                    return Some(ServerMessage::Error {
+                        code: "PROMPT_SELECT_FAILED".to_string(),
+                        msg: format!("Failed to start round: {}", e),
+                    });
+                }
+            }
+        }
+    };
+
+    // Select prompt from pool (removes it from pool)
     match state.select_prompt(&round.id, &prompt_id).await {
-        Ok(_) => {
-            let updated_round = state.get_current_round().await?;
-            updated_round.selected_prompt.map(|prompt| {
-                // Broadcast to all clients so beamer and players can update their displays
-                state.broadcast_to_all(ServerMessage::PromptSelected {
-                    prompt: prompt.clone(),
-                });
-                ServerMessage::PromptSelected { prompt }
-            })
+        Ok(prompt) => {
+            // Broadcast updated pool to host
+            state.broadcast_prompts_to_host().await;
+            // Broadcast to all clients so beamer and players can update their displays
+            state.broadcast_to_all(ServerMessage::PromptSelected {
+                prompt: prompt.clone(),
+            });
+            Some(ServerMessage::PromptSelected { prompt })
         }
         Err(e) => Some(ServerMessage::Error {
             code: "PROMPT_SELECT_FAILED".to_string(),
@@ -200,6 +233,16 @@ pub async fn handle_reset_game(state: &Arc<AppState>) -> Option<ServerMessage> {
     })
 }
 
+pub async fn handle_clear_prompt_pool(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host clearing prompt pool");
+    state.clear_prompt_pool().await;
+
+    // Broadcast empty prompts list to host
+    state.broadcast_prompts_to_host().await;
+
+    None
+}
+
 pub async fn handle_add_prompt(
     state: &Arc<AppState>,
     text: Option<String>,
@@ -207,53 +250,21 @@ pub async fn handle_add_prompt(
 ) -> Option<ServerMessage> {
     let is_multimodal = image_url.is_some();
     tracing::info!(
-        "Host adding prompt: {:?} (multimodal: {})",
+        "Host adding prompt to pool: {:?} (multimodal: {})",
         text.as_deref().unwrap_or("(image only)"),
         is_multimodal
     );
 
-    // Get or create a round - auto-create if none exists
-    let round = match state.get_current_round().await {
-        Some(r) => r,
-        None => {
-            // Auto-create a round so host can add prompts without explicitly starting one
-            tracing::info!("No current round, auto-creating one for prompt addition");
-            match state.start_round().await {
-                Ok(r) => r,
-                Err(e) => {
-                    return Some(ServerMessage::Error {
-                        code: "PROMPT_ADD_FAILED".to_string(),
-                        msg: format!("Failed to create round for prompt: {}", e),
-                    });
-                }
-            }
-        }
-    };
-
+    // Add prompt to the global pool (no round needed)
     match state
-        .add_prompt(
-            &round.id,
-            text,
-            image_url,
-            crate::types::PromptSource::Host,
-            None,
-        )
+        .add_prompt_to_pool(text, image_url, crate::types::PromptSource::Host, None)
         .await
     {
         Ok(prompt) => {
             // Broadcast updated prompts list to host so UI updates
-            state.broadcast_prompts_to_host(&round.id).await;
-
-            // Auto-select the prompt when added by host
-            let prompt_id = prompt.id.clone();
-            if let Err(e) = state.select_prompt(&round.id, &prompt_id).await {
-                tracing::warn!("Failed to auto-select prompt: {}", e);
-            }
-            // Broadcast to all clients so beamer and players can update their displays
-            state.broadcast_to_all(ServerMessage::PromptSelected {
-                prompt: prompt.clone(),
-            });
-            Some(ServerMessage::PromptSelected { prompt })
+            state.broadcast_prompts_to_host().await;
+            tracing::info!("Prompt added to pool: {}", prompt.id);
+            None // Just acknowledge, don't auto-select
         }
         Err(e) => Some(ServerMessage::Error {
             code: "PROMPT_ADD_FAILED".to_string(),
@@ -467,9 +478,7 @@ pub async fn handle_shadowban_audience(
     state.shadowban_audience(voter_id.clone()).await;
 
     // Re-broadcast prompts to host (now filtered)
-    if let Some(round) = state.get_current_round().await {
-        state.broadcast_prompts_to_host(&round.id).await;
-    }
+    state.broadcast_prompts_to_host().await;
 
     None
 }

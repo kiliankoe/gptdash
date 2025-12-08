@@ -359,6 +359,16 @@ function resetGame() {
   }
 }
 
+function clearPromptPool() {
+  if (
+    confirm(
+      "Willst du alle Prompts aus dem Pool löschen? Das kann nicht rückgängig gemacht werden.",
+    )
+  ) {
+    wsConn.send({ t: "host_clear_prompt_pool" });
+  }
+}
+
 function togglePanicMode() {
   const newState = !gameState.panicMode;
   if (

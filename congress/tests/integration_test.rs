@@ -108,8 +108,7 @@ async fn test_full_game_flow() {
 
     // 6. Add and select prompt
     let prompt = state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some("What is the meaning of life?".to_string()),
             None,
             PromptSource::Host,
@@ -689,8 +688,7 @@ async fn test_player_status_tracking() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some("Test prompt".to_string()),
             None,
             PromptSource::Host,
@@ -775,8 +773,7 @@ async fn test_submission_update() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some("Test prompt".to_string()),
             None,
             PromptSource::Host,
@@ -889,8 +886,7 @@ async fn test_submission_update_unauthorized() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some("Test prompt".to_string()),
             None,
             PromptSource::Host,
@@ -987,8 +983,7 @@ async fn test_host_write_ai_submission() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some("Test prompt".to_string()),
             None,
             PromptSource::Host,
@@ -1184,8 +1179,7 @@ async fn test_select_ai_submission() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some("Test prompt".to_string()),
             None,
             PromptSource::Host,
@@ -1371,8 +1365,7 @@ async fn test_remove_player_mid_round() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some("Test prompt".to_string()),
             None,
             PromptSource::Host,
@@ -1575,8 +1568,7 @@ async fn test_add_player_mid_round() {
 
     let round = state.get_current_round().await.expect("Should have round");
     let prompt = state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some("Test prompt".to_string()),
             None,
             PromptSource::Host,
@@ -1705,8 +1697,7 @@ async fn test_multimodal_prompt_image_only() {
     // Add a prompt with only image URL
     let image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
     let prompt = state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             None, // No text
             Some(image_url.to_string()),
             PromptSource::Host,
@@ -1752,14 +1743,13 @@ async fn test_multimodal_prompt_text_and_image() {
 
     handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
 
-    let round = state.get_current_round().await.expect("Should have round");
+    let _round = state.get_current_round().await.expect("Should have round");
 
     // Add a prompt with both text and image
     let image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
     let text = "What is this rocket called and what organization does it represent?";
     let prompt = state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some(text.to_string()),
             Some(image_url.to_string()),
             PromptSource::Host,
@@ -1794,11 +1784,11 @@ async fn test_multimodal_prompt_requires_content() {
 
     handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
 
-    let round = state.get_current_round().await.expect("Should have round");
+    let _round = state.get_current_round().await.expect("Should have round");
 
     // Try to add a prompt with neither text nor image - should fail
     let result = state
-        .add_prompt(&round.id, None, None, PromptSource::Host, None)
+        .add_prompt_to_pool(None, None, PromptSource::Host, None)
         .await;
 
     assert!(result.is_err());
@@ -1828,7 +1818,7 @@ async fn test_multimodal_prompt_via_handler() {
 
     handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
 
-    // Add prompt via handler with image URL
+    // Add prompt via handler with image URL (adds to pool)
     let image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
     let result = handle_message(
         ClientMessage::HostAddPrompt {
@@ -1840,13 +1830,32 @@ async fn test_multimodal_prompt_via_handler() {
     )
     .await;
 
-    // Handler auto-selects prompt, so we get PromptSelected
-    match result {
+    // Adding to pool returns None (success acknowledgment)
+    assert!(
+        result.is_none(),
+        "HostAddPrompt should return None, got: {:?}",
+        result
+    );
+
+    // Get the prompt from pool and select it
+    let pool = state.prompt_pool.read().await;
+    assert_eq!(pool.len(), 1);
+    let prompt_id = pool[0].id.clone();
+    drop(pool);
+
+    let select_result = handle_message(
+        ClientMessage::HostSelectPrompt { prompt_id },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    match select_result {
         Some(ServerMessage::PromptSelected { prompt }) => {
             assert_eq!(prompt.text, Some("Describe this image".to_string()));
             assert_eq!(prompt.image_url, Some(image_url.to_string()));
         }
-        _ => panic!("Expected PromptSelected message, got {:?}", result),
+        other => panic!("Expected PromptSelected message, got {:?}", other),
     }
 
     println!("✅ Multimodal prompt via handler test passed!");
@@ -1871,13 +1880,12 @@ async fn test_multimodal_prompt_selected_includes_image() {
 
     handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
 
-    let round = state.get_current_round().await.expect("Should have round");
+    let _round = state.get_current_round().await.expect("Should have round");
 
     // Add multimodal prompt
     let image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
     let prompt = state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some("What do you see?".to_string()),
             Some(image_url.to_string()),
             PromptSource::Host,
@@ -1930,7 +1938,7 @@ async fn test_add_prompt_in_lobby_without_round() {
     let round = state.get_current_round().await;
     assert!(round.is_none(), "Should not have a round yet");
 
-    // Try to add a prompt via handler - this should NOT silently fail
+    // Add a prompt via handler - this adds to the global pool (no round needed)
     let result = handle_message(
         ClientMessage::HostAddPrompt {
             text: Some("Test prompt in lobby".to_string()),
@@ -1941,34 +1949,18 @@ async fn test_add_prompt_in_lobby_without_round() {
     )
     .await;
 
-    // Should either:
-    // a) Return PromptSelected (if round was auto-created), or
-    // b) Return an error explaining that a round is needed
-    // But NOT return None (silent failure)
+    // With the new design, adding a prompt to the pool returns None (success acknowledgment)
+    // The prompt is NOT auto-selected - that requires a separate HostSelectPrompt call
     assert!(
-        result.is_some(),
-        "HostAddPrompt should not silently fail - got None instead of a response"
+        result.is_none(),
+        "HostAddPrompt should return None (success acknowledgment), got: {:?}",
+        result
     );
 
-    // Verify the prompt was added (round should have been created)
-    match result {
-        Some(ServerMessage::PromptSelected { prompt }) => {
-            assert_eq!(prompt.text, Some("Test prompt in lobby".to_string()));
-            // Verify a round was created
-            let round = state.get_current_round().await;
-            assert!(round.is_some(), "A round should have been created");
-        }
-        Some(ServerMessage::Error { code, msg }) => {
-            // Alternative: if we return an error, it should be informative
-            panic!(
-                "Acceptable error response, but auto-creating round is preferred. Error: {} - {}",
-                code, msg
-            );
-        }
-        other => {
-            panic!("Unexpected response: {:?}", other);
-        }
-    }
+    // Verify the prompt was added to the global pool
+    let pool = state.prompt_pool.read().await;
+    assert_eq!(pool.len(), 1, "Prompt should be in the pool");
+    assert_eq!(pool[0].text, Some("Test prompt in lobby".to_string()));
 
     println!("✅ Add prompt in lobby without round test passed!");
 }
@@ -1993,7 +1985,7 @@ async fn test_add_prompt_after_starting_round() {
 
     handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
 
-    // Now add a prompt - should work
+    // Add a prompt to the global pool
     let result = handle_message(
         ClientMessage::HostAddPrompt {
             text: Some("Test prompt after round start".to_string()),
@@ -2004,7 +1996,28 @@ async fn test_add_prompt_after_starting_round() {
     )
     .await;
 
-    match result {
+    // Adding to pool returns None (success acknowledgment)
+    assert!(
+        result.is_none(),
+        "HostAddPrompt should return None, got: {:?}",
+        result
+    );
+
+    // Verify prompt is in the pool
+    let pool = state.prompt_pool.read().await;
+    assert_eq!(pool.len(), 1);
+    let prompt_id = pool[0].id.clone();
+    drop(pool);
+
+    // Now select the prompt for the round
+    let select_result = handle_message(
+        ClientMessage::HostSelectPrompt { prompt_id },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    match select_result {
         Some(ServerMessage::PromptSelected { prompt }) => {
             assert_eq!(
                 prompt.text,
@@ -2039,12 +2052,11 @@ async fn test_host_prompts_broadcast_after_add() {
 
     handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
 
-    let round = state.get_current_round().await.expect("Should have round");
+    let _round = state.get_current_round().await.expect("Should have round");
 
     // Add a prompt directly to test the prompts list
     state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some("First prompt".to_string()),
             None,
             PromptSource::Host,
@@ -2054,8 +2066,7 @@ async fn test_host_prompts_broadcast_after_add() {
         .expect("Should add first prompt");
 
     state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some("Second prompt".to_string()),
             None,
             PromptSource::Host,
@@ -2064,13 +2075,9 @@ async fn test_host_prompts_broadcast_after_add() {
         .await
         .expect("Should add second prompt");
 
-    // Get prompts for the round
-    let updated_round = state.get_current_round().await.expect("Should have round");
-    assert_eq!(
-        updated_round.prompt_candidates.len(),
-        2,
-        "Should have 2 prompt candidates"
-    );
+    // Get prompts from the global pool
+    let pool = state.prompt_pool.read().await;
+    assert_eq!(pool.len(), 2, "Should have 2 prompt candidates in pool");
 
     println!("✅ Host prompts broadcast test passed!");
 }

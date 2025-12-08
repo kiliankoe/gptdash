@@ -128,6 +128,11 @@ pub async fn handle_message(
             host::handle_reset_game(state).await
         }
 
+        ClientMessage::HostClearPromptPool => {
+            check_host!(role, "clear prompt pool");
+            host::handle_clear_prompt_pool(state).await
+        }
+
         ClientMessage::HostAddPrompt { text, image_url } => {
             check_host!(role, "add prompts");
             host::handle_add_prompt(state, text, image_url).await
@@ -539,22 +544,16 @@ mod tests {
         // Should return None (silent success)
         assert!(result.is_none());
 
-        // Verify prompt was added with submitter_id
-        let round = state.get_current_round().await.unwrap();
-        let rounds = state.rounds.read().await;
-        let round_data = rounds.get(&round.id).unwrap();
-        assert_eq!(round_data.prompt_candidates.len(), 1);
-        assert_eq!(
-            round_data.prompt_candidates[0].submitter_id,
-            Some("voter123".to_string())
-        );
+        // Verify prompt was added to the global pool with submitter_id
+        let pool = state.prompt_pool.read().await;
+        assert_eq!(pool.len(), 1);
+        assert_eq!(pool[0].submitter_id, Some("voter123".to_string()));
     }
 
     #[tokio::test]
     async fn test_shadowbanned_user_prompt_silently_ignored() {
         let state = Arc::new(AppState::new());
         state.create_game().await;
-        let _round = state.start_round().await.unwrap();
         let role = Role::Audience;
 
         // First, shadowban the voter
@@ -574,11 +573,9 @@ mod tests {
         // Should return None (user thinks it succeeded)
         assert!(result.is_none());
 
-        // But prompt was NOT actually added
-        let round = state.get_current_round().await.unwrap();
-        let rounds = state.rounds.read().await;
-        let round_data = rounds.get(&round.id).unwrap();
-        assert_eq!(round_data.prompt_candidates.len(), 0);
+        // But prompt was NOT actually added to the pool
+        let pool = state.prompt_pool.read().await;
+        assert_eq!(pool.len(), 0);
     }
 
     // Remove player handler tests

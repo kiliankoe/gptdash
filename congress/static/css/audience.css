@@ -394,6 +394,111 @@ button.secondary:hover {
 }
 
 /* ========================
+   PROMPT SUBMISSION
+   ======================== */
+.prompt-submission-card {
+  margin-top: 16px;
+}
+
+.prompt-submission-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.prompt-submission-header h3 {
+  margin-bottom: 0;
+  color: var(--color-secondary);
+  font-size: 18px;
+}
+
+.toggle-icon {
+  font-size: 14px;
+  color: var(--color-secondary);
+  transition: transform 0.3s ease;
+}
+
+.toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.prompt-submission-content {
+  margin-top: 16px;
+  overflow: hidden;
+  transition:
+    max-height 0.3s ease,
+    opacity 0.3s ease;
+}
+
+.prompt-submission-content.collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+}
+
+.prompt-submission-content p {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.prompt-submission-content textarea {
+  width: 100%;
+  padding: 14px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(250, 245, 245, 0.2);
+  border-radius: 8px;
+  color: var(--color-neutral);
+  resize: none;
+  transition: border-color 0.2s ease;
+}
+
+.prompt-submission-content textarea:focus {
+  outline: none;
+  border-color: var(--color-secondary);
+}
+
+.prompt-submission-content textarea::placeholder {
+  color: rgba(250, 245, 245, 0.4);
+}
+
+.prompt-char-count {
+  text-align: right;
+  font-size: 12px;
+  opacity: 0.6;
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+
+.prompt-submission-content button {
+  background: var(--color-secondary);
+  box-shadow: 0 4px 20px rgba(150, 115, 255, 0.3);
+}
+
+.prompt-submission-content button:hover {
+  box-shadow: 0 6px 30px rgba(150, 115, 255, 0.4);
+}
+
+.prompt-submission-content button:disabled {
+  background: rgba(250, 245, 245, 0.2);
+  box-shadow: none;
+}
+
+.success-message {
+  background: rgba(0, 255, 0, 0.15);
+  border: 1px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--color-primary);
+  text-align: center;
+}
+
+/* ========================
    SCREEN: VOTING
    ======================== */
 .vote-section {

@@ -122,15 +122,15 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
 
     // Send host-specific state recovery
     if role == Role::Host {
-        // Send current prompts list
-        if let Some(round) = state.get_current_round().await {
-            let prompts = state.get_prompts_for_host(&round.id).await;
-            let host_prompts = ServerMessage::HostPrompts { prompts };
-            if let Ok(msg) = serde_json::to_string(&host_prompts) {
-                let _ = sender.send(Message::Text(msg.into())).await;
-            }
+        // Send current prompts pool (independent of rounds)
+        let prompts = state.get_prompts_for_host().await;
+        let host_prompts = ServerMessage::HostPrompts { prompts };
+        if let Ok(msg) = serde_json::to_string(&host_prompts) {
+            let _ = sender.send(Message::Text(msg.into())).await;
+        }
 
-            // Send current submissions list
+        // Send current submissions list if there's an active round
+        if let Some(round) = state.get_current_round().await {
             let submissions = state.get_submissions(&round.id).await;
             let host_submissions = ServerMessage::HostSubmissions {
                 list: submissions.iter().map(HostSubmissionInfo::from).collect(),

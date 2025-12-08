@@ -86,7 +86,7 @@ pub struct Round {
     pub game_id: GameId,
     pub number: u32,
     pub state: RoundState,
-    pub prompt_candidates: Vec<Prompt>,
+    // prompt_candidates removed - now lives in AppState.prompt_pool
     pub selected_prompt: Option<Prompt>,
     pub submission_deadline: Option<String>,
     pub reveal_order: Vec<SubmissionId>,

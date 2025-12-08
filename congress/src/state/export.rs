@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 /// Schema version for export format compatibility
-pub const EXPORT_SCHEMA_VERSION: u32 = 1;
+/// Version 2: prompt_pool moved from Round.prompt_candidates to global pool
+pub const EXPORT_SCHEMA_VERSION: u32 = 2;
 
 /// A serializable snapshot of the entire game state.
 ///
@@ -42,10 +43,14 @@ pub struct GameStateExport {
     /// Shadowbanned audience member IDs
     #[serde(default)]
     pub shadowbanned_audience: HashSet<VoterId>,
+    /// Global prompt pool (persists across games)
+    #[serde(default)]
+    pub prompt_pool: Vec<Prompt>,
 }
 
 impl GameStateExport {
     /// Create a new export with current timestamp
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         game: Option<Game>,
         rounds: HashMap<RoundId, Round>,
@@ -56,6 +61,7 @@ impl GameStateExport {
         processed_vote_msg_ids: HashMap<VoterId, String>,
         player_status: HashMap<PlayerId, PlayerSubmissionStatus>,
         shadowbanned_audience: HashSet<VoterId>,
+        prompt_pool: Vec<Prompt>,
     ) -> Self {
         Self {
             schema_version: EXPORT_SCHEMA_VERSION,
@@ -69,6 +75,7 @@ impl GameStateExport {
             processed_vote_msg_ids,
             player_status,
             shadowbanned_audience,
+            prompt_pool,
         }
     }
 
@@ -145,6 +152,7 @@ mod tests {
             HashMap::new(),
             HashMap::new(),
             HashSet::new(),
+            Vec::new(),
         );
 
         let json = serde_json::to_string_pretty(&export).unwrap();
@@ -177,6 +185,7 @@ mod tests {
             processed_vote_msg_ids: HashMap::new(),
             player_status: HashMap::new(),
             shadowbanned_audience: HashSet::new(),
+            prompt_pool: Vec::new(),
         };
 
         let result = export.validate();
@@ -198,6 +207,7 @@ mod tests {
             processed_vote_msg_ids: HashMap::new(),
             player_status: HashMap::new(),
             shadowbanned_audience: HashSet::new(),
+            prompt_pool: Vec::new(),
         };
 
         let result = export.validate();

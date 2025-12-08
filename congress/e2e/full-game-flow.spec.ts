@@ -113,8 +113,12 @@ test.describe("Full Game Flow", () => {
     resetPage.on("dialog", (dialog) => dialog.accept());
     await resetPage.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await resetPage.waitForSelector("#game.active");
+    // Reset game state (players, rounds, scores)
     await resetPage.click('button:has-text("Spiel zurücksetzen")');
-    await resetPage.waitForTimeout(500);
+    await resetPage.waitForTimeout(300);
+    // Also clear the prompt pool for test isolation
+    await resetPage.click('button:has-text("Prompt-Pool leeren")');
+    await resetPage.waitForTimeout(300);
     await resetContext.close();
   });
 
@@ -233,14 +237,18 @@ test.describe("Full Game Flow", () => {
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
 
-    // Add a prompt (auto-selects when added by host)
+    // Add a prompt to the pool
     await host.fill(
       "#promptText",
       "What is the meaning of life, the universe, and everything?",
     );
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
 
-    // Wait a bit for prompt to be added and selected
+    // Wait for prompt to appear in the list
+    await host.waitForSelector(".prompt-card");
+
+    // Select the prompt from the pool (click the "Auswählen" button)
+    await host.click('.prompt-card button:has-text("Auswählen")');
     await host.waitForTimeout(500);
 
     // ============================================
@@ -552,11 +560,15 @@ test.describe("Full Game Flow", () => {
     await host.click('#game button:has-text("Neue Runde starten")');
     await host.waitForTimeout(500);
 
-    // Add prompt (auto-selects when added by host)
+    // Add prompt to pool
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Scene test prompt");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector(".prompt-card");
+
+    // Select the prompt from the pool
+    await host.click('.prompt-card button:has-text("Auswählen")');
     await host.waitForTimeout(500);
 
     // Go back to game control
@@ -672,6 +684,8 @@ test.describe("Full Game Flow", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Panic mode test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector(".prompt-card");
+    await host.click('.prompt-card button:has-text("Auswählen")');
     await host.waitForTimeout(500);
 
     // Transition to WRITING
@@ -832,6 +846,8 @@ test.describe("Full Game Flow", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Duplicate detection test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector(".prompt-card");
+    await host.click('.prompt-card button:has-text("Auswählen")');
     await host.waitForTimeout(500);
 
     // Transition to WRITING
@@ -1007,6 +1023,8 @@ test.describe("Full Game Flow", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Typo correction test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector(".prompt-card");
+    await host.click('.prompt-card button:has-text("Auswählen")');
     await host.waitForTimeout(500);
 
     // Transition to WRITING
@@ -1027,7 +1045,7 @@ test.describe("Full Game Flow", () => {
       timeout: 5000,
     });
 
-    // Submit an answer (without LLM configured, no correction will be suggested)
+    // Submit an answer
     await players[0].fill(
       "#answerInput",
       "Dies ist eine Testantwort ohne Tippfehler.",
@@ -1039,25 +1057,32 @@ test.describe("Full Game Flow", () => {
       timeout: 5000,
     });
 
-    // Since no LLM is configured, typo check will return no changes
-    // and player stays on submitted screen
-    await players[0].waitForTimeout(1000);
+    // Wait for typo check to complete (runs in background)
+    // If LLM is configured and suggests changes, player moves to typoCheckScreen
+    // If no LLM or no changes suggested, player stays on submittedScreen
+    await players[0].waitForTimeout(2000);
 
-    // Verify still on submitted screen (no typo correction screen shown)
-    await expect(players[0].locator("#submittedScreen")).toHaveClass(/active/);
+    // Check which screen is active - both are valid outcomes
+    const isOnSubmittedScreen = await players[0]
+      .locator("#submittedScreen.active")
+      .isVisible();
+    const isOnTypoCheckScreen = await players[0]
+      .locator("#typoCheckScreen.active")
+      .isVisible();
 
-    // Verify typo check screen exists but is not active
-    const typoScreen = players[0].locator("#typoCheckScreen");
-    await expect(typoScreen).not.toHaveClass(/active/);
+    // One of them must be active
+    expect(isOnSubmittedScreen || isOnTypoCheckScreen).toBe(true);
 
-    console.log("Typo correction test: Verified submitted flow without LLM");
+    console.log(
+      `Typo correction test: Player is on ${isOnSubmittedScreen ? "submitted" : "typo check"} screen`,
+    );
 
     // ============================================
-    // TEST: Verify comparison UI elements exist
+    // TEST: Verify typo check UI elements exist
     // ============================================
     console.log("Typo correction test: Verifying UI elements exist...");
 
-    // Check that the typo check screen has all required elements
+    // Check that the typo check screen has all required elements (attached to DOM)
     await expect(players[0].locator("#typoCheckScreen")).toBeAttached();
     await expect(players[0].locator("#originalText")).toBeAttached();
     await expect(players[0].locator("#correctedText")).toBeAttached();
@@ -1070,6 +1095,27 @@ test.describe("Full Game Flow", () => {
     await expect(
       players[0].locator('button:has-text("Selbst bearbeiten")'),
     ).toBeAttached();
+
+    // ============================================
+    // TEST: If on typo check screen, verify the flow works
+    // ============================================
+    if (isOnTypoCheckScreen) {
+      console.log(
+        "Typo correction test: LLM suggested changes, testing accept flow...",
+      );
+
+      // Verify original and corrected text are shown
+      const originalText = await players[0]
+        .locator("#originalText")
+        .textContent();
+      expect(originalText).toContain("Testantwort");
+
+      // Click "Original behalten" to go back to submitted screen
+      await players[0].click('button:has-text("Original behalten")');
+      await players[0].waitForSelector("#submittedScreen.active", {
+        timeout: 5000,
+      });
+    }
 
     console.log("Typo correction test completed successfully!");
   });
@@ -1165,6 +1211,8 @@ test.describe("Full Game Flow", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Status test prompt");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector(".prompt-card");
+    await host.click('.prompt-card button:has-text("Auswählen")');
     await host.waitForTimeout(500);
 
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
@@ -1291,6 +1339,8 @@ test.describe("Full Game Flow", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Remove player test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector(".prompt-card");
+    await host.click('.prompt-card button:has-text("Auswählen")');
     await host.waitForTimeout(500);
 
     // Transition to WRITING
@@ -1504,6 +1554,8 @@ test.describe("Full Game Flow", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Add player mid-round test");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector(".prompt-card");
+    await host.click('.prompt-card button:has-text("Auswählen")');
     await host.waitForTimeout(500);
 
     // Transition to WRITING
@@ -1669,8 +1721,10 @@ test.describe("Full Game Flow", () => {
     await host.waitForSelector("#promptImageUrl", { state: "visible" });
     await host.fill("#promptImageUrl", imageUrl);
 
-    // Add prompt (auto-selects when added by host)
+    // Add prompt to pool and select it
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector(".prompt-card");
+    await host.click('.prompt-card button:has-text("Auswählen")');
     await host.waitForTimeout(500);
 
     // Transition to Writing phase (via PROMPT_SELECTION first)
@@ -1782,8 +1836,10 @@ test.describe("Full Game Flow", () => {
       "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
     await host.fill("#promptImageUrl", imageUrl);
 
-    // Add prompt
+    // Add prompt to pool and select it
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector(".prompt-card");
+    await host.click('.prompt-card button:has-text("Auswählen")');
     await host.waitForTimeout(500);
 
     // Transition to Writing phase (via PROMPT_SELECTION first)
@@ -1878,6 +1934,13 @@ test.describe("Full Game Flow", () => {
     const promptsBeforeReload = host.locator(".prompt-card");
     await expect(promptsBeforeReload).toHaveCount(3);
 
+    // Select the first prompt (required before transitioning to WRITING)
+    await host.click('.prompt-card button:has-text("Auswählen")');
+    await host.waitForTimeout(500);
+
+    // Now we should have 2 prompts left in the pool (3 - 1 selected)
+    await expect(host.locator(".prompt-card")).toHaveCount(2);
+
     // Transition to WRITING phase so players can submit
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await host.waitForSelector("#game.active");
@@ -1929,14 +1992,11 @@ test.describe("Full Game Flow", () => {
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
 
-    // Should still have 3 prompts
+    // Should still have 2 prompts in the pool (the first one was selected and assigned to the round)
     const promptsAfterReload = host.locator(".prompt-card");
-    await expect(promptsAfterReload).toHaveCount(3, { timeout: 5000 });
+    await expect(promptsAfterReload).toHaveCount(2, { timeout: 5000 });
 
-    // Verify prompt content is preserved
-    await expect(
-      host.locator('.prompt-card:has-text("First test prompt")'),
-    ).toBeVisible();
+    // Verify prompt content is preserved (Second and Third prompts remain in pool)
     await expect(
       host.locator('.prompt-card:has-text("Second test prompt")'),
     ).toBeVisible();

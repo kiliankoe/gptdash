@@ -274,15 +274,18 @@ impl AppState {
         }
     }
 
-    /// Reset game to initial state for a fresh show
+    /// Reset game to initial state for new volunteers
+    /// Note: This preserves the prompt_pool so prompts persist across games
+    /// Use clear_prompt_pool() to clear prompts explicitly
     pub async fn reset_game(&self) {
-        // Clear all state
+        // Clear game-specific state (NOT prompt_pool - that persists)
         self.players.write().await.clear();
         self.rounds.write().await.clear();
         self.submissions.write().await.clear();
         self.votes.write().await.clear();
         self.scores.write().await.clear();
         self.player_status.write().await.clear();
+        self.processed_vote_msg_ids.write().await.clear();
 
         // Reset game to initial state
         let mut game = self.game.write().await;
@@ -299,7 +302,13 @@ impl AppState {
         // Broadcast reset state to all clients
         self.broadcast_phase_change().await;
 
-        tracing::info!("Game reset to initial state");
+        tracing::info!("Game reset to initial state (prompt pool preserved)");
+    }
+
+    /// Clear the prompt pool (e.g., at end of evening)
+    pub async fn clear_prompt_pool(&self) {
+        self.prompt_pool.write().await.clear();
+        tracing::info!("Prompt pool cleared");
     }
 
     /// Toggle panic mode on/off

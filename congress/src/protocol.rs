@@ -53,6 +53,8 @@ pub enum ClientMessage {
     HostRevealNext,
     HostRevealPrev,
     HostResetGame,
+    /// Clear all prompts from the pool (for fresh start)
+    HostClearPromptPool,
     HostAddPrompt {
         text: Option<String>,
         image_url: Option<String>,

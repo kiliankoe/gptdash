@@ -48,9 +48,8 @@ pub async fn handle_submit_prompt(
     text: String,
 ) -> Option<ServerMessage> {
     tracing::info!("Prompt submitted: {}", text);
-    let round = state.get_current_round().await?;
 
-    // Check if this voter is shadowbanned
+    // Check if this voter is shadowbanned first
     if let Some(ref token) = voter_token {
         if state.is_shadowbanned(token).await {
             tracing::info!(
@@ -62,9 +61,9 @@ pub async fn handle_submit_prompt(
         }
     }
 
+    // Add prompt directly to the global pool (no round needed)
     match state
-        .add_prompt(
-            &round.id,
+        .add_prompt_to_pool(
             Some(text),
             None, // Audience prompts don't support images
             crate::types::PromptSource::Audience,
@@ -73,8 +72,8 @@ pub async fn handle_submit_prompt(
         .await
     {
         Ok(prompt) => {
-            state.broadcast_prompts_to_host(&round.id).await;
-            tracing::info!("Prompt added: {}", prompt.id);
+            state.broadcast_prompts_to_host().await;
+            tracing::info!("Prompt added to pool: {}", prompt.id);
             None
         }
         Err(e) => Some(ServerMessage::Error {

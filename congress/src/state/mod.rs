@@ -29,6 +29,8 @@ pub struct AppState {
     pub player_status: Arc<RwLock<HashMap<PlayerId, PlayerSubmissionStatus>>>,
     /// Shadowbanned audience member IDs (their prompts are silently ignored)
     pub shadowbanned_audience: Arc<RwLock<HashSet<VoterId>>>,
+    /// Global prompt pool - persists across rounds and game resets
+    pub prompt_pool: Arc<RwLock<Vec<Prompt>>>,
     /// LLM manager for generating AI answers
     pub llm: Option<Arc<LlmManager>>,
     /// LLM configuration (timeout, max tokens, etc.)
@@ -60,6 +62,7 @@ impl AppState {
             processed_vote_msg_ids: Arc::new(RwLock::new(HashMap::new())),
             player_status: Arc::new(RwLock::new(HashMap::new())),
             shadowbanned_audience: Arc::new(RwLock::new(HashSet::new())),
+            prompt_pool: Arc::new(RwLock::new(Vec::new())),
             llm: llm.map(Arc::new),
             llm_config,
             broadcast: broadcast_tx,
@@ -98,23 +101,13 @@ impl AppState {
             .collect()
     }
 
-    /// Get prompt candidates for host (filtered by shadowban status)
-    pub async fn get_prompts_for_host(
-        &self,
-        round_id: &str,
-    ) -> Vec<crate::protocol::HostPromptInfo> {
-        let rounds = self.rounds.read().await;
-        let round = match rounds.get(round_id) {
-            Some(r) => r,
-            None => return Vec::new(),
-        };
-
+    /// Get prompt pool for host (filtered by shadowban status)
+    pub async fn get_prompts_for_host(&self) -> Vec<crate::protocol::HostPromptInfo> {
+        let pool = self.prompt_pool.read().await;
         let shadowbanned = self.shadowbanned_audience.read().await;
 
         // Filter out prompts from shadowbanned users
-        round
-            .prompt_candidates
-            .iter()
+        pool.iter()
             .filter(|p| {
                 // Keep prompts from non-shadowbanned users or prompts without submitter_id
                 match &p.submitter_id {
@@ -132,10 +125,53 @@ impl AppState {
             .collect()
     }
 
-    /// Broadcast prompt candidates to host (filtered by shadowban status)
-    pub async fn broadcast_prompts_to_host(&self, round_id: &str) {
-        let prompts = self.get_prompts_for_host(round_id).await;
+    /// Broadcast prompt pool to host (filtered by shadowban status)
+    pub async fn broadcast_prompts_to_host(&self) {
+        let prompts = self.get_prompts_for_host().await;
         self.broadcast_to_host(ServerMessage::HostPrompts { prompts });
+    }
+
+    /// Add a prompt to the global pool
+    pub async fn add_prompt_to_pool(
+        &self,
+        text: Option<String>,
+        image_url: Option<String>,
+        source: PromptSource,
+        submitter_id: Option<VoterId>,
+    ) -> Result<Prompt, String> {
+        // Validate: must have either text or image_url
+        if text.is_none() && image_url.is_none() {
+            return Err("Prompt must have either text or image_url".to_string());
+        }
+
+        let prompt = Prompt {
+            id: ulid::Ulid::new().to_string(),
+            text,
+            image_url,
+            source,
+            submitter_id,
+        };
+
+        self.prompt_pool.write().await.push(prompt.clone());
+        Ok(prompt)
+    }
+
+    /// Remove a prompt from the pool by ID (used when selecting or deleting)
+    pub async fn remove_prompt_from_pool(&self, prompt_id: &str) -> Option<Prompt> {
+        let mut pool = self.prompt_pool.write().await;
+        pool.iter()
+            .position(|p| p.id == prompt_id)
+            .map(|pos| pool.remove(pos))
+    }
+
+    /// Get a prompt from the pool by ID (without removing)
+    pub async fn get_prompt_from_pool(&self, prompt_id: &str) -> Option<Prompt> {
+        self.prompt_pool
+            .read()
+            .await
+            .iter()
+            .find(|p| p.id == prompt_id)
+            .cloned()
     }
 
     /// Export the entire game state as a serializable snapshot.
@@ -152,6 +188,7 @@ impl AppState {
         let processed_vote_msg_ids = self.processed_vote_msg_ids.read().await.clone();
         let player_status = self.player_status.read().await.clone();
         let shadowbanned_audience = self.shadowbanned_audience.read().await.clone();
+        let prompt_pool = self.prompt_pool.read().await.clone();
 
         GameStateExport::new(
             game,
@@ -163,6 +200,7 @@ impl AppState {
             processed_vote_msg_ids,
             player_status,
             shadowbanned_audience,
+            prompt_pool,
         )
     }
 
@@ -184,6 +222,7 @@ impl AppState {
         *self.processed_vote_msg_ids.write().await = export.processed_vote_msg_ids;
         *self.player_status.write().await = export.player_status;
         *self.shadowbanned_audience.write().await = export.shadowbanned_audience;
+        *self.prompt_pool.write().await = export.prompt_pool;
 
         // Broadcast state refresh to all clients
         if let Some(ref game) = export.game {
@@ -335,10 +374,9 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("selected prompt"));
 
-        // Add and select a prompt
+        // Add prompt to pool and select it
         let prompt = state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Test prompt".to_string()),
                 None,
                 PromptSource::Host,
@@ -363,8 +401,7 @@ mod tests {
 
         let round = state.start_round().await.unwrap();
         let prompt = state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Test prompt".to_string()),
                 None,
                 PromptSource::Host,
@@ -392,8 +429,7 @@ mod tests {
 
         let round = state.start_round().await.unwrap();
         let prompt = state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Test prompt".to_string()),
                 None,
                 PromptSource::Host,
@@ -432,10 +468,9 @@ mod tests {
         state.create_game().await;
         let round = state.start_round().await.unwrap();
 
-        // Add prompt candidates and select one
+        // Add prompt to pool and select it
         let prompt = state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Test prompt".to_string()),
                 None,
                 PromptSource::Host,
@@ -487,8 +522,7 @@ mod tests {
         let round = state.start_round().await.unwrap();
 
         let prompt = state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Test prompt".to_string()),
                 None,
                 PromptSource::Host,
@@ -512,9 +546,9 @@ mod tests {
         state.create_game().await;
         let round = state.start_round().await.unwrap();
 
+        // Add both prompts to pool first
         let prompt = state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Test prompt".to_string()),
                 None,
                 PromptSource::Host,
@@ -522,14 +556,8 @@ mod tests {
             )
             .await
             .unwrap();
-
-        // First selection should work
-        assert!(state.select_prompt(&round.id, &prompt.id).await.is_ok());
-
-        // Try to select again when not in Setup
         let prompt2 = state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Test prompt 2".to_string()),
                 None,
                 PromptSource::Host,
@@ -538,6 +566,10 @@ mod tests {
             .await
             .unwrap();
 
+        // First selection should work (transitions round to Collecting)
+        assert!(state.select_prompt(&round.id, &prompt.id).await.is_ok());
+
+        // Try to select second prompt when not in Setup state
         let result = state.select_prompt(&round.id, &prompt2.id).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Setup state"));
@@ -558,13 +590,7 @@ mod tests {
             .unwrap();
         let round = state.get_current_round().await.unwrap();
         let prompt = state
-            .add_prompt(
-                &round.id,
-                Some("Test".to_string()),
-                None,
-                PromptSource::Host,
-                None,
-            )
+            .add_prompt_to_pool(Some("Test".to_string()), None, PromptSource::Host, None)
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -671,8 +697,7 @@ mod tests {
 
         // Add and select prompt
         let prompt = state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Test prompt".to_string()),
                 None,
                 PromptSource::Host,
@@ -727,13 +752,7 @@ mod tests {
 
         // Setup full round
         let prompt = state
-            .add_prompt(
-                &round.id,
-                Some("Test".to_string()),
-                None,
-                PromptSource::Host,
-                None,
-            )
+            .add_prompt_to_pool(Some("Test".to_string()), None, PromptSource::Host, None)
             .await
             .unwrap();
         state.select_prompt(&round.id, &prompt.id).await.unwrap();
@@ -923,12 +942,10 @@ mod tests {
     async fn test_shadowban_filters_prompts() {
         let state = AppState::new();
         state.create_game().await;
-        let round = state.start_round().await.unwrap();
 
-        // Add prompts from different audience members
+        // Add prompts from different audience members to the global pool
         state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Prompt from voter1".to_string()),
                 None,
                 PromptSource::Audience,
@@ -937,8 +954,7 @@ mod tests {
             .await
             .unwrap();
         state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Prompt from voter2".to_string()),
                 None,
                 PromptSource::Audience,
@@ -947,8 +963,7 @@ mod tests {
             .await
             .unwrap();
         state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Host prompt".to_string()),
                 None,
                 PromptSource::Host,
@@ -957,16 +972,15 @@ mod tests {
             .await
             .unwrap();
 
-        // Before shadowban: all 3 prompts should be visible
-        let rounds = state.rounds.read().await;
-        let round_data = rounds.get(&round.id).unwrap();
-        assert_eq!(round_data.prompt_candidates.len(), 3);
-        drop(rounds);
+        // Before shadowban: all 3 prompts should be visible in pool
+        let pool = state.prompt_pool.read().await;
+        assert_eq!(pool.len(), 3);
+        drop(pool);
 
         // Shadowban voter1
         state.shadowban_audience("voter1".to_string()).await;
 
-        // The prompts are still stored, but the broadcast filters them
+        // The prompts are still stored in pool, but get_prompts_for_host filters them
         // Let's verify the shadowban set contains voter1
         assert!(state.is_shadowbanned("voter1").await);
 
@@ -974,18 +988,20 @@ mod tests {
         let shadowbanned = state.get_shadowbanned_audience().await;
         assert_eq!(shadowbanned.len(), 1);
         assert!(shadowbanned.contains(&"voter1".to_string()));
+
+        // Verify get_prompts_for_host filters out shadowbanned voter's prompts
+        let filtered_prompts = state.get_prompts_for_host().await;
+        assert_eq!(filtered_prompts.len(), 2); // voter2's prompt + host prompt
     }
 
     #[tokio::test]
     async fn test_prompt_submitter_id_tracked() {
         let state = AppState::new();
         state.create_game().await;
-        let round = state.start_round().await.unwrap();
 
-        // Add a prompt with submitter_id
+        // Add a prompt with submitter_id to the global pool
         let prompt = state
-            .add_prompt(
-                &round.id,
+            .add_prompt_to_pool(
                 Some("Test prompt".to_string()),
                 None,
                 PromptSource::Audience,
@@ -997,14 +1013,9 @@ mod tests {
         // Verify submitter_id was stored
         assert_eq!(prompt.submitter_id, Some("voter123".to_string()));
 
-        // Verify it's in the round's prompt_candidates
-        let rounds = state.rounds.read().await;
-        let round_data = rounds.get(&round.id).unwrap();
-        let stored_prompt = round_data
-            .prompt_candidates
-            .iter()
-            .find(|p| p.id == prompt.id)
-            .unwrap();
+        // Verify it's in the prompt pool
+        let pool = state.prompt_pool.read().await;
+        let stored_prompt = pool.iter().find(|p| p.id == prompt.id).unwrap();
         assert_eq!(stored_prompt.submitter_id, Some("voter123".to_string()));
     }
 

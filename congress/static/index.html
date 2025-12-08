@@ -56,6 +56,26 @@
                         <p>Schau auf die große Leinwand, während wir vorbereiten!</p>
                     </div>
                 </div>
+
+                <!-- Prompt Submission Section -->
+                <div class="card prompt-submission-card" id="promptSubmissionCard">
+                    <div class="prompt-submission-header" onclick="togglePromptSubmission()">
+                        <h3>&#x1F4A1; Prompt vorschlagen</h3>
+                        <span class="toggle-icon" id="promptToggleIcon">&#x25BC;</span>
+                    </div>
+                    <div class="prompt-submission-content" id="promptSubmissionContent">
+                        <p>Schlage eine Prompt vor!</p>
+                        <textarea id="promptInput" placeholder="" maxlength="200" rows="3"></textarea>
+                        <div class="prompt-char-count">
+                            <span id="promptCharCount">0</span>/200
+                        </div>
+                        <button onclick="submitPrompt()" id="submitPromptButton">Vorschlagen</button>
+                        <div id="promptError" class="error-message" style="display: none;"></div>
+                        <div id="promptSuccess" class="success-message" style="display: none;">
+                            &#x2705; Prompt wurde vorgeschlagen!
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Voting Screen -->
@@ -73,7 +93,8 @@
                 <div class="card" id="votingContent">
                     <h2>Gib deine Stimme ab</h2>
                     <div style="text-align: center; margin-bottom: 15px;">
-                        <span style="font-size: 2em; font-family: monospace; font-weight: bold;" id="audienceTimer">--:--</span>
+                        <span style="font-size: 2em; font-family: monospace; font-weight: bold;"
+                            id="audienceTimer">--:--</span>
                     </div>
                     <p class="text-center mb-16">Wähle eine Antwort pro Kategorie</p>
 

@@ -13,7 +13,6 @@ impl AppState {
             game_id: game.id.clone(),
             number: game.round_no + 1,
             state: RoundState::Setup,
-            prompt_candidates: Vec::new(),
             selected_prompt: None,
             submission_deadline: None,
             reveal_order: Vec::new(),
@@ -167,75 +166,47 @@ impl AppState {
         }
     }
 
-    /// Add a prompt candidate (text and/or image)
-    pub async fn add_prompt(
-        &self,
-        round_id: &str,
-        text: Option<String>,
-        image_url: Option<String>,
-        source: PromptSource,
-        submitter_id: Option<String>,
-    ) -> Result<Prompt, String> {
-        // Validate at least one of text or image_url is provided
-        if text.is_none() && image_url.is_none() {
-            return Err("Prompt must have either text or image_url".to_string());
-        }
+    /// Select a prompt from the pool for the round and transition to Collecting
+    /// This removes the prompt from the pool (it's been "used")
+    pub async fn select_prompt(&self, round_id: &str, prompt_id: &str) -> Result<Prompt, String> {
+        // Get and remove the prompt from the pool
+        let prompt = self
+            .remove_prompt_from_pool(prompt_id)
+            .await
+            .ok_or_else(|| "Prompt not found in pool".to_string())?;
 
-        let prompt = Prompt {
-            id: ulid::Ulid::new().to_string(),
-            text,
-            image_url,
-            source,
-            submitter_id,
-        };
-
-        let mut rounds = self.rounds.write().await;
-        if let Some(round) = rounds.get_mut(round_id) {
-            round.prompt_candidates.push(prompt.clone());
-            Ok(prompt)
-        } else {
-            Err("Round not found".to_string())
-        }
-    }
-
-    /// Select a prompt for the round and transition to Collecting
-    pub async fn select_prompt(&self, round_id: &str, prompt_id: &str) -> Result<(), String> {
-        let selected_prompt = {
+        // Update the round
+        {
             let mut rounds = self.rounds.write().await;
             if let Some(round) = rounds.get_mut(round_id) {
                 // Validate current state
                 if round.state != RoundState::Setup {
+                    // Put prompt back in pool since we couldn't use it
+                    self.prompt_pool.write().await.push(prompt);
                     return Err(format!(
                         "Can only select prompt in Setup state, currently in {:?}",
                         round.state
                     ));
                 }
 
-                if let Some(prompt) = round
-                    .prompt_candidates
-                    .iter()
-                    .find(|p| p.id == prompt_id)
-                    .cloned()
-                {
-                    round.selected_prompt = Some(prompt.clone());
-                    round.state = RoundState::Collecting;
-                    prompt
-                } else {
-                    return Err("Prompt not found".to_string());
-                }
+                round.selected_prompt = Some(prompt.clone());
+                round.state = RoundState::Collecting;
             } else {
+                // Put prompt back in pool since round doesn't exist
+                self.prompt_pool.write().await.push(prompt);
                 return Err("Round not found".to_string());
             }
-        };
+        }
 
         // Kick off LLM generation in the background (don't block)
         // Only generate if there's text or an image to work with
-        if selected_prompt.text.is_some() || selected_prompt.image_url.is_some() {
+        if prompt.text.is_some() || prompt.image_url.is_some() {
             let state = self.clone();
             let round_id = round_id.to_string();
+            let prompt_clone = prompt.clone();
             tokio::spawn(async move {
                 if let Err(e) = state
-                    .generate_ai_submissions(&round_id, &selected_prompt)
+                    .generate_ai_submissions(&round_id, &prompt_clone)
                     .await
                 {
                     tracing::error!("Failed to generate AI submissions: {}", e);
@@ -243,7 +214,7 @@ impl AppState {
             });
         }
 
-        Ok(())
+        Ok(prompt)
     }
 
     /// Generate AI submissions from all available LLM providers
