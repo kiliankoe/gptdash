@@ -163,6 +163,7 @@ impl AppState {
                 .await?;
 
             // Special case: PromptSelection with 1 prompt should skip directly to Writing
+            // Handle round creation BEFORE changing phase since start_round validates current phase
             let effective_phase = if new_phase == GamePhase::PromptSelection {
                 let queued = self.queued_prompts.read().await;
                 if queued.len() == 1 {
@@ -175,7 +176,7 @@ impl AppState {
                     self.queued_prompts.write().await.clear();
                     self.prompt_votes.write().await.clear();
 
-                    // Create a new round
+                    // Create a new round BEFORE phase changes (start_round checks current phase)
                     match self.start_round().await {
                         Ok(round) => {
                             // Select the prompt (removes from pool, starts LLM)
@@ -194,6 +195,42 @@ impl AppState {
                     drop(queued);
                     new_phase.clone()
                 }
+            } else if new_phase == GamePhase::Writing
+                && game_clone.phase == GamePhase::PromptSelection
+            {
+                // Transitioning from PromptSelection to Writing: select winning prompt
+                // IMPORTANT: Create round BEFORE phase changes (start_round checks current phase)
+                match self.select_winning_prompt().await {
+                    Ok(prompt) => {
+                        // Put winning prompt back in pool so select_prompt can find it
+                        // (select_winning_prompt removes it from queue but doesn't add to pool)
+                        self.prompt_pool.write().await.push(prompt.clone());
+
+                        // Clear queue and votes (may already be cleared by select_winning_prompt)
+                        self.queued_prompts.write().await.clear();
+                        self.prompt_votes.write().await.clear();
+
+                        // Create a new round BEFORE phase changes
+                        match self.start_round().await {
+                            Ok(round) => {
+                                // Select the prompt (removes from pool, starts LLM)
+                                if let Err(e) = self.select_prompt(&round.id, &prompt.id).await {
+                                    tracing::error!("Failed to select winning prompt: {}", e);
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to start round: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "No winning prompt found during PromptSelection->Writing: {}",
+                            e
+                        );
+                    }
+                }
+                new_phase.clone()
             } else {
                 new_phase.clone()
             };
@@ -229,41 +266,6 @@ impl AppState {
                     self.broadcast_to_all(crate::protocol::ServerMessage::PromptCandidates {
                         prompts: candidates,
                     });
-                } else if effective_phase == GamePhase::Writing
-                    && game_clone.phase == GamePhase::PromptSelection
-                {
-                    // Transitioning from PromptSelection to Writing: select winning prompt
-                    match self.select_winning_prompt().await {
-                        Ok(prompt) => {
-                            // Put winning prompt back in pool so select_prompt can find it
-                            // (select_winning_prompt removes it from queue but doesn't add to pool)
-                            self.prompt_pool.write().await.push(prompt.clone());
-
-                            // Clear queue and votes (may already be cleared by select_winning_prompt)
-                            self.queued_prompts.write().await.clear();
-                            self.prompt_votes.write().await.clear();
-
-                            // Create a new round
-                            match self.start_round().await {
-                                Ok(round) => {
-                                    // Select the prompt (removes from pool, starts LLM)
-                                    if let Err(e) = self.select_prompt(&round.id, &prompt.id).await
-                                    {
-                                        tracing::error!("Failed to select winning prompt: {}", e);
-                                    }
-                                }
-                                Err(e) => {
-                                    tracing::error!("Failed to start round: {}", e);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!(
-                                "No winning prompt found during PromptSelection->Writing: {}",
-                                e
-                            );
-                        }
-                    }
                 } else if effective_phase == GamePhase::Reveal {
                     // Auto-populate reveal_order if not set, then reset reveal to first submission
                     if let Some(rid) = &round_id {

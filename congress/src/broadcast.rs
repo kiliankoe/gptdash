@@ -45,6 +45,34 @@ pub fn spawn_vote_broadcaster(state: Arc<AppState>) {
     });
 }
 
+/// Spawn a background task that broadcasts prompt vote counts to Beamer clients during PROMPT_SELECTION phase
+pub fn spawn_prompt_vote_broadcaster(state: Arc<AppState>) {
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+
+            // Check if we're in PROMPT_SELECTION phase
+            let game = match state.get_game().await {
+                Some(g) => g,
+                None => continue,
+            };
+
+            if game.phase != GamePhase::PromptSelection {
+                continue;
+            }
+
+            // Get prompt vote counts
+            let counts = state.get_prompt_vote_counts().await;
+
+            // Broadcast to Beamer clients
+            let msg = ServerMessage::BeamerPromptVoteCounts { counts };
+
+            // Ignore send errors (no receivers connected is fine)
+            let _ = state.beamer_broadcast.send(msg);
+        }
+    });
+}
+
 /// Spawn a background task that auto-advances from VOTING to RESULTS when deadline expires
 pub fn spawn_voting_deadline_watcher(state: Arc<AppState>) {
     tokio::spawn(async move {
