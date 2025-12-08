@@ -1450,4 +1450,61 @@ mod tests {
         // Player should be gone
         assert_eq!(state.players.read().await.len(), 0);
     }
+
+    #[tokio::test]
+    async fn test_resubmit_replaces_previous_submission() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // Create a player
+        let player = state.create_player().await;
+
+        // First submission
+        let sub1 = state
+            .submit_answer(
+                &round.id,
+                Some(player.id.clone()),
+                "First answer".to_string(),
+            )
+            .await
+            .unwrap();
+
+        // Verify one submission exists
+        let submissions = state.get_submissions(&round.id).await;
+        assert_eq!(submissions.len(), 1);
+        assert_eq!(submissions[0].original_text, "First answer");
+
+        // Resubmit with different answer
+        let sub2 = state
+            .submit_answer(
+                &round.id,
+                Some(player.id.clone()),
+                "Second answer".to_string(),
+            )
+            .await
+            .unwrap();
+
+        // Verify still only one submission (replacement, not addition)
+        let submissions = state.get_submissions(&round.id).await;
+        assert_eq!(submissions.len(), 1);
+        assert_eq!(submissions[0].original_text, "Second answer");
+        assert_eq!(submissions[0].id, sub2.id);
+        assert_ne!(sub1.id, sub2.id); // New submission ID
+
+        // Player can also resubmit the same text they had before
+        let sub3 = state
+            .submit_answer(
+                &round.id,
+                Some(player.id.clone()),
+                "First answer".to_string(),
+            )
+            .await
+            .unwrap();
+
+        let submissions = state.get_submissions(&round.id).await;
+        assert_eq!(submissions.len(), 1);
+        assert_eq!(submissions[0].original_text, "First answer");
+        assert_eq!(submissions[0].id, sub3.id);
+    }
 }

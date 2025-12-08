@@ -8,18 +8,42 @@ fn normalize(text: &str) -> String {
 
 impl AppState {
     /// Submit an answer with automatic exact duplicate detection
+    /// If the player already has a submission for this round, it will be replaced
     pub async fn submit_answer(
         &self,
         round_id: &str,
         player_id: Option<String>,
         text: String,
     ) -> Result<Submission, String> {
-        // Check for exact duplicates
+        // Check for exact duplicates (excluding this player's own submission)
         let normalized_new = normalize(&text);
         let existing = self.get_submissions(round_id).await;
         for existing_sub in &existing {
+            // Skip duplicate check against player's own previous submission
+            if let Some(ref pid) = player_id {
+                if existing_sub.author_ref.as_ref() == Some(pid) {
+                    continue;
+                }
+            }
             if normalize(&existing_sub.original_text) == normalized_new {
                 return Err("DUPLICATE_EXACT".to_string());
+            }
+        }
+
+        // Remove any existing submission from this player for this round
+        if let Some(ref pid) = player_id {
+            let mut submissions = self.submissions.write().await;
+            let to_remove: Vec<String> = submissions
+                .values()
+                .filter(|s| {
+                    s.round_id == round_id
+                        && s.author_kind == AuthorKind::Player
+                        && s.author_ref.as_ref() == Some(pid)
+                })
+                .map(|s| s.id.clone())
+                .collect();
+            for id in to_remove {
+                submissions.remove(&id);
             }
         }
 
