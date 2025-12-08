@@ -411,6 +411,7 @@ function resetGame() {
   }
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: Called from onclick in host.html
 function clearPromptPool() {
   if (
     confirm(
