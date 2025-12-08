@@ -180,6 +180,21 @@ pub async fn handle_message(
             check_host!(role, "remove players");
             host::handle_remove_player(state, player_id).await
         }
+
+        ClientMessage::HostQueuePrompt { prompt_id } => {
+            check_host!(role, "queue prompts");
+            host::handle_queue_prompt(state, prompt_id).await
+        }
+
+        ClientMessage::HostUnqueuePrompt { prompt_id } => {
+            check_host!(role, "unqueue prompts");
+            host::handle_unqueue_prompt(state, prompt_id).await
+        }
+
+        ClientMessage::PromptVote {
+            voter_token,
+            prompt_id,
+        } => audience::handle_prompt_vote(state, voter_token, prompt_id).await,
     }
 }
 
@@ -220,9 +235,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_phase_transition() {
+        use crate::types::PromptSource;
         let state = Arc::new(AppState::new());
         state.create_game().await;
         let role = Role::Host;
+
+        // Queue 2 prompts so we stay in PromptSelection (1 prompt auto-advances to Writing)
+        let prompt1 = state
+            .add_prompt_to_pool(Some("Test 1".to_string()), None, PromptSource::Host, None)
+            .await
+            .unwrap();
+        let prompt2 = state
+            .add_prompt_to_pool(Some("Test 2".to_string()), None, PromptSource::Host, None)
+            .await
+            .unwrap();
+        state.queue_prompt(&prompt1.id).await.unwrap();
+        state.queue_prompt(&prompt2.id).await.unwrap();
 
         let result = handle_message(
             ClientMessage::HostTransitionPhase {
@@ -243,12 +271,25 @@ mod tests {
 
     #[tokio::test]
     async fn test_reset_game() {
+        use crate::types::PromptSource;
         let state = Arc::new(AppState::new());
         state.create_game().await;
         let role = Role::Host;
 
         // Create some players
         handle_message(ClientMessage::HostCreatePlayers { count: 3 }, &role, &state).await;
+
+        // Queue 2 prompts so we can transition to PromptSelection
+        let prompt1 = state
+            .add_prompt_to_pool(Some("Test 1".to_string()), None, PromptSource::Host, None)
+            .await
+            .unwrap();
+        let prompt2 = state
+            .add_prompt_to_pool(Some("Test 2".to_string()), None, PromptSource::Host, None)
+            .await
+            .unwrap();
+        state.queue_prompt(&prompt1.id).await.unwrap();
+        state.queue_prompt(&prompt2.id).await.unwrap();
 
         // Transition to a different phase
         state

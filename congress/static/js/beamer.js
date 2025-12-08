@@ -13,6 +13,8 @@ const gameState = {
   currentRevealSubmission: null,
   scores: { players: [], audienceTop: [] },
   voteCounts: { ai: {}, funny: {} },
+  promptCandidates: [], // Prompts for voting during PROMPT_SELECTION
+  promptVoteCounts: {}, // Vote counts per prompt during PROMPT_SELECTION
 };
 
 // Connections and utilities
@@ -124,6 +126,12 @@ function handleMessage(msg) {
     case "deadline_update":
       handleDeadlineUpdate(msg);
       break;
+    case "prompt_candidates":
+      handlePromptCandidates(msg);
+      break;
+    case "beamer_prompt_vote_counts":
+      handlePromptVoteCounts(msg);
+      break;
     case "error":
       console.error("[Beamer] Error:", msg.code, msg.msg);
       break;
@@ -163,6 +171,15 @@ function handlePhaseChange(msg) {
     timer.hide();
   }
 
+  // Update prompt if included in phase message (sent during WRITING transition)
+  if (msg.prompt) {
+    if (!gameState.currentRound) {
+      gameState.currentRound = { selected_prompt: msg.prompt };
+    } else {
+      gameState.currentRound.selected_prompt = msg.prompt;
+    }
+  }
+
   // Clear reveal state when leaving REVEAL phase
   if (previousPhase === "REVEAL" && msg.phase !== "REVEAL") {
     gameState.currentRevealSubmission = null;
@@ -185,8 +202,13 @@ function handleRoundStarted(msg) {
 
 function handlePromptSelected(msg) {
   if (msg.prompt) {
-    // Also update the round state
-    if (gameState.currentRound) {
+    // Initialize currentRound if it doesn't exist (can happen if round was
+    // auto-created during prompt selection and RoundStarted wasn't broadcast)
+    if (!gameState.currentRound) {
+      gameState.currentRound = {
+        selected_prompt: msg.prompt,
+      };
+    } else {
       gameState.currentRound.selected_prompt = msg.prompt;
     }
 
@@ -249,6 +271,17 @@ function handleVoteCounts(msg) {
     funny: msg.funny || {},
   };
   updateVoteBarsAnimated();
+}
+
+function handlePromptCandidates(msg) {
+  gameState.promptCandidates = msg.prompts || [];
+  gameState.promptVoteCounts = {}; // Reset vote counts
+  updatePromptSelectionScene();
+}
+
+function handlePromptVoteCounts(msg) {
+  gameState.promptVoteCounts = msg.counts || {};
+  updatePromptVoteBars();
 }
 
 function handleScores(msg) {
@@ -433,6 +466,67 @@ function updateVoteBarsAnimated() {
     const percent = Math.min((count / funnyTotal) * 100, 100);
     const fill = bar.querySelector(".vote-bar-fill");
     const countEl = bar.querySelector(".vote-bar-count");
+    if (fill) fill.style.width = `${percent}%`;
+    if (countEl) countEl.textContent = count;
+  });
+}
+
+function updatePromptSelectionScene() {
+  const grid = document.getElementById("promptGrid");
+  if (!grid) return;
+
+  const prompts = gameState.promptCandidates;
+
+  if (prompts.length === 0) {
+    grid.innerHTML =
+      '<div class="prompt-card"><div class="prompt-text">Warte auf Prompts...</div></div>';
+    return;
+  }
+
+  // Calculate max votes for percentage
+  const counts = gameState.promptVoteCounts;
+  const maxVotes =
+    Math.max(...Object.values(counts), 1) || prompts.length > 0 ? 1 : 0;
+
+  grid.innerHTML = prompts
+    .map((prompt, idx) => {
+      const voteCount = counts[prompt.id] || 0;
+      const percent = maxVotes > 0 ? (voteCount / maxVotes) * 100 : 0;
+
+      let contentHtml = "";
+      if (prompt.image_url) {
+        contentHtml += `<div class="prompt-image"><img src="${escapeHtml(prompt.image_url)}" alt="Prompt Bild" style="max-height: 150px; border-radius: 8px;"></div>`;
+      }
+      if (prompt.text) {
+        contentHtml += `<div class="prompt-text">${escapeHtml(prompt.text)}</div>`;
+      }
+
+      return `
+        <div class="prompt-card" data-prompt-id="${prompt.id}">
+          <div class="prompt-number">${idx + 1}</div>
+          ${contentHtml}
+          <div class="prompt-vote-bar">
+            <div class="prompt-vote-bar-fill" style="width: ${percent}%"></div>
+            <span class="prompt-vote-count">${voteCount}</span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function updatePromptVoteBars() {
+  const counts = gameState.promptVoteCounts;
+  const maxVotes = Math.max(...Object.values(counts), 1) || 1;
+
+  document.querySelectorAll("#promptGrid .prompt-card").forEach((card) => {
+    const id = card.dataset.promptId;
+    const count = counts[id] || 0;
+    const percent = (count / maxVotes) * 100;
+
+    const fill = card.querySelector(".prompt-vote-bar-fill");
+    const countEl = card.querySelector(".prompt-vote-count");
+
     if (fill) fill.style.width = `${percent}%`;
     if (countEl) countEl.textContent = count;
   });

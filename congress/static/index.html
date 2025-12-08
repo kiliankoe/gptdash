@@ -51,9 +51,9 @@
             <div class="screen" id="waitingScreen">
                 <div class="card">
                     <div class="waiting-content">
-                        <div class="waiting-icon">&#x23F3;</div>
-                        <h3>Warte auf die nächste Runde...</h3>
-                        <p>Schau auf die große Leinwand, während wir vorbereiten!</p>
+                        <div class="waiting-icon" id="waitingIcon">&#x23F3;</div>
+                        <h3 id="waitingTitle">Warte auf die nächste Runde...</h3>
+                        <p id="waitingMessage">Schau auf die große Leinwand!</p>
                     </div>
                 </div>
 
@@ -73,6 +73,44 @@
                         <div id="promptError" class="error-message" style="display: none;"></div>
                         <div id="promptSuccess" class="success-message" style="display: none;">
                             &#x2705; Prompt wurde vorgeschlagen!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prompt Voting Screen -->
+            <div class="screen" id="promptVotingScreen">
+                <div class="card">
+                    <h2>&#x1F4AC; Wähle einen Prompt!</h2>
+                    <p class="text-center mb-16">Für welchen Prompt soll gespielt werden?</p>
+
+                    <div class="prompt-options" id="promptOptions">
+                        <!-- Prompt options will be inserted here -->
+                    </div>
+
+                    <button onclick="submitPromptVote()" id="promptVoteButton" disabled>Abstimmen</button>
+
+                    <div id="promptVoteError" class="error-message" style="display: none;"></div>
+
+                    <div class="help-text">
+                        Stimme für den Prompt ab, der gespielt werden soll!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prompt Vote Confirmed Screen -->
+            <div class="screen" id="promptVoteConfirmedScreen">
+                <div class="card">
+                    <div class="success-content">
+                        <div class="success-icon">&#x2705;</div>
+                        <h3>Stimme abgegeben!</h3>
+                        <p>Deine Prompt-Wahl wurde gespeichert.</p>
+                        <p id="promptVoteSummary" class="text-center" style="margin-top: 10px; font-style: italic;"></p>
+
+                        <button onclick="changePromptVote()" class="secondary">Stimme ändern</button>
+
+                        <div class="help-text">
+                            Warte auf die Auswahl des Gewinners...
                         </div>
                     </div>
                 </div>

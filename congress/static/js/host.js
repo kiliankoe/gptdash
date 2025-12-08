@@ -12,12 +12,15 @@ const gameState = {
   submissions: [],
   revealOrder: [], // Current reveal order (submission IDs)
   prompts: [], // Prompt candidates from audience (filtered by shadowban)
+  queuedPrompts: [], // Prompts queued for next round (max 3)
   scores: { players: [], audience_top: [] },
   validTransitions: [], // Populated by server
   panicMode: false,
   deadline: null,
   selectedAiSubmissionId: null, // Currently selected AI submission
   aiGenerationStatus: "idle", // idle, generating, completed, failed
+  currentRound: null, // Current round info
+  currentPrompt: null, // Currently selected prompt for the round
 };
 
 // Drag-and-drop state
@@ -125,6 +128,8 @@ function handleMessage(message) {
         gameState.players = [];
         gameState.submissions = [];
         gameState.scores = { players: [], audience_top: [] };
+        gameState.currentRound = null;
+        gameState.currentPrompt = null;
         updateUI();
         updatePlayersList();
         updateSubmissionsList();
@@ -149,6 +154,29 @@ function handleMessage(message) {
     case "host_prompts":
       gameState.prompts = message.prompts || [];
       updatePromptsList();
+      break;
+
+    case "host_queued_prompts":
+      gameState.queuedPrompts = message.prompts || [];
+      updateQueuedPromptsList();
+      updatePromptsList(); // Update pool to show queue status
+      break;
+
+    case "round_started":
+      gameState.currentRound = message.round;
+      gameState.roundNo = message.round.number;
+      if (message.round.selected_prompt) {
+        gameState.currentPrompt = message.round.selected_prompt;
+      }
+      updateCurrentRoundInfo();
+      updateUI();
+      log(`Runde ${message.round.number} gestartet`, "info");
+      break;
+
+    case "prompt_selected":
+      gameState.currentPrompt = message.prompt;
+      updateCurrentRoundInfo();
+      showAlert("Prompt ausgewählt - Runde wird vorbereitet", "success");
       break;
 
     case "player_removed":
@@ -198,6 +226,37 @@ function updateUI() {
 
   // Update phase transition buttons
   updatePhaseButtons();
+
+  // Update current round info
+  updateCurrentRoundInfo();
+}
+
+function updateCurrentRoundInfo() {
+  const container = document.getElementById("currentRoundInfo");
+  if (!container) return;
+
+  if (!gameState.currentPrompt) {
+    container.innerHTML =
+      '<p style="opacity: 0.6;">Keine aktive Runde. Wähle einen Prompt aus dem "Prompts"-Panel aus, um eine neue Runde zu starten.</p>';
+    return;
+  }
+
+  const prompt = gameState.currentPrompt;
+  let html = `<div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">`;
+  html += `<div style="font-size: 0.9em; opacity: 0.7; margin-bottom: 5px;">Runde ${gameState.roundNo} - Aktueller Prompt:</div>`;
+
+  if (prompt.image_url) {
+    html += `<img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" style="max-width: 100%; max-height: 150px; border-radius: 4px; margin-bottom: 8px;">`;
+  }
+
+  if (prompt.text) {
+    html += `<div style="font-size: 1.1em; font-weight: 500;">${escapeHtml(prompt.text)}</div>`;
+  } else if (prompt.image_url) {
+    html += `<div style="font-style: italic; opacity: 0.7;">(Nur Bild)</div>`;
+  }
+
+  html += `</div>`;
+  container.innerHTML = html;
 }
 
 /**
@@ -681,9 +740,12 @@ function updatePromptsList() {
 
   if (gameState.prompts.length === 0) {
     container.innerHTML =
-      '<p style="opacity: 0.6;">Keine Prompts von Publikum verfügbar</p>';
+      '<p style="opacity: 0.6;">Keine Prompts verfügbar</p>';
     return;
   }
+
+  // Get IDs of queued prompts
+  const queuedIds = gameState.queuedPrompts.map((p) => p.id);
 
   gameState.prompts.forEach((prompt) => {
     const div = document.createElement("div");
@@ -695,6 +757,8 @@ function updatePromptsList() {
       : "";
     const hasImage = !!prompt.image_url;
     const hasText = !!prompt.text;
+    const isQueued = queuedIds.includes(prompt.id);
+    const queueFull = gameState.queuedPrompts.length >= 3;
 
     // Build content based on what's available
     let contentHtml = "";
@@ -708,20 +772,109 @@ function updatePromptsList() {
       contentHtml = '<div class="prompt-text">(Leerer Prompt)</div>';
     }
 
+    // Queue button: disabled if already queued or queue is full
+    let queueBtn;
+    if (isQueued) {
+      queueBtn = `<button class="secondary" disabled>✓ In Warteschlange</button>`;
+    } else if (queueFull) {
+      queueBtn = `<button class="secondary" disabled title="Maximal 3 Prompts">Warteschlange voll</button>`;
+    } else {
+      queueBtn = `<button class="secondary" onclick="queuePrompt('${prompt.id}')">+ Warteschlange</button>`;
+    }
+
     div.innerHTML = `
       <div class="prompt-header">
         <span class="prompt-id">${prompt.id.substring(0, 12)}...</span>
         <span class="badge ${isAudience ? "audience" : "host"}">${isAudience ? "Publikum" : "Host"}</span>
         ${hasImage ? '<span class="badge multimodal">Bild</span>' : ""}
+        ${isQueued ? '<span class="badge queued">Queued</span>' : ""}
         ${shortId ? `<span class="submitter-id" title="${escapeHtml(prompt.submitter_id)}">${shortId}</span>` : ""}
       </div>
       ${contentHtml}
       <div class="prompt-actions">
-        <button class="secondary" onclick="selectPromptById('${prompt.id}')">Auswählen</button>
+        ${queueBtn}
         ${isAudience && prompt.submitter_id ? `<button class="danger" onclick="shadowbanAudience('${prompt.submitter_id}')" title="Diesen Nutzer shadowbannen (ignoriert zukünftige Prompts)">🚫 Shadowban</button>` : ""}
       </div>
     `;
     container.appendChild(div);
+  });
+}
+
+function updateQueuedPromptsList() {
+  const container = document.getElementById("queuedPromptsList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  // Always update start button visibility first
+  const startBtn = document.getElementById("startPromptSelectionBtn");
+  if (startBtn) {
+    startBtn.style.display =
+      gameState.queuedPrompts.length > 0 ? "block" : "none";
+    const count = gameState.queuedPrompts.length;
+    if (count === 1) {
+      startBtn.textContent = "▶ Runde starten (1 Prompt → direkt zu Schreiben)";
+    } else if (count > 1) {
+      startBtn.textContent = `▶ Prompt-Voting starten (${count} Prompts)`;
+    }
+  }
+
+  if (gameState.queuedPrompts.length === 0) {
+    container.innerHTML =
+      '<p style="opacity: 0.6;">Keine Prompts in der Warteschlange. Wähle Prompts aus dem Pool.</p>';
+    return;
+  }
+
+  gameState.queuedPrompts.forEach((prompt, idx) => {
+    const div = document.createElement("div");
+    div.className = "prompt-card queued";
+
+    const hasImage = !!prompt.image_url;
+    const hasText = !!prompt.text;
+
+    let contentHtml = "";
+    if (hasImage) {
+      contentHtml += `<div class="prompt-image"><img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" style="max-width: 150px; max-height: 100px; border-radius: 4px;"></div>`;
+    }
+    if (hasText) {
+      contentHtml += `<div class="prompt-text">${escapeHtml(prompt.text)}</div>`;
+    }
+
+    div.innerHTML = `
+      <div class="prompt-header">
+        <span class="queue-number">#${idx + 1}</span>
+        ${hasImage ? '<span class="badge multimodal">Bild</span>' : ""}
+      </div>
+      ${contentHtml}
+      <div class="prompt-actions">
+        <button class="danger small" onclick="unqueuePrompt('${prompt.id}')">Entfernen</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function queuePrompt(promptId) {
+  wsConn.send({
+    t: "host_queue_prompt",
+    prompt_id: promptId,
+  });
+}
+
+function unqueuePrompt(promptId) {
+  wsConn.send({
+    t: "host_unqueue_prompt",
+    prompt_id: promptId,
+  });
+}
+
+function startPromptSelection() {
+  if (gameState.queuedPrompts.length === 0) {
+    showAlert("Keine Prompts in der Warteschlange", "warning");
+    return;
+  }
+  wsConn.send({
+    t: "host_transition_phase",
+    phase: "PROMPT_SELECTION",
   });
 }
 
@@ -1235,6 +1388,9 @@ if (typeof window !== "undefined") {
     addPrompt,
     selectPrompt,
     selectPromptById,
+    queuePrompt,
+    unqueuePrompt,
+    startPromptSelection,
     setAiSubmission,
     setRevealOrder,
     resetGame,

@@ -97,6 +97,19 @@ pub enum ClientMessage {
         submission_id: SubmissionId,
         new_text: String,
     },
+    /// Queue a prompt for the next round (host only, max 3)
+    HostQueuePrompt {
+        prompt_id: PromptId,
+    },
+    /// Unqueue a prompt (move back to pool)
+    HostUnqueuePrompt {
+        prompt_id: PromptId,
+    },
+    /// Vote for a prompt during PROMPT_SELECTION phase (audience)
+    PromptVote {
+        voter_token: String,
+        prompt_id: PromptId,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -122,6 +135,9 @@ pub enum ServerMessage {
         server_now: String,
         deadline: Option<String>,
         valid_transitions: Vec<GamePhase>,
+        /// Current prompt (included when transitioning to WRITING so clients always have it)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        prompt: Option<Prompt>,
     },
     Submissions {
         list: Vec<SubmissionInfo>,
@@ -168,6 +184,9 @@ pub enum ServerMessage {
         display_name: Option<String>,
         has_submitted: bool,
         current_submission: Option<SubmissionInfo>,
+        /// Current prompt (included during WRITING phase for state recovery)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        current_prompt: Option<Prompt>,
     },
     /// Sent to audience on reconnect with their current vote
     AudienceState {
@@ -214,6 +233,20 @@ pub enum ServerMessage {
     PlayerRemoved {
         player_id: PlayerId,
     },
+    /// Queued prompts sent to host (prompts ready for PROMPT_SELECTION)
+    HostQueuedPrompts {
+        prompts: Vec<HostPromptInfo>,
+    },
+    /// Prompt candidates for voting (sent to all during PROMPT_SELECTION)
+    PromptCandidates {
+        prompts: Vec<Prompt>,
+    },
+    /// Prompt vote counts for beamer during PROMPT_SELECTION
+    BeamerPromptVoteCounts {
+        counts: HashMap<PromptId, u32>,
+    },
+    /// Acknowledge a prompt vote
+    PromptVoteAck,
     Error {
         code: String,
         msg: String,

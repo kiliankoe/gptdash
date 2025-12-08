@@ -80,6 +80,10 @@ function handleMessage(message) {
       playerId = message.player_id;
       playerName = message.display_name;
       hasSubmitted = message.has_submitted;
+      // Recover prompt from state if available
+      if (message.current_prompt) {
+        currentPrompt = message.current_prompt;
+      }
 
       if (playerName) {
         // Player is registered, go to appropriate screen
@@ -111,6 +115,10 @@ function handleMessage(message) {
         playerTimer.hide();
         const timerEl = document.getElementById("playerTimer");
         if (timerEl) timerEl.textContent = "--:--";
+      }
+      // Update prompt if included in phase message (sent during WRITING transition)
+      if (message.prompt) {
+        currentPrompt = message.prompt;
       }
       updateScreen(message.phase);
       break;

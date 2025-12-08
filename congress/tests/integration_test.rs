@@ -76,25 +76,7 @@ async fn test_full_game_flow() {
         _ => panic!("Expected PlayerRegistered message for Bob"),
     }
 
-    // 4. Transition to PromptSelection
-    let phase_result = handle_message(
-        ClientMessage::HostTransitionPhase {
-            phase: GamePhase::PromptSelection,
-        },
-        &host_role,
-        &state,
-    )
-    .await;
-
-    // Phase transitions now return Phase message instead of GameState
-    match phase_result {
-        Some(ServerMessage::Phase { phase, .. }) => {
-            assert_eq!(phase, GamePhase::PromptSelection);
-        }
-        _ => panic!("Expected Phase message"),
-    }
-
-    // 5. Start round
+    // 4. Start round (from Lobby)
     let start_round_result =
         handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
 
@@ -106,7 +88,7 @@ async fn test_full_game_flow() {
         _ => panic!("Expected RoundStarted message"),
     };
 
-    // 6. Add and select prompt
+    // 5. Add and select prompt
     let prompt = state
         .add_prompt_to_pool(
             Some("What is the meaning of life?".to_string()),
@@ -133,7 +115,7 @@ async fn test_full_game_flow() {
         _ => panic!("Expected PromptSelected message"),
     }
 
-    // 7. Transition to Writing phase
+    // 6. Transition to Writing phase (directly from Lobby)
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,

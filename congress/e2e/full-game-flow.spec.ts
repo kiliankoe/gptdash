@@ -221,17 +221,9 @@ test.describe("Full Game Flow", () => {
     await audience[1].waitForSelector("#waitingScreen.active");
 
     // ============================================
-    // STEP 5: Host starts round and adds prompt
+    // STEP 5: Host adds and queues prompt
     // ============================================
-    console.log("Step 5: Starting round and adding prompt...");
-
-    // Navigate to game control
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-
-    // Start round first (required before adding prompts)
-    await host.click('button:has-text("Neue Runde starten")');
-    await host.waitForTimeout(500);
+    console.log("Step 5: Adding and queueing prompt...");
 
     // Navigate to prompts panel
     await host.click('.sidebar-item:has-text("Prompts")');
@@ -247,27 +239,27 @@ test.describe("Full Game Flow", () => {
     // Wait for prompt to appear in the list
     await host.waitForSelector(".prompt-card");
 
-    // Select the prompt from the pool (click the "Auswählen" button)
-    await host.click('.prompt-card button:has-text("Auswählen")');
-    await host.waitForTimeout(500);
+    // Queue the prompt (new flow: queue -> start -> auto-advance to WRITING)
+    await host.click('.prompt-card button:has-text("+ Warteschlange")');
+
+    // Wait for start button to become visible (triggered by server response)
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
 
     // ============================================
-    // STEP 6: Host transitions to writing (via PROMPT_SELECTION)
+    // STEP 6: Host starts prompt selection (auto-advances to WRITING with 1 prompt)
     // ============================================
-    console.log("Step 6: Transitioning to writing...");
+    console.log(
+      "Step 6: Starting prompt selection (will auto-advance to WRITING)...",
+    );
 
-    // Navigate to game control
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
+    // Click the start button to begin prompt selection
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
 
-    // First transition to PROMPT_SELECTION (required from LOBBY)
-    await host.click('button[data-phase="PROMPT_SELECTION"]');
-    await host.waitForTimeout(500);
-
-    // Now transition to WRITING (prompt is already selected)
-    await host.click('button[data-phase="WRITING"]');
-
-    // Wait for phase change
+    // Wait for phase change - should auto-advance to WRITING since only 1 prompt
     await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
       timeout: 5000,
     });
@@ -554,12 +546,6 @@ test.describe("Full Game Flow", () => {
     await host.click('#players button:has-text("Spieler erstellen")');
     await host.waitForSelector("#playerTokensList .token");
 
-    // Start round first (required before adding prompts)
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('#game button:has-text("Neue Runde starten")');
-    await host.waitForTimeout(500);
-
     // Add prompt to pool
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
@@ -567,29 +553,28 @@ test.describe("Full Game Flow", () => {
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForSelector(".prompt-card");
 
-    // Select the prompt from the pool
-    await host.click('.prompt-card button:has-text("Auswählen")');
-    await host.waitForTimeout(500);
+    // Queue the prompt
+    await host.click('.prompt-card button:has-text("+ Warteschlange")');
 
-    // Go back to game control
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-
-    // First transition to PROMPT_SELECTION (required from LOBBY)
-    await host.click('button[data-phase="PROMPT_SELECTION"]');
-    await host.waitForTimeout(500);
-
-    // Now WRITING should be enabled
-    await host.waitForSelector('button[data-phase="WRITING"]:not([disabled])', {
+    // Wait for start button to become visible (triggered by server response)
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
       timeout: 5000,
     });
 
-    // WRITING
-    await host.click('button[data-phase="WRITING"]');
+    // Start prompt selection (auto-advances to WRITING with 1 prompt)
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
+
+    // WRITING - should auto-advance since only 1 prompt
     await waitForBeamerScene(beamer, "sceneWriting");
 
     // Note: REVEAL, VOTING, and RESULTS require submissions/votes
     // Testing those phases in the full game flow test instead
+
+    // Navigate to Game Control panel for phase transition buttons
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
 
     // INTERMISSION (from writing)
     await host.click('button[data-phase="INTERMISSION"]');
@@ -674,25 +659,23 @@ test.describe("Full Game Flow", () => {
     await audience[0].click("#joinButton");
     await audience[0].waitForSelector("#waitingScreen.active");
 
-    // Start round and add prompt
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button:has-text("Neue Runde starten")');
-    await host.waitForTimeout(500);
-
+    // Add prompt
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Panic mode test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("Auswählen")');
-    await host.waitForTimeout(500);
+    await host.click('.prompt-card button:has-text("+ Warteschlange")');
 
-    // Transition to WRITING
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.click('button[data-phase="PROMPT_SELECTION"]');
-    await host.waitForTimeout(500);
-    await host.click('button[data-phase="WRITING"]');
+    // Wait for start button to become visible (triggered by server response)
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+
+    // Start prompt selection (auto-advances to WRITING with 1 prompt)
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
     await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
       timeout: 5000,
     });
@@ -836,25 +819,23 @@ test.describe("Full Game Flow", () => {
     await players[1].click("#registerButton");
     await players[1].waitForSelector("#waitingScreen.active");
 
-    // Start round and add prompt
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button:has-text("Neue Runde starten")');
-    await host.waitForTimeout(500);
-
+    // Add prompt
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Duplicate detection test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("Auswählen")');
-    await host.waitForTimeout(500);
+    await host.click('.prompt-card button:has-text("+ Warteschlange")');
 
-    // Transition to WRITING
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.click('button[data-phase="PROMPT_SELECTION"]');
-    await host.waitForTimeout(500);
-    await host.click('button[data-phase="WRITING"]');
+    // Wait for start button to become visible (triggered by server response)
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+
+    // Start prompt selection (auto-advances to WRITING with 1 prompt)
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
     await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
       timeout: 5000,
     });
@@ -1013,25 +994,23 @@ test.describe("Full Game Flow", () => {
     await players[0].click("#registerButton");
     await players[0].waitForSelector("#waitingScreen.active");
 
-    // Start round and add prompt
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button:has-text("Neue Runde starten")');
-    await host.waitForTimeout(500);
-
+    // Add prompt
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Typo correction test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("Auswählen")');
-    await host.waitForTimeout(500);
+    await host.click('.prompt-card button:has-text("+ Warteschlange")');
 
-    // Transition to WRITING
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.click('button[data-phase="PROMPT_SELECTION"]');
-    await host.waitForTimeout(500);
-    await host.click('button[data-phase="WRITING"]');
+    // Wait for start button to become visible (triggered by server response)
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+
+    // Start prompt selection (auto-advances to WRITING with 1 prompt)
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
     await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
       timeout: 5000,
     });
@@ -1201,24 +1180,23 @@ test.describe("Full Game Flow", () => {
       host.locator('.player-name:has-text("StatusTestBob")'),
     ).toBeVisible();
 
-    // Start round and setup prompt
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button:has-text("Neue Runde starten")');
-    await host.waitForTimeout(500);
-
+    // Add prompt
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Status test prompt");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("Auswählen")');
-    await host.waitForTimeout(500);
+    await host.click('.prompt-card button:has-text("+ Warteschlange")');
 
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.click('button[data-phase="PROMPT_SELECTION"]');
-    await host.waitForTimeout(500);
-    await host.click('button[data-phase="WRITING"]');
+    // Wait for start button to become visible (triggered by server response)
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+
+    // Start prompt selection (auto-advances to WRITING with 1 prompt)
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
     await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
       timeout: 5000,
     });
@@ -1329,25 +1307,23 @@ test.describe("Full Game Flow", () => {
     await audience[0].click("#joinButton");
     await audience[0].waitForSelector("#waitingScreen.active");
 
-    // Start round and add prompt
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button:has-text("Neue Runde starten")');
-    await host.waitForTimeout(500);
-
+    // Add prompt
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Remove player test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("Auswählen")');
-    await host.waitForTimeout(500);
+    await host.click('.prompt-card button:has-text("+ Warteschlange")');
 
-    // Transition to WRITING
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.click('button[data-phase="PROMPT_SELECTION"]');
-    await host.waitForTimeout(500);
-    await host.click('button[data-phase="WRITING"]');
+    // Wait for start button to become visible (triggered by server response)
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+
+    // Start prompt selection (auto-advances to WRITING with 1 prompt)
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
     await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
       timeout: 5000,
     });
@@ -1544,25 +1520,23 @@ test.describe("Full Game Flow", () => {
     await players[0].click("#registerButton");
     await players[0].waitForSelector("#waitingScreen.active");
 
-    // Start round and setup
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button:has-text("Neue Runde starten")');
-    await host.waitForTimeout(500);
-
+    // Add prompt
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Add player mid-round test");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("Auswählen")');
-    await host.waitForTimeout(500);
+    await host.click('.prompt-card button:has-text("+ Warteschlange")');
 
-    // Transition to WRITING
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.click('button[data-phase="PROMPT_SELECTION"]');
-    await host.waitForTimeout(500);
-    await host.click('button[data-phase="WRITING"]');
+    // Wait for start button to become visible (triggered by server response)
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+
+    // Start prompt selection (auto-advances to WRITING with 1 prompt)
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
     await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
       timeout: 5000,
     });
@@ -1697,12 +1671,6 @@ test.describe("Full Game Flow", () => {
     await beamer.goto("/beamer.html");
     await waitForConnection(beamer);
 
-    // Navigate to game control and start round
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button:has-text("Neue Runde starten")');
-    await host.waitForTimeout(500);
-
     // ============================================
     // TEST: Add multimodal prompt with image URL
     // ============================================
@@ -1721,19 +1689,20 @@ test.describe("Full Game Flow", () => {
     await host.waitForSelector("#promptImageUrl", { state: "visible" });
     await host.fill("#promptImageUrl", imageUrl);
 
-    // Add prompt to pool and select it
+    // Add prompt to pool and queue it
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("Auswählen")');
-    await host.waitForTimeout(500);
+    await host.click('.prompt-card button:has-text("+ Warteschlange")');
 
-    // Transition to Writing phase (via PROMPT_SELECTION first)
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button[data-phase="PROMPT_SELECTION"]');
-    await host.waitForTimeout(500);
-    await host.click('button[data-phase="WRITING"]');
-    await host.waitForTimeout(500);
+    // Wait for start button to become visible (triggered by server response)
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+
+    // Start prompt selection (auto-advances to WRITING with 1 prompt)
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
 
     // ============================================
     // VERIFY: Beamer shows the image in writing scene
@@ -1812,12 +1781,6 @@ test.describe("Full Game Flow", () => {
     await beamer.goto("/beamer.html");
     await waitForConnection(beamer);
 
-    // Navigate to game control and start round
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button:has-text("Neue Runde starten")');
-    await host.waitForTimeout(500);
-
     // ============================================
     // TEST: Add image-only prompt (no text)
     // ============================================
@@ -1836,19 +1799,20 @@ test.describe("Full Game Flow", () => {
       "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
     await host.fill("#promptImageUrl", imageUrl);
 
-    // Add prompt to pool and select it
+    // Add prompt to pool and queue it
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("Auswählen")');
-    await host.waitForTimeout(500);
+    await host.click('.prompt-card button:has-text("+ Warteschlange")');
 
-    // Transition to Writing phase (via PROMPT_SELECTION first)
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button[data-phase="PROMPT_SELECTION"]');
-    await host.waitForTimeout(500);
-    await host.click('button[data-phase="WRITING"]');
-    await host.waitForTimeout(500);
+    // Wait for start button to become visible (triggered by server response)
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+
+    // Start prompt selection (auto-advances to WRITING with 1 prompt)
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
 
     // ============================================
     // VERIFY: Beamer shows the image
@@ -1908,12 +1872,6 @@ test.describe("Full Game Flow", () => {
     await players[0].click("#registerButton");
     await players[0].waitForSelector("#waitingScreen.active");
 
-    // Start round
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button:has-text("Neue Runde starten")');
-    await host.waitForTimeout(500);
-
     // Add multiple prompts to test list restoration
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
@@ -1930,23 +1888,25 @@ test.describe("Full Game Flow", () => {
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
     await host.waitForTimeout(300);
 
-    // Verify prompts are listed before reload
-    const promptsBeforeReload = host.locator(".prompt-card");
+    // Verify prompts are listed before reload (pool prompts only, not queued)
+    const promptsBeforeReload = host.locator("#promptsList .prompt-card");
     await expect(promptsBeforeReload).toHaveCount(3);
 
-    // Select the first prompt (required before transitioning to WRITING)
-    await host.click('.prompt-card button:has-text("Auswählen")');
-    await host.waitForTimeout(500);
+    // Queue the first prompt
+    await host.click('#promptsList .prompt-card button:has-text("+ Warteschlange")');
 
-    // Now we should have 2 prompts left in the pool (3 - 1 selected)
-    await expect(host.locator(".prompt-card")).toHaveCount(2);
+    // Wait for start button to become visible (indicates queue operation completed)
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
 
-    // Transition to WRITING phase so players can submit
-    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.waitForSelector("#game.active");
-    await host.click('button[data-phase="PROMPT_SELECTION"]');
-    await host.waitForTimeout(500);
-    await host.click('button[data-phase="WRITING"]');
+    // Now we should have 2 prompts left in the pool (3 - 1 queued)
+    await expect(host.locator("#promptsList .prompt-card")).toHaveCount(2);
+
+    // Start prompt selection (auto-advances to WRITING with 1 prompt)
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
     await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
       timeout: 5000,
     });
@@ -1993,21 +1953,23 @@ test.describe("Full Game Flow", () => {
     await host.waitForSelector("#prompts.active");
 
     // Should still have 2 prompts in the pool (the first one was selected and assigned to the round)
-    const promptsAfterReload = host.locator(".prompt-card");
+    const promptsAfterReload = host.locator("#promptsList .prompt-card");
     await expect(promptsAfterReload).toHaveCount(2, { timeout: 5000 });
 
     // Verify prompt content is preserved (Second and Third prompts remain in pool)
     await expect(
-      host.locator('.prompt-card:has-text("Second test prompt")'),
+      host.locator('#promptsList .prompt-card:has-text("Second test prompt")'),
     ).toBeVisible();
     await expect(
-      host.locator('.prompt-card:has-text("Third test prompt")'),
+      host.locator('#promptsList .prompt-card:has-text("Third test prompt")'),
     ).toBeVisible();
 
     // ============================================
     // VERIFY: Submissions list is restored after reload
     // ============================================
-    console.log("Host state restoration test: Verifying submissions restored...");
+    console.log(
+      "Host state restoration test: Verifying submissions restored...",
+    );
 
     await host.click('.sidebar-item:has-text("Antworten")');
     await host.waitForSelector("#submissions.active");
@@ -2021,13 +1983,17 @@ test.describe("Full Game Flow", () => {
 
     // Verify submission content is preserved
     await expect(
-      host.locator(".submission-card:has-text('Test answer for state restoration')"),
+      host.locator(
+        ".submission-card:has-text('Test answer for state restoration')",
+      ),
     ).toBeVisible();
 
     // ============================================
     // VERIFY: Player status is restored after reload
     // ============================================
-    console.log("Host state restoration test: Verifying player status restored...");
+    console.log(
+      "Host state restoration test: Verifying player status restored...",
+    );
 
     await host.click('.sidebar-item:has-text("Spieler")');
     await host.waitForSelector("#players.active");
@@ -2043,7 +2009,9 @@ test.describe("Full Game Flow", () => {
     // ============================================
     // VERIFY: Game phase is restored after reload
     // ============================================
-    console.log("Host state restoration test: Verifying game phase restored...");
+    console.log(
+      "Host state restoration test: Verifying game phase restored...",
+    );
 
     // Phase should still be WRITING
     await expect(host.locator("#overviewPhase")).toHaveText("WRITING");

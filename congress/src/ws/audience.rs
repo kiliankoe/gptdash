@@ -82,3 +82,45 @@ pub async fn handle_submit_prompt(
         }),
     }
 }
+
+pub async fn handle_prompt_vote(
+    state: &Arc<AppState>,
+    voter_token: String,
+    prompt_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Prompt vote: {} for {}", voter_token, prompt_id);
+
+    // Check we're in PROMPT_SELECTION phase
+    let game = state.get_game().await;
+    if let Some(game) = game {
+        if game.phase != crate::types::GamePhase::PromptSelection {
+            return Some(ServerMessage::Error {
+                code: "WRONG_PHASE".to_string(),
+                msg: "Prompt voting only available during prompt selection".to_string(),
+            });
+        }
+    } else {
+        return Some(ServerMessage::Error {
+            code: "NO_GAME".to_string(),
+            msg: "No active game".to_string(),
+        });
+    }
+
+    // Check if shadowbanned
+    if state.is_shadowbanned(&voter_token).await {
+        tracing::info!(
+            "Shadowbanned voter {} tried to vote on prompt, silently ignoring",
+            voter_token
+        );
+        return Some(ServerMessage::PromptVoteAck);
+    }
+
+    // Record the vote
+    match state.record_prompt_vote(&voter_token, &prompt_id).await {
+        Ok(_) => Some(ServerMessage::PromptVoteAck),
+        Err(e) => Some(ServerMessage::Error {
+            code: "PROMPT_VOTE_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}

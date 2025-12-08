@@ -33,17 +33,28 @@ pub async fn handle_transition_phase(
     phase: crate::types::GamePhase,
 ) -> Option<ServerMessage> {
     tracing::info!("Host transitioning to phase: {:?}", phase);
-    match state.transition_phase(phase).await {
-        Ok(_) => state.get_game().await.map(|game| {
+    match state.transition_phase(phase.clone()).await {
+        Ok(_) => {
+            let game = state.get_game().await?;
             let valid_transitions = AppState::get_valid_transitions(&game.phase);
-            ServerMessage::Phase {
+            // Include prompt when transitioning to WRITING so host has it
+            let prompt = if game.phase == crate::types::GamePhase::Writing {
+                state
+                    .get_current_round()
+                    .await
+                    .and_then(|r| r.selected_prompt)
+            } else {
+                None
+            };
+            Some(ServerMessage::Phase {
                 phase: game.phase,
                 round_no: game.round_no,
                 server_now: chrono::Utc::now().to_rfc3339(),
                 deadline: game.phase_deadline,
                 valid_transitions,
-            }
-        }),
+                prompt,
+            })
+        }
         Err(e) => Some(ServerMessage::Error {
             code: "TRANSITION_FAILED".to_string(),
             msg: e,
@@ -69,13 +80,13 @@ pub async fn handle_select_prompt(
     tracing::info!("Host selecting prompt: {}", prompt_id);
 
     // Ensure we have a round to select the prompt for
-    let round = match state.get_current_round().await {
+    let (round, is_new_round) = match state.get_current_round().await {
         Some(r) => {
             // Check if round is in Setup state, if not start a new one
             if r.state != crate::types::RoundState::Setup {
                 tracing::info!("Current round not in Setup state, starting new round");
                 match state.start_round().await {
-                    Ok(new_round) => new_round,
+                    Ok(new_round) => (new_round, true),
                     Err(e) => {
                         return Some(ServerMessage::Error {
                             code: "PROMPT_SELECT_FAILED".to_string(),
@@ -84,14 +95,14 @@ pub async fn handle_select_prompt(
                     }
                 }
             } else {
-                r
+                (r, false)
             }
         }
         None => {
             // No round exists, create one
             tracing::info!("No current round, creating one for prompt selection");
             match state.start_round().await {
-                Ok(new_round) => new_round,
+                Ok(new_round) => (new_round, true),
                 Err(e) => {
                     return Some(ServerMessage::Error {
                         code: "PROMPT_SELECT_FAILED".to_string(),
@@ -101,6 +112,13 @@ pub async fn handle_select_prompt(
             }
         }
     };
+
+    // If we created a new round, broadcast it to all clients
+    if is_new_round {
+        state.broadcast_to_all(ServerMessage::RoundStarted {
+            round: round.clone(),
+        });
+    }
 
     // Select prompt from pool (removes it from pool)
     match state.select_prompt(&round.id, &prompt_id).await {
@@ -499,6 +517,46 @@ pub async fn handle_remove_player(
         }
         Err(e) => Some(ServerMessage::Error {
             code: "REMOVE_PLAYER_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_queue_prompt(
+    state: &Arc<AppState>,
+    prompt_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host queuing prompt: {}", prompt_id);
+
+    match state.queue_prompt(&prompt_id).await {
+        Ok(_prompt) => {
+            // Broadcast updated pool and queue to host
+            state.broadcast_prompts_to_host().await;
+            state.broadcast_queued_prompts_to_host().await;
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "QUEUE_PROMPT_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_unqueue_prompt(
+    state: &Arc<AppState>,
+    prompt_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host unqueuing prompt: {}", prompt_id);
+
+    match state.unqueue_prompt(&prompt_id).await {
+        Ok(_prompt) => {
+            // Broadcast updated pool and queue to host
+            state.broadcast_prompts_to_host().await;
+            state.broadcast_queued_prompts_to_host().await;
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "UNQUEUE_PROMPT_FAILED".to_string(),
             msg: e,
         }),
     }

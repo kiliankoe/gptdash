@@ -31,6 +31,10 @@ pub struct AppState {
     pub shadowbanned_audience: Arc<RwLock<HashSet<VoterId>>>,
     /// Global prompt pool - persists across rounds and game resets
     pub prompt_pool: Arc<RwLock<Vec<Prompt>>>,
+    /// Queued prompts for the next round (1-3 max, host selects from pool)
+    pub queued_prompts: Arc<RwLock<Vec<Prompt>>>,
+    /// Audience votes on which queued prompt to use (voter_id -> prompt_id)
+    pub prompt_votes: Arc<RwLock<HashMap<VoterId, PromptId>>>,
     /// LLM manager for generating AI answers
     pub llm: Option<Arc<LlmManager>>,
     /// LLM configuration (timeout, max tokens, etc.)
@@ -63,6 +67,8 @@ impl AppState {
             player_status: Arc::new(RwLock::new(HashMap::new())),
             shadowbanned_audience: Arc::new(RwLock::new(HashSet::new())),
             prompt_pool: Arc::new(RwLock::new(Vec::new())),
+            queued_prompts: Arc::new(RwLock::new(Vec::new())),
+            prompt_votes: Arc::new(RwLock::new(HashMap::new())),
             llm: llm.map(Arc::new),
             llm_config,
             broadcast: broadcast_tx,
@@ -172,6 +178,176 @@ impl AppState {
             .iter()
             .find(|p| p.id == prompt_id)
             .cloned()
+    }
+
+    // =========================================================================
+    // Queued Prompts Management (for PROMPT_SELECTION phase)
+    // =========================================================================
+
+    /// Queue a prompt for the next round (move from pool to queue)
+    /// Max 3 prompts can be queued at a time
+    pub async fn queue_prompt(&self, prompt_id: &str) -> Result<Prompt, String> {
+        // Check if already at max
+        let queue_len = self.queued_prompts.read().await.len();
+        if queue_len >= 3 {
+            return Err("Maximum 3 prompts can be queued".to_string());
+        }
+
+        // Check if already queued
+        if self
+            .queued_prompts
+            .read()
+            .await
+            .iter()
+            .any(|p| p.id == prompt_id)
+        {
+            return Err("Prompt already queued".to_string());
+        }
+
+        // Remove from pool and add to queue
+        let prompt = self
+            .remove_prompt_from_pool(prompt_id)
+            .await
+            .ok_or_else(|| "Prompt not found in pool".to_string())?;
+
+        self.queued_prompts.write().await.push(prompt.clone());
+        Ok(prompt)
+    }
+
+    /// Unqueue a prompt (move from queue back to pool)
+    pub async fn unqueue_prompt(&self, prompt_id: &str) -> Result<Prompt, String> {
+        let mut queue = self.queued_prompts.write().await;
+        let pos = queue
+            .iter()
+            .position(|p| p.id == prompt_id)
+            .ok_or_else(|| "Prompt not found in queue".to_string())?;
+
+        let prompt = queue.remove(pos);
+        drop(queue);
+
+        // Add back to pool
+        self.prompt_pool.write().await.push(prompt.clone());
+        Ok(prompt)
+    }
+
+    /// Get all queued prompts
+    pub async fn get_queued_prompts(&self) -> Vec<Prompt> {
+        self.queued_prompts.read().await.clone()
+    }
+
+    /// Clear all queued prompts (move back to pool)
+    pub async fn clear_queued_prompts(&self) {
+        let mut queue = self.queued_prompts.write().await;
+        let prompts: Vec<Prompt> = queue.drain(..).collect();
+        drop(queue);
+
+        // Move all back to pool
+        let mut pool = self.prompt_pool.write().await;
+        pool.extend(prompts);
+    }
+
+    /// Select winning prompt from queue based on votes (or the only one if single)
+    /// Returns the winning prompt and removes it from queue
+    /// Remaining prompts are moved back to pool
+    pub async fn select_winning_prompt(&self) -> Result<Prompt, String> {
+        let queue = self.queued_prompts.read().await;
+        if queue.is_empty() {
+            return Err("No prompts queued".to_string());
+        }
+
+        let winner = if queue.len() == 1 {
+            // Only one prompt, it wins automatically
+            queue[0].clone()
+        } else {
+            // Multiple prompts, count votes
+            let votes = self.prompt_votes.read().await;
+            let mut counts: std::collections::HashMap<&str, u32> = std::collections::HashMap::new();
+
+            for prompt_id in votes.values() {
+                // Only count votes for queued prompts
+                if queue.iter().any(|p| &p.id == prompt_id) {
+                    *counts.entry(prompt_id.as_str()).or_insert(0) += 1;
+                }
+            }
+
+            // Find winner (highest votes, or first prompt if tie/no votes)
+            let winner_id = queue
+                .iter()
+                .max_by_key(|p| counts.get(p.id.as_str()).unwrap_or(&0))
+                .map(|p| p.id.clone())
+                .unwrap();
+
+            queue
+                .iter()
+                .find(|p| p.id == winner_id)
+                .cloned()
+                .ok_or_else(|| "Winner not found".to_string())?
+        };
+        drop(queue);
+
+        // Remove winner from queue
+        let mut queue = self.queued_prompts.write().await;
+        queue.retain(|p| p.id != winner.id);
+
+        // Move remaining prompts back to pool
+        let remaining: Vec<Prompt> = queue.drain(..).collect();
+        drop(queue);
+
+        let mut pool = self.prompt_pool.write().await;
+        pool.extend(remaining);
+
+        // Clear prompt votes for next round
+        self.prompt_votes.write().await.clear();
+
+        Ok(winner)
+    }
+
+    /// Record a prompt vote from an audience member
+    pub async fn record_prompt_vote(&self, voter_id: &str, prompt_id: &str) -> Result<(), String> {
+        // Verify prompt is in queue
+        let queue = self.queued_prompts.read().await;
+        if !queue.iter().any(|p| p.id == prompt_id) {
+            return Err("Prompt not in queue".to_string());
+        }
+        drop(queue);
+
+        // Record vote (overwrites previous vote from same voter)
+        self.prompt_votes
+            .write()
+            .await
+            .insert(voter_id.to_string(), prompt_id.to_string());
+
+        Ok(())
+    }
+
+    /// Get prompt vote counts for display
+    pub async fn get_prompt_vote_counts(&self) -> std::collections::HashMap<String, u32> {
+        let votes = self.prompt_votes.read().await;
+        let mut counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+
+        for prompt_id in votes.values() {
+            *counts.entry(prompt_id.clone()).or_insert(0) += 1;
+        }
+
+        counts
+    }
+
+    /// Broadcast queued prompts to host
+    pub async fn broadcast_queued_prompts_to_host(&self) {
+        let prompts = self.get_queued_prompts().await;
+        let prompt_infos: Vec<crate::protocol::HostPromptInfo> = prompts
+            .iter()
+            .map(|p| crate::protocol::HostPromptInfo {
+                id: p.id.clone(),
+                text: p.text.clone(),
+                image_url: p.image_url.clone(),
+                source: p.source.clone(),
+                submitter_id: p.submitter_id.clone(),
+            })
+            .collect();
+        self.broadcast_to_host(ServerMessage::HostQueuedPrompts {
+            prompts: prompt_infos,
+        });
     }
 
     /// Export the entire game state as a serializable snapshot.
@@ -304,13 +480,26 @@ mod tests {
         let state = AppState::new();
         state.create_game().await;
 
-        // Lobby -> PromptSelection
+        // Queue 2 prompts so we can test PromptSelection
+        let prompt1 = state
+            .add_prompt_to_pool(Some("Test 1".to_string()), None, PromptSource::Host, None)
+            .await
+            .unwrap();
+        let prompt2 = state
+            .add_prompt_to_pool(Some("Test 2".to_string()), None, PromptSource::Host, None)
+            .await
+            .unwrap();
+        state.queue_prompt(&prompt1.id).await.unwrap();
+        state.queue_prompt(&prompt2.id).await.unwrap();
+
+        // Lobby -> PromptSelection (with 2 prompts, stays in PromptSelection)
         assert!(state
             .transition_phase(GamePhase::PromptSelection)
             .await
             .is_ok());
 
-        // PromptSelection -> Writing requires prompt selected
+        // PromptSelection -> Writing (auto-selects winning prompt)
+        // Note: This is now valid because it auto-selects winning prompt
         // Skip for now, test separately
 
         // Test panic mode: any phase -> Intermission
@@ -331,14 +520,20 @@ mod tests {
         let state = AppState::new();
         state.create_game().await;
 
-        // Can't go from Lobby to Writing directly
+        // Lobby -> Writing is now valid (with preconditions), but fails without round/prompt
         let result = state.transition_phase(GamePhase::Writing).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Writing phase requires"));
+
+        // Can't go from Lobby to Voting (invalid transition)
+        let result = state.transition_phase(GamePhase::Voting).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid phase transition"));
 
-        // Can't go from Lobby to Voting
-        let result = state.transition_phase(GamePhase::Voting).await;
+        // Can't go from Lobby to Reveal (invalid transition)
+        let result = state.transition_phase(GamePhase::Reveal).await;
         assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid phase transition"));
     }
 
     #[tokio::test]
@@ -346,30 +541,48 @@ mod tests {
         let state = AppState::new();
         state.create_game().await;
 
-        // Try to go to Writing without a round
+        // Queue 2 prompts so we stay in PromptSelection (single prompt auto-advances)
+        let prompt1 = state
+            .add_prompt_to_pool(Some("Test 1".to_string()), None, PromptSource::Host, None)
+            .await
+            .unwrap();
+        let prompt2 = state
+            .add_prompt_to_pool(Some("Test 2".to_string()), None, PromptSource::Host, None)
+            .await
+            .unwrap();
+        state.queue_prompt(&prompt1.id).await.unwrap();
+        state.queue_prompt(&prompt2.id).await.unwrap();
+
+        // Transition to PromptSelection
         state
             .transition_phase(GamePhase::PromptSelection)
             .await
             .unwrap();
-        let result = state.transition_phase(GamePhase::Writing).await;
+
+        // With new flow, going to Writing from PromptSelection auto-selects winner and creates round
+        // So the test needs to verify something different - let's verify PromptSelection requires queued prompts
+        let state2 = AppState::new();
+        state2.create_game().await;
+        let result = state2.transition_phase(GamePhase::PromptSelection).await;
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
-            .contains("Writing phase requires an active round"));
+            .contains("Prompt selection requires at least 1 queued prompt"));
     }
 
     #[tokio::test]
     async fn test_writing_phase_requires_prompt() {
         let state = AppState::new();
         state.create_game().await;
-        state
-            .transition_phase(GamePhase::PromptSelection)
-            .await
-            .unwrap();
 
+        // Test direct Lobby -> Writing requires round with prompt
+        // First, trying without a round should fail
+        let result = state.transition_phase(GamePhase::Writing).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Writing phase requires"));
+
+        // Create a round but don't select a prompt
         let round = state.start_round().await.unwrap();
-
-        // Try to transition to Writing without selected prompt
         let result = state.transition_phase(GamePhase::Writing).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("selected prompt"));
@@ -394,11 +607,8 @@ mod tests {
     async fn test_reveal_phase_requires_submissions() {
         let state = AppState::new();
         state.create_game().await;
-        state
-            .transition_phase(GamePhase::PromptSelection)
-            .await
-            .unwrap();
 
+        // Create round and select prompt (direct Lobby->Writing path)
         let round = state.start_round().await.unwrap();
         let prompt = state
             .add_prompt_to_pool(
@@ -422,11 +632,8 @@ mod tests {
     async fn test_reveal_auto_populates_reveal_order() {
         let state = AppState::new();
         state.create_game().await;
-        state
-            .transition_phase(GamePhase::PromptSelection)
-            .await
-            .unwrap();
 
+        // Create round and select prompt (direct Lobby->Writing path)
         let round = state.start_round().await.unwrap();
         let prompt = state
             .add_prompt_to_pool(
@@ -581,14 +788,9 @@ mod tests {
         state.create_game().await;
 
         // First round should work in Lobby
-        assert!(state.start_round().await.is_ok());
+        let round = state.start_round().await.unwrap();
 
-        // Transition to Writing phase
-        state
-            .transition_phase(GamePhase::PromptSelection)
-            .await
-            .unwrap();
-        let round = state.get_current_round().await.unwrap();
+        // Add prompt and select it, then transition to Writing phase
         let prompt = state
             .add_prompt_to_pool(Some("Test".to_string()), None, PromptSource::Host, None)
             .await
@@ -662,11 +864,7 @@ mod tests {
         }
         drop(rounds);
 
-        // Transition to Results phase first (valid path)
-        state
-            .transition_phase(GamePhase::PromptSelection)
-            .await
-            .unwrap();
+        // Create second round (directly from Lobby, skipping PromptSelection)
         let round2 = state.start_round().await.unwrap();
 
         // Create submission in round 2
@@ -689,13 +887,8 @@ mod tests {
         let state = AppState::new();
         state.create_game().await;
 
-        state
-            .transition_phase(GamePhase::PromptSelection)
-            .await
-            .unwrap();
+        // Create round and select prompt (direct path)
         let round = state.start_round().await.unwrap();
-
-        // Add and select prompt
         let prompt = state
             .add_prompt_to_pool(
                 Some("Test prompt".to_string()),
@@ -744,13 +937,8 @@ mod tests {
         let state = AppState::new();
         state.create_game().await;
 
-        state
-            .transition_phase(GamePhase::PromptSelection)
-            .await
-            .unwrap();
+        // Create round and select prompt directly
         let round = state.start_round().await.unwrap();
-
-        // Setup full round
         let prompt = state
             .add_prompt_to_pool(Some("Test".to_string()), None, PromptSource::Host, None)
             .await

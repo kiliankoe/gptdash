@@ -103,7 +103,6 @@
                     <div class="card-header">Phasen-Übergänge</div>
                     <div class="phase-selector" id="phaseButtons">
                         <button data-phase="LOBBY" onclick="transitionPhase('LOBBY')">Lobby</button>
-                        <button data-phase="PROMPT_SELECTION" onclick="transitionPhase('PROMPT_SELECTION')">Prompt auswählen</button>
                         <button data-phase="WRITING" onclick="transitionPhase('WRITING')">Schreiben</button>
                         <button data-phase="REVEAL" onclick="transitionPhase('REVEAL')">Antworten zeigen</button>
                         <button data-phase="VOTING" onclick="transitionPhase('VOTING')">Abstimmen</button>
@@ -115,10 +114,11 @@
                 </div>
 
                 <div class="card">
-                    <div class="card-header">Runden-Verwaltung</div>
+                    <div class="card-header">Aktuelle Runde</div>
+                    <div id="currentRoundInfo" style="margin-bottom: 10px;">
+                        <p style="opacity: 0.6;">Keine aktive Runde. Wähle einen Prompt aus dem "Prompts"-Panel aus, um eine neue Runde zu starten.</p>
+                    </div>
                     <div class="button-group">
-                        <button onclick="hostStartRound()">Neue Runde starten</button>
-                        <button onclick="selectPrompt()">Prompt auswählen</button>
                         <button onclick="closeWriting()">Schreib-Phase beenden</button>
                     </div>
                 </div>
@@ -207,8 +207,16 @@
                     <button onclick="addPrompt()">Prompt hinzufügen</button>
                 </div>
 
+                <div class="card" style="border: 2px solid #51cf66;">
+                    <div class="card-header" style="color: #51cf66;">Warteschlange für nächste Runde (max. 3)</div>
+                    <div id="queuedPromptsList">
+                        <p style="opacity: 0.6;">Keine Prompts in der Warteschlange. Wähle Prompts aus dem Pool.</p>
+                    </div>
+                    <button id="startPromptSelectionBtn" onclick="startPromptSelection()" style="display: none; margin-top: 15px; background: #51cf66;" class="primary">▶ Runde starten</button>
+                </div>
+
                 <div class="card">
-                    <div class="card-header">Verfügbare Prompts</div>
+                    <div class="card-header">Prompt-Pool</div>
                     <div id="promptsList">
                         <p style="opacity: 0.6;">Keine Prompts verfügbar</p>
                     </div>

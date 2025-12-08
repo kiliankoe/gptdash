@@ -557,6 +557,40 @@ select:focus {
   width: auto;
 }
 
+.prompt-card .badge.queued {
+  background: #51cf66;
+  color: #0f172a;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.prompt-card .badge.multimodal {
+  background: #8b5cf6;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.prompt-card.queued {
+  border-color: #51cf66;
+  background: rgba(81, 207, 102, 0.1);
+}
+
+.prompt-card .queue-number {
+  font-size: 18px;
+  font-weight: bold;
+  color: #51cf66;
+}
+
+.prompt-card .prompt-actions button.small {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
 /* AI Generation Status styles */
 #aiGenerationStatus p.info {
   color: #4dabf7;

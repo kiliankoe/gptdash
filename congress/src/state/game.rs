@@ -34,13 +34,15 @@ impl AppState {
         use GamePhase::*;
 
         match from {
-            Lobby => vec![PromptSelection, Intermission, Ended],
+            // Lobby can go directly to Writing if a prompt is selected (skips PromptSelection)
+            Lobby => vec![PromptSelection, Writing, Intermission, Ended],
             PromptSelection => vec![Writing, Intermission, Ended],
             Writing => vec![Reveal, Intermission, Ended],
             Reveal => vec![Voting, Intermission, Ended],
             Voting => vec![Results, Intermission, Ended],
-            Results => vec![Podium, PromptSelection, Intermission, Ended],
-            Podium => vec![PromptSelection, Intermission, Ended],
+            // Results/Podium can go back to Lobby for new game or PromptSelection for next round
+            Results => vec![Podium, Lobby, PromptSelection, Intermission, Ended],
+            Podium => vec![Lobby, PromptSelection, Intermission, Ended],
             Intermission => vec![
                 Lobby,
                 PromptSelection,
@@ -62,20 +64,31 @@ impl AppState {
         to: &GamePhase,
     ) -> Result<(), String> {
         match to {
+            GamePhase::PromptSelection => {
+                // Requires at least 1 queued prompt
+                let queued = self.queued_prompts.read().await;
+                if queued.is_empty() {
+                    return Err("Prompt selection requires at least 1 queued prompt".to_string());
+                }
+            }
             GamePhase::Writing => {
                 // Requires a current round with selected prompt
-                if let Some(round_id) = &game.current_round_id {
-                    let rounds = self.rounds.read().await;
-                    if let Some(round) = rounds.get(round_id) {
-                        if round.selected_prompt.is_none() {
-                            return Err("Writing phase requires a selected prompt".to_string());
+                // (Exception: when coming from PromptSelection, we select the winning prompt first)
+                if game.phase != GamePhase::PromptSelection {
+                    if let Some(round_id) = &game.current_round_id {
+                        let rounds = self.rounds.read().await;
+                        if let Some(round) = rounds.get(round_id) {
+                            if round.selected_prompt.is_none() {
+                                return Err("Writing phase requires a selected prompt".to_string());
+                            }
+                        } else {
+                            return Err("Current round not found".to_string());
                         }
                     } else {
-                        return Err("Current round not found".to_string());
+                        return Err("Writing phase requires an active round".to_string());
                     }
-                } else {
-                    return Err("Writing phase requires an active round".to_string());
                 }
+                // If coming from PromptSelection, we'll select the winning prompt in the transition
             }
             GamePhase::Reveal => {
                 // Requires submissions in current round
@@ -149,14 +162,50 @@ impl AppState {
             self.validate_phase_preconditions(&game_clone, &new_phase)
                 .await?;
 
+            // Special case: PromptSelection with 1 prompt should skip directly to Writing
+            let effective_phase = if new_phase == GamePhase::PromptSelection {
+                let queued = self.queued_prompts.read().await;
+                if queued.len() == 1 {
+                    // Single prompt: set up round and go directly to Writing
+                    let prompt = queued[0].clone();
+                    drop(queued);
+
+                    // Put prompt back in pool so select_prompt can find it
+                    self.prompt_pool.write().await.push(prompt.clone());
+                    self.queued_prompts.write().await.clear();
+                    self.prompt_votes.write().await.clear();
+
+                    // Create a new round
+                    match self.start_round().await {
+                        Ok(round) => {
+                            // Select the prompt (removes from pool, starts LLM)
+                            if let Err(e) = self.select_prompt(&round.id, &prompt.id).await {
+                                tracing::error!("Failed to select prompt: {}", e);
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to start round: {}", e);
+                        }
+                    }
+
+                    // Skip to Writing phase instead of PromptSelection
+                    GamePhase::Writing
+                } else {
+                    drop(queued);
+                    new_phase.clone()
+                }
+            } else {
+                new_phase.clone()
+            };
+
             // Re-acquire lock and apply transition
             let mut game = self.game.write().await;
             if let Some(ref mut g) = *game {
-                g.phase = new_phase.clone();
+                g.phase = effective_phase.clone();
                 g.version += 1;
 
                 // Set deadline for timed phases
-                g.phase_deadline = match new_phase {
+                g.phase_deadline = match effective_phase {
                     GamePhase::Writing => {
                         let seconds = g.config.writing_seconds as i64;
                         Some((chrono::Utc::now() + chrono::Duration::seconds(seconds)).to_rfc3339())
@@ -172,7 +221,50 @@ impl AppState {
                 drop(game);
 
                 // Handle phase-specific actions
-                if new_phase == GamePhase::Reveal {
+                if effective_phase == GamePhase::PromptSelection {
+                    // Multiple prompts: broadcast candidates for voting
+                    let queued = self.queued_prompts.read().await;
+                    let candidates: Vec<_> = queued.clone();
+                    drop(queued);
+                    self.broadcast_to_all(crate::protocol::ServerMessage::PromptCandidates {
+                        prompts: candidates,
+                    });
+                } else if effective_phase == GamePhase::Writing
+                    && game_clone.phase == GamePhase::PromptSelection
+                {
+                    // Transitioning from PromptSelection to Writing: select winning prompt
+                    match self.select_winning_prompt().await {
+                        Ok(prompt) => {
+                            // Put winning prompt back in pool so select_prompt can find it
+                            // (select_winning_prompt removes it from queue but doesn't add to pool)
+                            self.prompt_pool.write().await.push(prompt.clone());
+
+                            // Clear queue and votes (may already be cleared by select_winning_prompt)
+                            self.queued_prompts.write().await.clear();
+                            self.prompt_votes.write().await.clear();
+
+                            // Create a new round
+                            match self.start_round().await {
+                                Ok(round) => {
+                                    // Select the prompt (removes from pool, starts LLM)
+                                    if let Err(e) = self.select_prompt(&round.id, &prompt.id).await
+                                    {
+                                        tracing::error!("Failed to select winning prompt: {}", e);
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to start round: {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "No winning prompt found during PromptSelection->Writing: {}",
+                                e
+                            );
+                        }
+                    }
+                } else if effective_phase == GamePhase::Reveal {
                     // Auto-populate reveal_order if not set, then reset reveal to first submission
                     if let Some(rid) = &round_id {
                         // Get submissions for auto-populating reveal_order if needed
@@ -203,7 +295,7 @@ impl AppState {
                             });
                         }
                     }
-                } else if new_phase == GamePhase::Results {
+                } else if effective_phase == GamePhase::Results {
                     // Compute scores when entering RESULTS phase (idempotent)
                     if let Some(rid) = round_id {
                         // Check if already scored
@@ -264,12 +356,21 @@ impl AppState {
     async fn broadcast_phase_change(&self) {
         if let Some(game) = self.get_game().await {
             let valid_transitions = Self::get_valid_transitions(&game.phase);
+            // Include prompt when transitioning to WRITING so all clients have it
+            let prompt = if game.phase == GamePhase::Writing {
+                self.get_current_round()
+                    .await
+                    .and_then(|r| r.selected_prompt)
+            } else {
+                None
+            };
             self.broadcast_to_all(crate::protocol::ServerMessage::Phase {
                 phase: game.phase.clone(),
                 round_no: game.round_no,
                 server_now: chrono::Utc::now().to_rfc3339(),
                 deadline: game.phase_deadline.clone(),
                 valid_transitions,
+                prompt,
             });
         }
     }
@@ -286,6 +387,9 @@ impl AppState {
         self.scores.write().await.clear();
         self.player_status.write().await.clear();
         self.processed_vote_msg_ids.write().await.clear();
+        // Clear queued prompts and prompt votes (move back to pool)
+        self.clear_queued_prompts().await;
+        self.prompt_votes.write().await.clear();
 
         // Reset game to initial state
         let mut game = self.game.write().await;

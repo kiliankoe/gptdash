@@ -89,11 +89,17 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                     let submission = state
                         .get_player_submission_for_current_round(&player.id)
                         .await;
+                    // Include current prompt for state recovery during WRITING phase
+                    let current_prompt = state
+                        .get_current_round()
+                        .await
+                        .and_then(|r| r.selected_prompt);
                     let player_state = ServerMessage::PlayerState {
                         player_id: player.id,
                         display_name: player.display_name,
                         has_submitted: submission.is_some(),
                         current_submission: submission.map(|s| SubmissionInfo::from(&s)),
+                        current_prompt,
                     };
                     if let Ok(msg) = serde_json::to_string(&player_state) {
                         let _ = sender.send(Message::Text(msg.into())).await;

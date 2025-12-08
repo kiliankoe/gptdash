@@ -764,3 +764,86 @@ button.secondary:hover {
 #votingScreen {
   position: relative;
 }
+
+/* ========================
+   SCREEN: PROMPT VOTING
+   ======================== */
+.prompt-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.prompt-option {
+  background: rgba(250, 245, 245, 0.05);
+  border: 2px solid rgba(250, 245, 245, 0.2);
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.prompt-option:hover {
+  border-color: rgba(250, 245, 245, 0.4);
+  background: rgba(250, 245, 245, 0.08);
+}
+
+.prompt-option.selected {
+  border-color: var(--color-secondary);
+  background: rgba(150, 115, 255, 0.1);
+  box-shadow: 0 0 20px rgba(150, 115, 255, 0.2);
+}
+
+.prompt-option .number {
+  font-family: var(--font-headline);
+  font-size: 14px;
+  font-variation-settings:
+    "wght" 100,
+    "wdth" 100;
+  color: var(--color-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.prompt-option .text {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.prompt-option .checkmark {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 20px;
+  display: none;
+  color: var(--color-secondary);
+}
+
+.prompt-option.selected .checkmark {
+  display: block;
+}
+
+.prompt-option .prompt-image {
+  max-width: 100%;
+  max-height: 150px;
+  object-fit: contain;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+#promptVoteButton {
+  background: var(--color-secondary);
+  box-shadow: 0 4px 20px rgba(150, 115, 255, 0.3);
+}
+
+#promptVoteButton:hover {
+  box-shadow: 0 6px 30px rgba(150, 115, 255, 0.4);
+}
+
+#promptVoteButton:disabled {
+  background: rgba(250, 245, 245, 0.2);
+  box-shadow: none;
+}
