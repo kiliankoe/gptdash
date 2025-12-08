@@ -263,6 +263,9 @@ impl AppState {
             return Err("All LLM providers failed".to_string());
         }
 
+        // Track generated submission IDs for auto-selection
+        let mut generated_submission_ids = Vec::new();
+
         // Store each AI submission with provider metadata
         for (provider_name, response) in responses {
             let submission_id = ulid::Ulid::new().to_string();
@@ -290,11 +293,32 @@ impl AppState {
                 .await
                 .insert(submission_id.clone(), submission.clone());
 
+            generated_submission_ids.push(submission_id.clone());
+
             tracing::info!(
                 "Generated AI submission from {}: {} chars in {}ms",
                 provider_name,
                 response.text.len(),
                 response.metadata.latency_ms
+            );
+        }
+
+        // Auto-select the AI submission if only one was generated
+        // (host can still override with HostSetAiSubmission if multiple providers exist)
+        if generated_submission_ids.len() == 1 {
+            let submission_id = &generated_submission_ids[0];
+            let mut rounds = self.rounds.write().await;
+            if let Some(round) = rounds.get_mut(round_id) {
+                round.ai_submission_id = Some(submission_id.clone());
+                tracing::info!(
+                    "Auto-selected AI submission {} (single provider)",
+                    submission_id
+                );
+            }
+        } else {
+            tracing::info!(
+                "Multiple AI submissions generated ({}), host must select one",
+                generated_submission_ids.len()
             );
         }
 
