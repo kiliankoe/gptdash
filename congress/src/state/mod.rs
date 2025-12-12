@@ -108,36 +108,175 @@ impl AppState {
     }
 
     /// Get prompt pool for host (filtered by shadowban status)
+    /// Returns prompts sorted by submission_count (popular first), then by created_at (newest first)
     pub async fn get_prompts_for_host(&self) -> Vec<crate::protocol::HostPromptInfo> {
         let pool = self.prompt_pool.read().await;
         let shadowbanned = self.shadowbanned_audience.read().await;
 
-        // Filter out prompts from shadowbanned users
-        pool.iter()
+        // Filter out prompts where ALL submitters are shadowbanned
+        let mut prompts: Vec<_> = pool
+            .iter()
             .filter(|p| {
-                // Keep prompts from non-shadowbanned users or prompts without submitter_id
-                match &p.submitter_id {
-                    Some(id) => !shadowbanned.contains(id),
-                    None => true,
+                // Keep prompts with no submitters (host prompts)
+                if p.submitter_ids.is_empty() {
+                    return true;
                 }
+                // Keep prompts where at least one submitter is not shadowbanned
+                p.submitter_ids.iter().any(|id| !shadowbanned.contains(id))
             })
             .map(|p| crate::protocol::HostPromptInfo {
                 id: p.id.clone(),
                 text: p.text.clone(),
                 image_url: p.image_url.clone(),
                 source: p.source.clone(),
-                submitter_id: p.submitter_id.clone(),
+                submitter_ids: p.submitter_ids.clone(),
+                submission_count: p.submission_count,
+                created_at: p.created_at.clone(),
             })
-            .collect()
+            .collect();
+
+        // Sort by submission_count (descending), then by created_at (newest first)
+        prompts.sort_by(|a, b| {
+            b.submission_count
+                .cmp(&a.submission_count)
+                .then_with(|| b.created_at.cmp(&a.created_at))
+        });
+
+        prompts
+    }
+
+    /// Compute stats about the prompt pool
+    pub async fn compute_prompt_pool_stats(&self) -> crate::protocol::PromptPoolStats {
+        let pool = self.prompt_pool.read().await;
+        let shadowbanned = self.shadowbanned_audience.read().await;
+
+        // Filter out fully shadowbanned prompts for counting
+        let visible_prompts: Vec<_> = pool
+            .iter()
+            .filter(|p| {
+                if p.submitter_ids.is_empty() {
+                    return true;
+                }
+                p.submitter_ids.iter().any(|id| !shadowbanned.contains(id))
+            })
+            .collect();
+
+        let total = visible_prompts.len();
+        let host_count = visible_prompts
+            .iter()
+            .filter(|p| p.source == PromptSource::Host)
+            .count();
+        let audience_count = total - host_count;
+
+        // Count submissions per voter (across all prompts)
+        let mut submitter_counts: std::collections::HashMap<&str, usize> =
+            std::collections::HashMap::new();
+        for prompt in &visible_prompts {
+            for submitter_id in &prompt.submitter_ids {
+                if !shadowbanned.contains(submitter_id) {
+                    *submitter_counts.entry(submitter_id.as_str()).or_insert(0) += 1;
+                }
+            }
+        }
+
+        // Get top 5 submitters
+        let mut top_submitters: Vec<_> = submitter_counts
+            .into_iter()
+            .map(|(voter_id, count)| crate::protocol::SubmitterStats {
+                voter_id: voter_id.to_string(),
+                count,
+            })
+            .collect();
+        top_submitters.sort_by(|a, b| b.count.cmp(&a.count));
+        top_submitters.truncate(5);
+
+        crate::protocol::PromptPoolStats {
+            total,
+            host_count,
+            audience_count,
+            top_submitters,
+        }
     }
 
     /// Broadcast prompt pool to host (filtered by shadowban status)
     pub async fn broadcast_prompts_to_host(&self) {
         let prompts = self.get_prompts_for_host().await;
-        self.broadcast_to_host(ServerMessage::HostPrompts { prompts });
+        let stats = self.compute_prompt_pool_stats().await;
+        self.broadcast_to_host(ServerMessage::HostPrompts { prompts, stats });
+    }
+
+    /// Maximum number of prompts an audience member can submit before their prompts are used
+    const MAX_PROMPTS_PER_USER: usize = 10;
+
+    /// Fuzzy similarity threshold for deduplication (0.0 - 1.0)
+    const SIMILARITY_THRESHOLD: f64 = 0.6;
+
+    /// Compute Jaccard similarity between two texts (word-based)
+    fn compute_similarity(text1: &str, text2: &str) -> f64 {
+        // Normalize: lowercase, remove punctuation, split into words
+        fn normalize_to_words(s: &str) -> std::collections::HashSet<String> {
+            s.to_lowercase()
+                .chars()
+                .map(|c| {
+                    if c.is_alphanumeric() || c.is_whitespace() {
+                        c
+                    } else {
+                        ' '
+                    }
+                })
+                .collect::<String>()
+                .split_whitespace()
+                .filter(|w| w.len() > 2) // Skip very short words
+                .map(|s| s.to_string())
+                .collect()
+        }
+
+        let words1 = normalize_to_words(text1);
+        let words2 = normalize_to_words(text2);
+
+        if words1.is_empty() && words2.is_empty() {
+            return 1.0; // Both empty = identical
+        }
+        if words1.is_empty() || words2.is_empty() {
+            return 0.0; // One empty = not similar
+        }
+
+        let intersection: std::collections::HashSet<_> = words1.intersection(&words2).collect();
+        let union: std::collections::HashSet<_> = words1.union(&words2).collect();
+
+        intersection.len() as f64 / union.len() as f64
+    }
+
+    /// Find a similar prompt in the pool (for deduplication)
+    /// Returns the prompt ID if a similar prompt is found
+    pub async fn find_similar_prompt(&self, text: &str) -> Option<PromptId> {
+        let pool = self.prompt_pool.read().await;
+
+        for prompt in pool.iter() {
+            if let Some(ref existing_text) = prompt.text {
+                let similarity = Self::compute_similarity(text, existing_text);
+                if similarity >= Self::SIMILARITY_THRESHOLD {
+                    return Some(prompt.id.clone());
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Count how many prompts a user has in the pool (for throttling)
+    pub async fn count_user_prompts(&self, voter_id: &str) -> usize {
+        self.prompt_pool
+            .read()
+            .await
+            .iter()
+            .filter(|p| p.submitter_ids.contains(&voter_id.to_string()))
+            .count()
     }
 
     /// Add a prompt to the global pool
+    /// Handles deduplication: if similar prompt exists, adds submitter to existing prompt
+    /// Handles throttling: rejects if user has >= 10 pending prompts
     pub async fn add_prompt_to_pool(
         &self,
         text: Option<String>,
@@ -150,16 +289,76 @@ impl AppState {
             return Err("Prompt must have either text or image_url".to_string());
         }
 
+        // Throttling: check if audience member has too many prompts
+        if let Some(ref voter_id) = submitter_id {
+            let count = self.count_user_prompts(voter_id).await;
+            if count >= Self::MAX_PROMPTS_PER_USER {
+                return Err(format!(
+                    "PROMPT_LIMIT_REACHED: Du hast bereits {} Prompts eingereicht. Warte, bis deine Prompts verwendet wurden.",
+                    Self::MAX_PROMPTS_PER_USER
+                ));
+            }
+        }
+
+        // Fuzzy deduplication: check for similar prompts (only for text prompts)
+        if let Some(ref prompt_text) = text {
+            if let Some(similar_id) = self.find_similar_prompt(prompt_text).await {
+                // Found similar prompt - add submitter to existing prompt instead
+                let mut pool = self.prompt_pool.write().await;
+                if let Some(existing) = pool.iter_mut().find(|p| p.id == similar_id) {
+                    // Add submitter if not already in list
+                    if let Some(ref voter_id) = submitter_id {
+                        if !existing.submitter_ids.contains(voter_id) {
+                            existing.submitter_ids.push(voter_id.clone());
+                        }
+                    }
+                    existing.submission_count += 1;
+                    return Ok(existing.clone());
+                }
+            }
+        }
+
+        // No similar prompt found - create new one
+        let now = chrono::Utc::now().to_rfc3339();
+        let submitter_ids = submitter_id.map(|id| vec![id]).unwrap_or_default();
+
         let prompt = Prompt {
             id: ulid::Ulid::new().to_string(),
             text,
             image_url,
             source,
-            submitter_id,
+            submitter_ids,
+            submission_count: 1,
+            created_at: Some(now),
         };
 
         self.prompt_pool.write().await.push(prompt.clone());
         Ok(prompt)
+    }
+
+    /// Shadowban all submitters of a prompt (bulk shadowban for spam)
+    pub async fn shadowban_prompt_submitters(
+        &self,
+        prompt_id: &str,
+    ) -> Result<Vec<VoterId>, String> {
+        let pool = self.prompt_pool.read().await;
+        let prompt = pool
+            .iter()
+            .find(|p| p.id == prompt_id)
+            .ok_or_else(|| "Prompt not found".to_string())?;
+
+        let submitter_ids = prompt.submitter_ids.clone();
+        drop(pool);
+
+        // Shadowban all submitters
+        for voter_id in &submitter_ids {
+            self.shadowban_audience(voter_id.clone()).await;
+        }
+
+        // Remove the prompt from the pool
+        self.remove_prompt_from_pool(prompt_id).await;
+
+        Ok(submitter_ids)
     }
 
     /// Remove a prompt from the pool by ID (used when selecting or deleting)
@@ -367,7 +566,9 @@ impl AppState {
                 text: p.text.clone(),
                 image_url: p.image_url.clone(),
                 source: p.source.clone(),
-                submitter_id: p.submitter_id.clone(),
+                submitter_ids: p.submitter_ids.clone(),
+                submission_count: p.submission_count,
+                created_at: p.created_at.clone(),
             })
             .collect();
         self.broadcast_to_host(ServerMessage::HostQueuedPrompts {
@@ -506,12 +707,23 @@ mod tests {
         state.create_game().await;
 
         // Queue 2 prompts so we can test PromptSelection
+        // Use distinct prompts that won't be merged by fuzzy deduplication
         let prompt1 = state
-            .add_prompt_to_pool(Some("Test 1".to_string()), None, PromptSource::Host, None)
+            .add_prompt_to_pool(
+                Some("Apple fruit basket".to_string()),
+                None,
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         let prompt2 = state
-            .add_prompt_to_pool(Some("Test 2".to_string()), None, PromptSource::Host, None)
+            .add_prompt_to_pool(
+                Some("Banana orange juice".to_string()),
+                None,
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.queue_prompt(&prompt1.id).await.unwrap();
@@ -567,12 +779,23 @@ mod tests {
         state.create_game().await;
 
         // Queue 2 prompts so we stay in PromptSelection (single prompt auto-advances)
+        // Use distinct prompts that won't be merged by fuzzy deduplication
         let prompt1 = state
-            .add_prompt_to_pool(Some("Test 1".to_string()), None, PromptSource::Host, None)
+            .add_prompt_to_pool(
+                Some("Mountain hiking adventure".to_string()),
+                None,
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         let prompt2 = state
-            .add_prompt_to_pool(Some("Test 2".to_string()), None, PromptSource::Host, None)
+            .add_prompt_to_pool(
+                Some("Ocean swimming beach".to_string()),
+                None,
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.queue_prompt(&prompt1.id).await.unwrap();
@@ -779,9 +1002,10 @@ mod tests {
         let round = state.start_round().await.unwrap();
 
         // Add both prompts to pool first
+        // Use distinct prompts that won't be merged by fuzzy deduplication
         let prompt = state
             .add_prompt_to_pool(
-                Some("Test prompt".to_string()),
+                Some("First unique question".to_string()),
                 None,
                 PromptSource::Host,
                 None,
@@ -790,7 +1014,7 @@ mod tests {
             .unwrap();
         let prompt2 = state
             .add_prompt_to_pool(
-                Some("Test prompt 2".to_string()),
+                Some("Second different topic".to_string()),
                 None,
                 PromptSource::Host,
                 None,
@@ -1224,12 +1448,14 @@ mod tests {
             .unwrap();
 
         // Verify submitter_id was stored
-        assert_eq!(prompt.submitter_id, Some("voter123".to_string()));
+        assert!(prompt.submitter_ids.contains(&"voter123".to_string()));
 
         // Verify it's in the prompt pool
         let pool = state.prompt_pool.read().await;
         let stored_prompt = pool.iter().find(|p| p.id == prompt.id).unwrap();
-        assert_eq!(stored_prompt.submitter_id, Some("voter123".to_string()));
+        assert!(stored_prompt
+            .submitter_ids
+            .contains(&"voter123".to_string()));
     }
 
     // Remove player tests

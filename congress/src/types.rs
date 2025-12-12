@@ -69,8 +69,27 @@ pub struct Prompt {
     pub text: Option<String>,
     pub image_url: Option<String>,
     pub source: PromptSource,
-    /// ID of the audience member who submitted this prompt (None for host-submitted)
-    pub submitter_id: Option<VoterId>,
+    /// IDs of audience members who submitted this prompt (for deduplicated prompts)
+    /// Empty for host-submitted prompts
+    #[serde(default)]
+    pub submitter_ids: Vec<VoterId>,
+    /// How many times this prompt was submitted (1 = unique, >1 = deduplicated)
+    #[serde(default = "default_submission_count")]
+    pub submission_count: u32,
+    /// When this prompt was first created (ISO8601 timestamp)
+    #[serde(default)]
+    pub created_at: Option<String>,
+}
+
+fn default_submission_count() -> u32 {
+    1
+}
+
+impl Prompt {
+    /// Get the first/primary submitter ID (for backwards compatibility)
+    pub fn submitter_id(&self) -> Option<&VoterId> {
+        self.submitter_ids.first()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

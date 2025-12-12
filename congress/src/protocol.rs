@@ -87,6 +87,10 @@ pub enum ClientMessage {
     HostShadowbanAudience {
         voter_id: VoterId,
     },
+    /// Shadowban all submitters of a prompt (host only, for spam prompts)
+    HostShadowbanPromptSubmitters {
+        prompt_id: PromptId,
+    },
     /// Remove a player from the game (host only)
     HostRemovePlayer {
         player_id: PlayerId,
@@ -232,6 +236,7 @@ pub enum ServerMessage {
     /// Prompt candidates sent to host (includes submitter info for moderation)
     HostPrompts {
         prompts: Vec<HostPromptInfo>,
+        stats: PromptPoolStats,
     },
     /// Broadcast when a player is removed from the game
     PlayerRemoved {
@@ -349,12 +354,37 @@ pub struct PlayerStatusInfo {
     pub status: PlayerSubmissionStatus,
 }
 
-/// Prompt info sent to host (includes submitter ID for shadowban functionality)
+/// Prompt info sent to host (includes submitter IDs for shadowban functionality)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HostPromptInfo {
     pub id: PromptId,
     pub text: Option<String>,
     pub image_url: Option<String>,
     pub source: PromptSource,
-    pub submitter_id: Option<VoterId>,
+    /// All submitter IDs (for deduplicated prompts, may have multiple)
+    pub submitter_ids: Vec<VoterId>,
+    /// How many times this prompt was submitted
+    pub submission_count: u32,
+    /// When this prompt was first created (ISO8601)
+    pub created_at: Option<String>,
+}
+
+/// Statistics about the prompt pool (sent to host)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptPoolStats {
+    /// Total number of prompts in pool
+    pub total: usize,
+    /// Number of host-submitted prompts
+    pub host_count: usize,
+    /// Number of audience-submitted prompts
+    pub audience_count: usize,
+    /// Top submitters by prompt count (for moderation)
+    pub top_submitters: Vec<SubmitterStats>,
+}
+
+/// Stats about a single submitter
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubmitterStats {
+    pub voter_id: VoterId,
+    pub count: usize,
 }

@@ -501,6 +501,30 @@ pub async fn handle_shadowban_audience(
     None
 }
 
+pub async fn handle_shadowban_prompt_submitters(
+    state: &Arc<AppState>,
+    prompt_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host shadowbanning all submitters of prompt: {}", prompt_id);
+
+    match state.shadowban_prompt_submitters(&prompt_id).await {
+        Ok(banned_ids) => {
+            tracing::info!(
+                "Shadowbanned {} users for prompt {}",
+                banned_ids.len(),
+                prompt_id
+            );
+            // Re-broadcast prompts to host (now filtered)
+            state.broadcast_prompts_to_host().await;
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "SHADOWBAN_PROMPT_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
 pub async fn handle_remove_player(
     state: &Arc<AppState>,
     player_id: String,

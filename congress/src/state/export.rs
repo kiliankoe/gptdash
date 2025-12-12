@@ -10,7 +10,8 @@ use std::collections::{HashMap, HashSet};
 
 /// Schema version for export format compatibility
 /// Version 2: prompt_pool moved from Round.prompt_candidates to global pool
-pub const EXPORT_SCHEMA_VERSION: u32 = 2;
+/// Version 3: Prompt struct changed - submitter_id -> submitter_ids (Vec), added submission_count, created_at
+pub const EXPORT_SCHEMA_VERSION: u32 = 3;
 
 /// A serializable snapshot of the entire game state.
 ///

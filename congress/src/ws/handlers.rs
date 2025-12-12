@@ -176,6 +176,11 @@ pub async fn handle_message(
             host::handle_shadowban_audience(state, voter_id).await
         }
 
+        ClientMessage::HostShadowbanPromptSubmitters { prompt_id } => {
+            check_host!(role, "shadowban prompt submitters");
+            host::handle_shadowban_prompt_submitters(state, prompt_id).await
+        }
+
         ClientMessage::HostRemovePlayer { player_id } => {
             check_host!(role, "remove players");
             host::handle_remove_player(state, player_id).await
@@ -246,12 +251,23 @@ mod tests {
         let role = Role::Host;
 
         // Queue 2 prompts so we stay in PromptSelection (1 prompt auto-advances to Writing)
+        // Use distinct prompts that won't be merged by fuzzy deduplication
         let prompt1 = state
-            .add_prompt_to_pool(Some("Test 1".to_string()), None, PromptSource::Host, None)
+            .add_prompt_to_pool(
+                Some("Space rocket travel".to_string()),
+                None,
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         let prompt2 = state
-            .add_prompt_to_pool(Some("Test 2".to_string()), None, PromptSource::Host, None)
+            .add_prompt_to_pool(
+                Some("Garden flower bloom".to_string()),
+                None,
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.queue_prompt(&prompt1.id).await.unwrap();
@@ -285,12 +301,23 @@ mod tests {
         handle_message(ClientMessage::HostCreatePlayers { count: 3 }, &role, &state).await;
 
         // Queue 2 prompts so we can transition to PromptSelection
+        // Use distinct prompts that won't be merged by fuzzy deduplication
         let prompt1 = state
-            .add_prompt_to_pool(Some("Test 1".to_string()), None, PromptSource::Host, None)
+            .add_prompt_to_pool(
+                Some("Winter snow mountain".to_string()),
+                None,
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         let prompt2 = state
-            .add_prompt_to_pool(Some("Test 2".to_string()), None, PromptSource::Host, None)
+            .add_prompt_to_pool(
+                Some("Summer beach vacation".to_string()),
+                None,
+                PromptSource::Host,
+                None,
+            )
             .await
             .unwrap();
         state.queue_prompt(&prompt1.id).await.unwrap();
@@ -590,10 +617,10 @@ mod tests {
         // Should return None (silent success)
         assert!(result.is_none());
 
-        // Verify prompt was added to the global pool with submitter_id
+        // Verify prompt was added to the global pool with submitter_ids
         let pool = state.prompt_pool.read().await;
         assert_eq!(pool.len(), 1);
-        assert_eq!(pool[0].submitter_id, Some("voter123".to_string()));
+        assert!(pool[0].submitter_ids.contains(&"voter123".to_string()));
     }
 
     #[tokio::test]

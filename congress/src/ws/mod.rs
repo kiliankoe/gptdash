@@ -304,7 +304,8 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
     if role == Role::Host {
         // Send current prompts pool (independent of rounds)
         let prompts = state.get_prompts_for_host().await;
-        let host_prompts = ServerMessage::HostPrompts { prompts };
+        let stats = state.compute_prompt_pool_stats().await;
+        let host_prompts = ServerMessage::HostPrompts { prompts, stats };
         if let Ok(msg) = serde_json::to_string(&host_prompts) {
             let _ = sender.send(Message::Text(msg.into())).await;
         }

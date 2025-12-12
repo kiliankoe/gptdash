@@ -12,6 +12,7 @@ const gameState = {
   submissions: [],
   revealOrder: [], // Current reveal order (submission IDs)
   prompts: [], // Prompt candidates from audience (filtered by shadowban)
+  promptStats: { total: 0, host_count: 0, audience_count: 0, top_submitters: [] }, // Stats about prompt pool
   queuedPrompts: [], // Prompts queued for next round (max 3)
   scores: { players: [], audience_top: [] },
   validTransitions: [], // Populated by server
@@ -21,6 +22,12 @@ const gameState = {
   aiGenerationStatus: "idle", // idle, generating, completed, failed
   currentRound: null, // Current round info
   currentPrompt: null, // Currently selected prompt for the round
+};
+
+// Prompt section collapse state (persisted in localStorage)
+const promptSectionState = {
+  hostPrompts: localStorage.getItem('promptSection_hostPrompts') !== 'collapsed',
+  audiencePrompts: localStorage.getItem('promptSection_audiencePrompts') !== 'collapsed',
 };
 
 // Drag-and-drop state
@@ -153,6 +160,7 @@ function handleMessage(message) {
 
     case "host_prompts":
       gameState.prompts = message.prompts || [];
+      gameState.promptStats = message.stats || { total: 0, host_count: 0, audience_count: 0, top_submitters: [] };
       updatePromptsList();
       break;
 
@@ -727,72 +735,243 @@ function updatePlayersList() {
   }
 }
 
-function updatePromptsList() {
-  const container = document.getElementById("promptsList");
-  if (!container) return;
-  container.innerHTML = "";
+/**
+ * Update the prompt stats dashboard
+ */
+function updatePromptStats() {
+  const stats = gameState.promptStats;
 
-  if (gameState.prompts.length === 0) {
-    container.innerHTML =
-      '<p style="opacity: 0.6;">Keine Prompts verfügbar</p>';
+  // Update stat values
+  document.getElementById("promptStatTotal").textContent = stats.total || 0;
+  document.getElementById("promptStatHost").textContent = stats.host_count || 0;
+  document.getElementById("promptStatAudience").textContent = stats.audience_count || 0;
+
+  // Update top submitters section
+  const topSection = document.getElementById("topSubmittersSection");
+  const topList = document.getElementById("topSubmittersList");
+
+  if (stats.top_submitters && stats.top_submitters.length > 0) {
+    topSection.style.display = "block";
+    topList.innerHTML = stats.top_submitters.map(s => {
+      const shortId = s.voter_id.substring(0, 8);
+      return `
+        <div class="top-submitter-item">
+          <span class="submitter-id" title="${escapeHtml(s.voter_id)}">${shortId}...</span>
+          <span class="submitter-count">${s.count} Prompts</span>
+          <button class="danger small" onclick="shadowbanAudience('${s.voter_id}')" title="Shadowban">🚫</button>
+        </div>
+      `;
+    }).join("");
+  } else {
+    topSection.style.display = "none";
+  }
+}
+
+/**
+ * Toggle collapsible prompt section
+ */
+function togglePromptSection(sectionKey) {
+  const isExpanded = promptSectionState[sectionKey];
+  promptSectionState[sectionKey] = !isExpanded;
+
+  // Persist state
+  localStorage.setItem(`promptSection_${sectionKey}`, isExpanded ? 'collapsed' : 'expanded');
+
+  // Update UI
+  const listId = sectionKey === 'hostPrompts' ? 'hostPromptsList' : 'audiencePromptsList';
+  const toggleId = sectionKey === 'hostPrompts' ? 'hostPromptsToggle' : 'audiencePromptsToggle';
+
+  const list = document.getElementById(listId);
+  const toggle = document.getElementById(toggleId);
+
+  if (list) {
+    list.classList.toggle('collapsed', isExpanded);
+  }
+  if (toggle) {
+    toggle.textContent = isExpanded ? '▶' : '▼';
+  }
+}
+
+/**
+ * Filter prompts by search query
+ */
+function filterPrompts() {
+  const query = document.getElementById("promptSearchInput").value.toLowerCase().trim();
+
+  // Filter all prompt rows
+  document.querySelectorAll(".prompt-row").forEach(row => {
+    const text = row.dataset.searchText || "";
+    const matches = !query || text.toLowerCase().includes(query);
+    row.style.display = matches ? "" : "none";
+  });
+}
+
+/**
+ * Pick a random prompt from visible prompts and add to queue
+ */
+function pickRandomPrompt() {
+  const queuedIds = new Set(gameState.queuedPrompts.map(p => p.id));
+  const availablePrompts = gameState.prompts.filter(p => !queuedIds.has(p.id));
+
+  if (availablePrompts.length === 0) {
+    showAlert("Keine verfügbaren Prompts zum Auswählen", "warning");
     return;
   }
 
-  // Get IDs of queued prompts
-  const queuedIds = gameState.queuedPrompts.map((p) => p.id);
+  if (gameState.queuedPrompts.length >= 3) {
+    showAlert("Warteschlange ist voll (max. 3)", "warning");
+    return;
+  }
 
-  gameState.prompts.forEach((prompt) => {
-    const div = document.createElement("div");
-    div.className = "prompt-card";
+  const randomPrompt = availablePrompts[Math.floor(Math.random() * availablePrompts.length)];
+  queuePrompt(randomPrompt.id);
+}
 
-    const isAudience = prompt.source === "audience";
-    const shortId = prompt.submitter_id
-      ? `${prompt.submitter_id.substring(0, 8)}...`
-      : "";
-    const hasImage = !!prompt.image_url;
-    const hasText = !!prompt.text;
-    const isQueued = queuedIds.includes(prompt.id);
-    const queueFull = gameState.queuedPrompts.length >= 3;
+/**
+ * Shadowban all submitters of a deduplicated prompt
+ */
+function shadowbanPromptSubmitters(promptId) {
+  const prompt = gameState.prompts.find(p => p.id === promptId);
+  if (!prompt) return;
 
-    // Build content based on what's available
-    let contentHtml = "";
-    if (hasImage) {
-      contentHtml += `<div class="prompt-image"><img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" style="max-width: 200px; max-height: 150px; border-radius: 4px;"></div>`;
-    }
-    if (hasText) {
-      contentHtml += `<div class="prompt-text">${escapeHtml(prompt.text)}</div>`;
-    }
-    if (!hasImage && !hasText) {
-      contentHtml = '<div class="prompt-text">(Leerer Prompt)</div>';
-    }
+  const submitterCount = prompt.submitter_ids?.length || 0;
+  const message = submitterCount > 1
+    ? `Alle ${submitterCount} Einreicher dieses Prompts shadowbannen?\n\nDiese Nutzer können weiterhin Prompts einreichen, aber sie werden ignoriert.`
+    : "Diesen Einreicher shadowbannen?\n\nDer Nutzer kann weiterhin Prompts einreichen, aber sie werden ignoriert.";
 
-    // Queue button: disabled if already queued or queue is full
-    let queueBtn;
-    if (isQueued) {
-      queueBtn = `<button class="secondary" disabled>✓ In Warteschlange</button>`;
-    } else if (queueFull) {
-      queueBtn = `<button class="secondary" disabled title="Maximal 3 Prompts">Warteschlange voll</button>`;
-    } else {
-      queueBtn = `<button class="secondary" onclick="queuePrompt('${prompt.id}')">+ Warteschlange</button>`;
-    }
+  if (confirm(message)) {
+    wsConn.send({
+      t: "host_shadowban_prompt_submitters",
+      prompt_id: promptId,
+    });
+    showAlert(`${submitterCount} Nutzer shadowbanned`, "success");
+  }
+}
 
-    div.innerHTML = `
-      <div class="prompt-header">
-        <span class="prompt-id">${prompt.id.substring(0, 12)}...</span>
-        <span class="badge ${isAudience ? "audience" : "host"}">${isAudience ? "Publikum" : "Host"}</span>
-        ${hasImage ? '<span class="badge multimodal">Bild</span>' : ""}
-        ${isQueued ? '<span class="badge queued">Queued</span>' : ""}
-        ${shortId ? `<span class="submitter-id" title="${escapeHtml(prompt.submitter_id)}">${shortId}</span>` : ""}
-      </div>
-      ${contentHtml}
-      <div class="prompt-actions">
-        ${queueBtn}
-        ${isAudience && prompt.submitter_id ? `<button class="danger" onclick="shadowbanAudience('${prompt.submitter_id}')" title="Diesen Nutzer shadowbannen (ignoriert zukünftige Prompts)">🚫 Shadowban</button>` : ""}
-        <button class="danger small" onclick="deletePrompt('${prompt.id}')" title="Prompt löschen">🗑️</button>
-      </div>
-    `;
-    container.appendChild(div);
-  });
+/**
+ * Render a single compact prompt row
+ */
+function renderPromptRow(prompt, queuedIds, queueFull) {
+  const isQueued = queuedIds.has(prompt.id);
+  const hasImage = !!prompt.image_url;
+  const hasText = !!prompt.text;
+  const submitterCount = prompt.submission_count || 1;
+
+  // Build display text
+  let displayText = "";
+  if (hasText) {
+    displayText = prompt.text;
+  } else if (hasImage) {
+    displayText = "[Bild-Prompt]";
+  } else {
+    displayText = "(Leerer Prompt)";
+  }
+
+  // Truncate for display
+  const truncatedText = displayText.length > 60
+    ? `${displayText.substring(0, 60)}...`
+    : displayText;
+
+  // Build tooltip content
+  let tooltipContent = displayText;
+  if (hasImage) {
+    tooltipContent = `<img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" style="max-width: 300px; max-height: 200px;"><br>${tooltipContent}`;
+  }
+
+  // Submitter info for audience prompts
+  const submitterInfo = prompt.source === "audience" && prompt.submitter_ids?.length > 0
+    ? `<span class="submitter-count" title="${prompt.submitter_ids.length} Einreicher">${submitterCount}x</span>`
+    : "";
+
+  const div = document.createElement("div");
+  div.className = `prompt-row${isQueued ? " queued" : ""}`;
+  div.dataset.searchText = displayText;
+  div.dataset.promptId = prompt.id;
+
+  div.innerHTML = `
+    <div class="prompt-row-content">
+      ${hasImage ? '<span class="prompt-image-indicator" title="Hat Bild">🖼️</span>' : ""}
+      <span class="prompt-text-preview" title="${escapeHtml(displayText)}">${escapeHtml(truncatedText)}</span>
+      ${submitterInfo}
+    </div>
+    <div class="prompt-row-actions">
+      ${isQueued
+        ? '<span class="queued-badge">✓</span>'
+        : queueFull
+          ? ''
+          : `<button class="action-btn queue-btn" onclick="event.stopPropagation(); queuePrompt('${prompt.id}')" title="In Warteschlange">+</button>`
+      }
+      ${prompt.source === "audience" && prompt.submitter_ids?.length > 0
+        ? `<button class="action-btn ban-btn" onclick="event.stopPropagation(); shadowbanPromptSubmitters('${prompt.id}')" title="Einreicher shadowbannen">🚫</button>`
+        : ""
+      }
+      <button class="action-btn delete-btn" onclick="event.stopPropagation(); deletePrompt('${prompt.id}')" title="Löschen">×</button>
+    </div>
+    <div class="prompt-tooltip">${tooltipContent}</div>
+  `;
+
+  return div;
+}
+
+function updatePromptsList() {
+  // Update stats first
+  updatePromptStats();
+
+  const hostList = document.getElementById("hostPromptsList");
+  const audienceList = document.getElementById("audiencePromptsList");
+
+  if (!hostList || !audienceList) return;
+
+  // Get queued prompt IDs
+  const queuedIds = new Set(gameState.queuedPrompts.map(p => p.id));
+  const queueFull = gameState.queuedPrompts.length >= 3;
+
+  // Separate prompts by source
+  const hostPrompts = gameState.prompts.filter(p => p.source === "host");
+  const audiencePrompts = gameState.prompts.filter(p => p.source === "audience");
+
+  // Update counts
+  document.getElementById("hostPromptsCount").textContent = hostPrompts.length;
+  document.getElementById("audiencePromptsCount").textContent = audiencePrompts.length;
+
+  // Render host prompts
+  hostList.innerHTML = "";
+  if (hostPrompts.length === 0) {
+    hostList.innerHTML = '<p class="no-prompts-hint">Keine Host-Prompts</p>';
+  } else {
+    hostPrompts.forEach(prompt => {
+      hostList.appendChild(renderPromptRow(prompt, queuedIds, queueFull));
+    });
+  }
+
+  // Render audience prompts
+  audienceList.innerHTML = "";
+  if (audiencePrompts.length === 0) {
+    audienceList.innerHTML = '<p class="no-prompts-hint">Keine Publikums-Prompts</p>';
+  } else {
+    audiencePrompts.forEach(prompt => {
+      audienceList.appendChild(renderPromptRow(prompt, queuedIds, queueFull));
+    });
+  }
+
+  // Apply current collapse state
+  const hostToggle = document.getElementById("hostPromptsToggle");
+  const audienceToggle = document.getElementById("audiencePromptsToggle");
+
+  if (!promptSectionState.hostPrompts) {
+    hostList.classList.add('collapsed');
+    if (hostToggle) hostToggle.textContent = '▶';
+  }
+  if (!promptSectionState.audiencePrompts) {
+    audienceList.classList.add('collapsed');
+    if (audienceToggle) audienceToggle.textContent = '▶';
+  }
+
+  // Apply search filter if there's a query
+  const searchInput = document.getElementById("promptSearchInput");
+  if (searchInput?.value.trim()) {
+    filterPrompts();
+  }
 }
 
 function updateQueuedPromptsList() {
@@ -1408,7 +1587,12 @@ if (typeof window !== "undefined") {
     writeManualAiSubmission,
     selectAiSubmission,
     shadowbanAudience,
+    shadowbanPromptSubmitters,
     removePlayer,
+    // Prompt panel functions
+    togglePromptSection,
+    filterPrompts,
+    pickRandomPrompt,
     // State export/import
     refreshStateView,
     downloadStateExport,
