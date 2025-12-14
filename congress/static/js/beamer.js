@@ -32,10 +32,10 @@ function initializeBeamer() {
   // Initialize TTS
   tts = new TTSManager();
 
-  // Initialize timer
-  timer = new CountdownTimer("footerTimer", onTimerComplete);
+  // Initialize timer (using phase-specific timers, no footer timer)
+  timer = new CountdownTimer("writingTimer", onTimerComplete);
 
-  // Generate QR codes
+  // Generate QR codes and set URL
   generateQRCodes();
 
   // Connect to WebSocket
@@ -53,20 +53,12 @@ function generateQRCodes() {
     colorLight: "#faf5f5",
   });
 
-  // Footer QR (small)
-  QRCodeManager.generate("footerQR", url, {
-    width: 60,
-    height: 60,
-    colorDark: "#141414",
-    colorLight: "#faf5f5",
-  });
-
-  // Set URL text
+  // Set URL text in header and lobby
   const displayUrl = url.replace(/^https?:\/\//, "");
   const lobbyUrlEl = document.getElementById("lobbyUrl");
-  const footerUrlEl = document.getElementById("footerUrl");
+  const headerUrlEl = document.getElementById("headerUrl");
   if (lobbyUrlEl) lobbyUrlEl.textContent = displayUrl;
-  if (footerUrlEl) footerUrlEl.textContent = displayUrl;
+  if (headerUrlEl) headerUrlEl.textContent = displayUrl;
 }
 
 function connectWebSocket() {
@@ -162,6 +154,13 @@ function handlePhaseChange(msg) {
   gameState.phase = msg.phase;
   gameState.roundNo = msg.round_no;
   updateRoundBadge();
+
+  // Switch timer element based on phase
+  if (msg.phase === "WRITING") {
+    timer.setElement("writingTimer");
+  } else if (msg.phase === "VOTING") {
+    timer.setElement("votingTimer");
+  }
 
   // Handle timer
   if (msg.deadline) {
@@ -779,23 +778,29 @@ function updatePodium() {
 
 function onTimerComplete() {
   // Timer finished - add warning class to timers
-  const footerTimer = document.getElementById("footerTimer");
   const writingTimer = document.getElementById("writingTimer");
   const votingTimer = document.getElementById("votingTimer");
 
-  [footerTimer, writingTimer, votingTimer].forEach((el) => {
+  [writingTimer, votingTimer].forEach((el) => {
     if (el) {
       el.classList.add("warning");
     }
   });
 }
 
-// Sync phase-specific timers with footer timer
+// Sync phase-specific timers based on current phase
 setInterval(() => {
-  const footerTimer = document.getElementById("footerTimer");
-  if (!footerTimer) return;
+  // Get the active timer element based on phase
+  let activeTimerEl = null;
+  if (gameState.phase === "WRITING") {
+    activeTimerEl = document.getElementById("writingTimer");
+  } else if (gameState.phase === "VOTING") {
+    activeTimerEl = document.getElementById("votingTimer");
+  }
 
-  const time = footerTimer.textContent;
+  if (!activeTimerEl) return;
+
+  const time = activeTimerEl.textContent;
   if (!time || time === "") return;
 
   // Parse time to check for warning threshold
@@ -804,25 +809,9 @@ setInterval(() => {
   const seconds = parseInt(parts[1] || "0", 10);
   const isWarning = minutes === 0 && seconds <= 10;
 
-  // Update writing timer
-  const writingTimer = document.getElementById("writingTimer");
-  if (writingTimer && gameState.phase === "WRITING") {
-    writingTimer.textContent = time;
-    if (isWarning) {
-      writingTimer.classList.add("warning");
-    } else {
-      writingTimer.classList.remove("warning");
-    }
-  }
-
-  // Update voting timer
-  const votingTimer = document.getElementById("votingTimer");
-  if (votingTimer && gameState.phase === "VOTING") {
-    votingTimer.textContent = time;
-    if (isWarning) {
-      votingTimer.classList.add("warning");
-    } else {
-      votingTimer.classList.remove("warning");
-    }
+  if (isWarning) {
+    activeTimerEl.classList.add("warning");
+  } else {
+    activeTimerEl.classList.remove("warning");
   }
 }, 100);

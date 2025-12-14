@@ -326,6 +326,14 @@ class CountdownTimer {
     }
   }
 
+  /**
+   * Change the target element for the countdown display
+   * @param {string} elementId - New element ID to update
+   */
+  setElement(elementId) {
+    this.elementId = elementId;
+  }
+
   hide() {
     const el = document.getElementById(this.elementId);
     if (el) {
