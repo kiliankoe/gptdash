@@ -171,6 +171,13 @@ pub struct Player {
     pub display_name: Option<String>,
 }
 
+/// Audience member with auto-generated friendly display name
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudienceMember {
+    pub voter_id: VoterId,
+    pub display_name: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {

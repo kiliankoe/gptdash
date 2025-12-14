@@ -198,6 +198,8 @@ pub enum ServerMessage {
     },
     /// Sent to audience on reconnect with their current vote
     AudienceState {
+        /// Auto-generated friendly display name for this audience member
+        display_name: String,
         has_voted: bool,
         current_vote: Option<AudienceVoteInfo>,
     },

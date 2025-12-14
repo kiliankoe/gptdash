@@ -63,17 +63,23 @@ impl AppState {
 
         // Compute audience scores
         let votes = self.votes.read().await;
+        let audience_members = self.audience_members.read().await;
         let mut audience_scores_map: HashMap<VoterId, Score> = HashMap::new();
 
         for vote in votes.values() {
             if vote.round_id == *round_id {
+                // Look up audience member's display name
+                let display_name = audience_members
+                    .get(&vote.voter_id)
+                    .map(|m| m.display_name.clone());
+
                 let score = audience_scores_map
                     .entry(vote.voter_id.clone())
                     .or_insert_with(|| Score {
                         id: ulid::Ulid::new().to_string(),
                         kind: ScoreKind::Audience,
                         ref_id: vote.voter_id.clone(),
-                        display_name: None,
+                        display_name,
                         ai_detect_points: 0,
                         funny_points: 0,
                         total: 0,
@@ -86,6 +92,7 @@ impl AppState {
                 }
             }
         }
+        drop(audience_members);
 
         let audience_scores: Vec<Score> = audience_scores_map.into_values().collect();
 
@@ -133,11 +140,15 @@ impl AppState {
                             id: score.ref_id.clone(),
                             kind: ScoreKind::Audience,
                             ref_id: score.ref_id.clone(),
-                            display_name: None,
+                            display_name: score.display_name.clone(),
                             ai_detect_points: 0,
                             funny_points: 0,
                             total: 0,
                         });
+                    // Update display_name if we get a newer one (in case name was added later)
+                    if score.display_name.is_some() && entry.display_name.is_none() {
+                        entry.display_name = score.display_name.clone();
+                    }
                     entry.ai_detect_points += score.ai_detect_points;
                     entry.funny_points += score.funny_points;
                     entry.total += score.total;

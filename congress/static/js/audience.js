@@ -4,6 +4,7 @@
 
 let wsConn = null;
 let voterToken = null;
+let displayName = null; // Auto-generated friendly name from server
 let currentPhase = null;
 let submissions = [];
 let selectedAiAnswer = null;
@@ -71,6 +72,13 @@ function handleMessage(message) {
     case "audience_state":
       // State recovery on reconnect
       console.log("Audience state recovery:", message);
+
+      // Store and display the friendly name
+      if (message.display_name) {
+        displayName = message.display_name;
+        updateDisplayNameUI();
+      }
+
       if (message.has_voted && message.current_vote) {
         hasVoted = true;
         selectedAiAnswer = message.current_vote.ai_pick;
@@ -302,6 +310,22 @@ function updateWaitingMessage(icon, title, message) {
   if (iconEl) iconEl.innerHTML = icon;
   if (titleEl) titleEl.textContent = title;
   if (messageEl) messageEl.textContent = message;
+}
+
+function updateDisplayNameUI() {
+  // Update all elements that show the display name
+  const nameElements = document.querySelectorAll(".audience-display-name");
+  nameElements.forEach((el) => {
+    el.textContent = displayName || "";
+    el.style.display = displayName ? "block" : "none";
+  });
+
+  // Update the header name display
+  const headerName = document.getElementById("headerDisplayName");
+  if (headerName) {
+    headerName.textContent = displayName || "";
+    headerName.style.display = displayName ? "inline" : "none";
+  }
 }
 
 function showVotingScreen() {

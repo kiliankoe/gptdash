@@ -119,9 +119,13 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                 }
             }
             Role::Audience => {
+                // Get or create audience member with friendly display name
+                let member = state.get_or_create_audience_member(token).await;
+
                 // Try to recover audience vote state
                 let vote = state.get_audience_vote_for_current_round(token).await;
                 let audience_state = ServerMessage::AudienceState {
+                    display_name: member.display_name.clone(),
                     has_voted: vote.is_some(),
                     current_vote: vote.map(|v| AudienceVoteInfo {
                         ai_pick: v.ai_pick_submission_id,
@@ -131,7 +135,10 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                 if let Ok(msg) = serde_json::to_string(&audience_state) {
                     let _ = sender.send(Message::Text(msg.into())).await;
                 }
-                tracing::info!("Sent audience state recovery for token");
+                tracing::info!(
+                    "Sent audience state recovery for token (name: {})",
+                    member.display_name
+                );
 
                 // Send phase-specific state for audience
                 match game.phase {

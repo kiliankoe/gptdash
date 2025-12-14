@@ -11,7 +11,8 @@ use std::collections::{HashMap, HashSet};
 /// Schema version for export format compatibility
 /// Version 2: prompt_pool moved from Round.prompt_candidates to global pool
 /// Version 3: Prompt struct changed - submitter_id -> submitter_ids (Vec), added submission_count, created_at
-pub const EXPORT_SCHEMA_VERSION: u32 = 3;
+/// Version 4: Added audience_members with auto-generated display names
+pub const EXPORT_SCHEMA_VERSION: u32 = 4;
 
 /// A serializable snapshot of the entire game state.
 ///
@@ -47,6 +48,9 @@ pub struct GameStateExport {
     /// Global prompt pool (persists across games)
     #[serde(default)]
     pub prompt_pool: Vec<Prompt>,
+    /// Audience members with auto-generated display names (persists across games)
+    #[serde(default)]
+    pub audience_members: HashMap<VoterId, AudienceMember>,
 }
 
 impl GameStateExport {
@@ -63,6 +67,7 @@ impl GameStateExport {
         player_status: HashMap<PlayerId, PlayerSubmissionStatus>,
         shadowbanned_audience: HashSet<VoterId>,
         prompt_pool: Vec<Prompt>,
+        audience_members: HashMap<VoterId, AudienceMember>,
     ) -> Self {
         Self {
             schema_version: EXPORT_SCHEMA_VERSION,
@@ -77,6 +82,7 @@ impl GameStateExport {
             player_status,
             shadowbanned_audience,
             prompt_pool,
+            audience_members,
         }
     }
 
@@ -154,6 +160,7 @@ mod tests {
             HashMap::new(),
             HashSet::new(),
             Vec::new(),
+            HashMap::new(),
         );
 
         let json = serde_json::to_string_pretty(&export).unwrap();
@@ -187,6 +194,7 @@ mod tests {
             player_status: HashMap::new(),
             shadowbanned_audience: HashSet::new(),
             prompt_pool: Vec::new(),
+            audience_members: HashMap::new(),
         };
 
         let result = export.validate();
@@ -209,6 +217,7 @@ mod tests {
             player_status: HashMap::new(),
             shadowbanned_audience: HashSet::new(),
             prompt_pool: Vec::new(),
+            audience_members: HashMap::new(),
         };
 
         let result = export.validate();

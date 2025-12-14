@@ -634,6 +634,49 @@ function updateLeaderboard() {
         `;
     })
     .join("");
+
+  // Also update audience leaderboard
+  updateAudienceLeaderboard();
+}
+
+function updateAudienceLeaderboard() {
+  const container = document.getElementById("audienceLeaderboardList");
+  if (!container) return;
+
+  const audience = gameState.scores.audienceTop;
+
+  if (!audience || audience.length === 0) {
+    container.innerHTML =
+      '<div class="body-text" style="opacity: 0.6; text-align: center;">Noch keine Detektive</div>';
+    return;
+  }
+
+  // Sort by total score descending (should already be sorted, but ensure)
+  const sorted = [...audience].sort((a, b) => b.total - a.total);
+
+  // Show top 5 audience members
+  container.innerHTML = sorted
+    .slice(0, 5)
+    .map((member, index) => {
+      const rankClass =
+        index === 0
+          ? "gold"
+          : index === 1
+            ? "silver"
+            : index === 2
+              ? "bronze"
+              : "";
+      // Use display_name from server (auto-generated friendly name) or fallback
+      const displayName = member.display_name || `Detektiv ${index + 1}`;
+      return `
+            <div class="leaderboard-row" style="animation-delay: ${index * 0.1}s">
+                <div class="leaderboard-rank ${rankClass}">${index + 1}</div>
+                <div class="leaderboard-name">${escapeHtml(displayName)}</div>
+                <div class="leaderboard-score">${member.total}</div>
+            </div>
+        `;
+    })
+    .join("");
 }
 
 function updateResultReveals() {

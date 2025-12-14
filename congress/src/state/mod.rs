@@ -35,6 +35,8 @@ pub struct AppState {
     pub queued_prompts: Arc<RwLock<Vec<Prompt>>>,
     /// Audience votes on which queued prompt to use (voter_id -> prompt_id)
     pub prompt_votes: Arc<RwLock<HashMap<VoterId, PromptId>>>,
+    /// Audience members with auto-generated display names (persists across games)
+    pub audience_members: Arc<RwLock<HashMap<VoterId, AudienceMember>>>,
     /// LLM manager for generating AI answers
     pub llm: Option<Arc<LlmManager>>,
     /// LLM configuration (timeout, max tokens, etc.)
@@ -69,6 +71,7 @@ impl AppState {
             prompt_pool: Arc::new(RwLock::new(Vec::new())),
             queued_prompts: Arc::new(RwLock::new(Vec::new())),
             prompt_votes: Arc::new(RwLock::new(HashMap::new())),
+            audience_members: Arc::new(RwLock::new(HashMap::new())),
             llm: llm.map(Arc::new),
             llm_config,
             broadcast: broadcast_tx,
@@ -105,6 +108,92 @@ impl AppState {
             .iter()
             .cloned()
             .collect()
+    }
+
+    // =========================================================================
+    // Audience Member Management (auto-generated friendly names)
+    // =========================================================================
+
+    /// Generate a unique friendly name for an audience member
+    /// Uses petname crate to generate adjective-noun combinations
+    fn generate_unique_name(existing_names: &HashSet<String>) -> String {
+        // Helper to capitalize each word
+        fn capitalize(name: &str) -> String {
+            name.split(' ')
+                .map(|word| {
+                    let mut chars = word.chars();
+                    match chars.next() {
+                        None => String::new(),
+                        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        }
+
+        // Try to generate a unique 2-word name (adjective + noun)
+        for _ in 0..100 {
+            // petname::petname() generates a name using thread-local RNG
+            if let Some(name) = petname::petname(2, " ") {
+                let capitalized = capitalize(&name);
+                if !existing_names.contains(&capitalized) {
+                    return capitalized;
+                }
+            }
+        }
+
+        // Fallback: add a random number suffix if all attempts fail
+        let base_name = petname::petname(2, " ").unwrap_or_else(|| "Mystery Guest".to_string());
+        let suffix: u16 = rand::random::<u16>() % 1000;
+        format!("{} {}", capitalize(&base_name), suffix)
+    }
+
+    /// Get or create an audience member with an auto-generated display name
+    /// Returns the member (newly created or existing)
+    pub async fn get_or_create_audience_member(&self, voter_id: &str) -> AudienceMember {
+        // Check if member already exists
+        {
+            let members = self.audience_members.read().await;
+            if let Some(member) = members.get(voter_id) {
+                return member.clone();
+            }
+        }
+
+        // Generate a unique name
+        let existing_names: HashSet<String> = {
+            let members = self.audience_members.read().await;
+            members.values().map(|m| m.display_name.clone()).collect()
+        };
+        let display_name = Self::generate_unique_name(&existing_names);
+
+        // Create and store the new member
+        let member = AudienceMember {
+            voter_id: voter_id.to_string(),
+            display_name,
+        };
+
+        self.audience_members
+            .write()
+            .await
+            .insert(voter_id.to_string(), member.clone());
+
+        tracing::info!(
+            "Created new audience member: {} -> {}",
+            voter_id,
+            member.display_name
+        );
+
+        member
+    }
+
+    /// Get an existing audience member by voter_id (returns None if not found)
+    pub async fn get_audience_member(&self, voter_id: &str) -> Option<AudienceMember> {
+        self.audience_members.read().await.get(voter_id).cloned()
+    }
+
+    /// Get all audience members (for export)
+    pub async fn get_all_audience_members(&self) -> HashMap<VoterId, AudienceMember> {
+        self.audience_members.read().await.clone()
     }
 
     /// Get prompt pool for host (filtered by shadowban status)
@@ -591,6 +680,7 @@ impl AppState {
         let player_status = self.player_status.read().await.clone();
         let shadowbanned_audience = self.shadowbanned_audience.read().await.clone();
         let prompt_pool = self.prompt_pool.read().await.clone();
+        let audience_members = self.audience_members.read().await.clone();
 
         GameStateExport::new(
             game,
@@ -603,6 +693,7 @@ impl AppState {
             player_status,
             shadowbanned_audience,
             prompt_pool,
+            audience_members,
         )
     }
 
@@ -625,6 +716,7 @@ impl AppState {
         *self.player_status.write().await = export.player_status;
         *self.shadowbanned_audience.write().await = export.shadowbanned_audience;
         *self.prompt_pool.write().await = export.prompt_pool;
+        *self.audience_members.write().await = export.audience_members;
 
         // Broadcast state refresh to all clients
         if let Some(ref game) = export.game {
