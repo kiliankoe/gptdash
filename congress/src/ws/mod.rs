@@ -8,11 +8,13 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Query, State,
     },
+    http::StatusCode,
     response::IntoResponse,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::protocol::{
     AudienceVoteInfo, ClientMessage, HostSubmissionInfo, ServerMessage, SubmissionInfo,
@@ -20,10 +22,138 @@ use crate::protocol::{
 use crate::state::AppState;
 use crate::types::{GamePhase, Role};
 
+const MAX_WS_MESSAGE_BYTES: usize = 32 * 1024;
+
 #[derive(Debug, Deserialize)]
 pub struct WsQuery {
     pub role: Option<String>,
     pub token: Option<String>,
+}
+
+#[derive(Debug)]
+struct TokenBucket {
+    rate_per_sec: f64,
+    burst: f64,
+    allowance: f64,
+    last_check: Instant,
+}
+
+impl TokenBucket {
+    fn new(rate_per_sec: f64, burst: f64) -> Self {
+        Self {
+            rate_per_sec,
+            burst,
+            allowance: burst,
+            last_check: Instant::now(),
+        }
+    }
+
+    fn allow(&mut self) -> bool {
+        let now = Instant::now();
+        let elapsed = (now - self.last_check).as_secs_f64();
+        self.last_check = now;
+
+        self.allowance = (self.allowance + elapsed * self.rate_per_sec).min(self.burst);
+        if self.allowance < 1.0 {
+            return false;
+        }
+        self.allowance -= 1.0;
+        true
+    }
+}
+
+fn token_required_for_role(role: &Role) -> bool {
+    matches!(role, Role::Player | Role::Audience)
+}
+
+fn validate_message_for_role(
+    role: &Role,
+    connection_token: Option<&str>,
+    msg: &ClientMessage,
+) -> Result<(), ValidationError> {
+    // We allow Join/AckNeeded from anyone (including beamer/host), but everything else is role-bound.
+    match role {
+        Role::Audience => match msg {
+            ClientMessage::Join { .. } | ClientMessage::AckNeeded { .. } => Ok(()),
+            ClientMessage::Vote { voter_token, .. }
+            | ClientMessage::PromptVote { voter_token, .. } => {
+                if connection_token == Some(voter_token.as_str()) {
+                    Ok(())
+                } else {
+                    Err(ValidationError::TokenMismatch)
+                }
+            }
+            ClientMessage::SubmitPrompt { voter_token, .. } => {
+                let Some(voter_token) = voter_token.as_deref() else {
+                    return Err(ValidationError::TokenRequired("Missing voter token"));
+                };
+                if connection_token == Some(voter_token) {
+                    Ok(())
+                } else {
+                    Err(ValidationError::TokenMismatch)
+                }
+            }
+            _ => Err(ValidationError::UnauthorizedRole(
+                "Message type not allowed for audience connections",
+            )),
+        },
+        Role::Player => match msg {
+            ClientMessage::Join { .. } | ClientMessage::AckNeeded { .. } => Ok(()),
+            ClientMessage::RegisterPlayer { player_token, .. }
+            | ClientMessage::RequestTypoCheck { player_token, .. }
+            | ClientMessage::UpdateSubmission { player_token, .. } => {
+                if connection_token == Some(player_token.as_str()) {
+                    Ok(())
+                } else {
+                    Err(ValidationError::TokenMismatch)
+                }
+            }
+            ClientMessage::SubmitAnswer { player_token, .. } => {
+                let Some(player_token) = player_token.as_deref() else {
+                    return Err(ValidationError::TokenRequired("Missing player token"));
+                };
+                if connection_token == Some(player_token) {
+                    Ok(())
+                } else {
+                    Err(ValidationError::TokenMismatch)
+                }
+            }
+            _ => Err(ValidationError::UnauthorizedRole(
+                "Message type not allowed for player connections",
+            )),
+        },
+        Role::Beamer => match msg {
+            ClientMessage::Join { .. } | ClientMessage::AckNeeded { .. } => Ok(()),
+            _ => Err(ValidationError::UnauthorizedRole("Beamer is read-only")),
+        },
+        Role::Host => Ok(()),
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ValidationError {
+    TokenRequired(&'static str),
+    TokenMismatch,
+    UnauthorizedRole(&'static str),
+}
+
+impl ValidationError {
+    fn to_server_message(self) -> ServerMessage {
+        match self {
+            ValidationError::TokenRequired(msg) => ServerMessage::Error {
+                code: "TOKEN_REQUIRED".to_string(),
+                msg: msg.to_string(),
+            },
+            ValidationError::TokenMismatch => ServerMessage::Error {
+                code: "TOKEN_MISMATCH".to_string(),
+                msg: "Token mismatch for this connection".to_string(),
+            },
+            ValidationError::UnauthorizedRole(msg) => ServerMessage::Error {
+                code: "UNAUTHORIZED_ROLE".to_string(),
+                msg: msg.to_string(),
+            },
+        }
+    }
 }
 
 /// WebSocket upgrade handler
@@ -32,6 +162,21 @@ pub async fn ws_handler(
     Query(params): Query<WsQuery>,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    let role = match params.role.as_deref() {
+        Some("host") => Role::Host,
+        Some("beamer") => Role::Beamer,
+        Some("player") => Role::Player,
+        _ => Role::Audience,
+    };
+
+    if token_required_for_role(&role) && params.token.is_none() {
+        return (
+            StatusCode::FORBIDDEN,
+            "Missing token. Reconnect with ?token=... in the WebSocket URL.",
+        )
+            .into_response();
+    }
+
     tracing::info!(
         "WebSocket connection request: role={:?}, token={:?}",
         params.role,
@@ -53,6 +198,8 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
     };
 
     tracing::info!("WebSocket connected with role: {:?}", role);
+
+    let connection_token = params.token.as_deref();
 
     // Ensure a game exists
     let game = match state.get_game().await {
@@ -358,6 +505,7 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
     };
 
     // Handle incoming messages and broadcasts
+    let mut msg_rate_limiter = TokenBucket::new(20.0, 40.0);
     loop {
         tokio::select! {
             // Handle general broadcasts (all clients)
@@ -413,10 +561,44 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
             ws_msg = receiver.next() => {
                 match ws_msg {
                     Some(Ok(Message::Text(text))) => {
+                        if text.len() > MAX_WS_MESSAGE_BYTES {
+                            let error = ServerMessage::Error {
+                                code: "MESSAGE_TOO_LARGE".to_string(),
+                                msg: "Message too large".to_string(),
+                            };
+                            if let Ok(json) = serde_json::to_string(&error) {
+                                let _ = sender.send(Message::Text(json.into())).await;
+                            }
+                            break;
+                        }
+
+                        if !msg_rate_limiter.allow() {
+                            let error = ServerMessage::Error {
+                                code: "RATE_LIMITED".to_string(),
+                                msg: "Too many messages. Please slow down.".to_string(),
+                            };
+                            if let Ok(json) = serde_json::to_string(&error) {
+                                let _ = sender.send(Message::Text(json.into())).await;
+                            }
+                            break;
+                        }
+
                         tracing::debug!("Received message: {}", text);
 
                         match serde_json::from_str::<ClientMessage>(&text) {
                             Ok(client_msg) => {
+                                if let Err(err_msg) = validate_message_for_role(
+                                    &role,
+                                    connection_token,
+                                    &client_msg,
+                                ) {
+                                    let err_msg = err_msg.to_server_message();
+                                    if let Ok(json) = serde_json::to_string(&err_msg) {
+                                        let _ = sender.send(Message::Text(json.into())).await;
+                                    }
+                                    continue;
+                                }
+
                                 if let Some(response) =
                                     handlers::handle_message(client_msg, &role, &state).await
                                 {

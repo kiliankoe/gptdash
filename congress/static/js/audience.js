@@ -24,6 +24,11 @@ let hasPromptVoted = false;
 function init() {
   // Check if voter token is in localStorage
   voterToken = localStorage.getItem(STORAGE_KEY);
+  // Ensure we always have a token before connecting (server requires it)
+  if (!voterToken) {
+    voterToken = generateId("voter");
+    localStorage.setItem(STORAGE_KEY, voterToken);
+  }
 
   // Initialize timer
   audienceTimer = new CountdownTimer("audienceTimer");
@@ -181,14 +186,6 @@ function handleMessage(message) {
 }
 
 function joinAudience() {
-  // Generate voter token if we don't have one
-  if (!voterToken) {
-    voterToken = generateId("voter");
-    localStorage.setItem(STORAGE_KEY, voterToken);
-    // Update connection with token for future reconnects
-    wsConn.setToken(voterToken);
-  }
-
   if (!requireConnection("welcomeError")) {
     return;
   }

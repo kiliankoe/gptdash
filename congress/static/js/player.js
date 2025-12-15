@@ -39,14 +39,14 @@ function init() {
   // Initialize timer
   playerTimer = new CountdownTimer("playerTimer");
 
-  // Connect to WebSocket with token for state recovery
-  wsConn = new WSConnection(
-    "player",
-    handleMessage,
-    updateConnectionStatus,
-    playerToken,
-  );
-  wsConn.connect();
+  // Create WS connection manager.
+  // Only connect once we have a token (server requires it for player connections).
+  wsConn = new WSConnection("player", handleMessage, updateConnectionStatus, playerToken);
+  if (playerToken) {
+    wsConn.connect();
+  } else {
+    updateConnectionStatus(false, "Token eingeben");
+  }
 }
 
 function requireConnection(errorElementId) {
@@ -233,10 +233,6 @@ function joinGame() {
 
   if (!token) {
     showError("joinError", "Bitte gib einen Spieler-Token ein");
-    return;
-  }
-
-  if (!requireConnection("joinError")) {
     return;
   }
 
