@@ -619,6 +619,30 @@ function selectAiSubmission(submissionId) {
   showAlert("KI-Antwort ausgewählt", "success");
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: Called from onclick in host.html / dynamic HTML.
+function removeSubmission(submissionId) {
+  const sub = gameState.submissions.find((s) => s.id === submissionId);
+  const label =
+    sub?.author_kind === "ai"
+      ? "Diese KI-Antwort entfernen?"
+      : "Diese Antwort entfernen?";
+
+  if (!confirm(`${label}\n\nDas kann nicht rückgängig gemacht werden.`)) {
+    return;
+  }
+
+  wsConn.send({
+    t: "host_remove_submission",
+    submission_id: submissionId,
+  });
+
+  if (gameState.selectedAiSubmissionId === submissionId) {
+    gameState.selectedAiSubmissionId = null;
+  }
+
+  showAlert("Antwort entfernt", "success");
+}
+
 function handleAiGenerationStatus(message) {
   gameState.aiGenerationStatus = message.status;
   updateAiGenerationStatusUI(message);
@@ -675,6 +699,13 @@ function updateAiSubmissionsList() {
     (s) => s.author_kind === "ai",
   );
 
+  if (
+    gameState.selectedAiSubmissionId &&
+    !aiSubmissions.some((s) => s.id === gameState.selectedAiSubmissionId)
+  ) {
+    gameState.selectedAiSubmissionId = null;
+  }
+
   if (aiSubmissions.length === 0) {
     container.innerHTML =
       '<p style="opacity: 0.6;">Keine KI-Antworten vorhanden</p>';
@@ -704,6 +735,9 @@ function updateAiSubmissionsList() {
         <div class="ai-card-actions">
           <button class="${isSelected ? "" : "secondary"}" onclick="event.stopPropagation(); selectAiSubmission('${sub.id}')">
             ${isSelected ? "Ausgewählt" : "Auswählen"}
+          </button>
+          <button class="remove-btn" onclick="event.stopPropagation(); removeSubmission('${sub.id}')">
+            Entfernen
           </button>
         </div>
       </div>
@@ -1590,6 +1624,7 @@ function updateSubmissionsList() {
       <div class="text">${escapeHtml(sub.display_text)}</div>
       <div class="actions">
         ${authorKind === "ai" && !isSelectedAi ? `<button onclick="selectAiSubmission('${sub.id}')">Als KI auswählen</button>` : ""}
+        ${authorKind === "ai" ? `<button class="remove-btn" onclick="removeSubmission('${sub.id}')">Entfernen</button>` : ""}
         ${authorKind === "player" ? `<button class="danger" onclick="markDuplicate('${sub.id}')">Dupe</button>` : ""}
         <button class="secondary">Bearbeiten</button>
       </div>

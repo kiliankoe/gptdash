@@ -460,6 +460,15 @@ select:focus {
   background: rgba(255, 255, 255, 0.2);
 }
 
+.remove-btn {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.remove-btn:hover {
+  background: rgba(239, 68, 68, 0.4);
+}
+
 .player-token .remove-btn {
   padding: 4px 8px;
   font-size: 12px;

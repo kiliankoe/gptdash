@@ -2,6 +2,7 @@ use super::AppState;
 use crate::llm::GenerateRequest;
 use crate::protocol::ServerMessage;
 use crate::types::*;
+use std::collections::HashSet;
 
 impl AppState {
     /// Create a new round
@@ -287,11 +288,58 @@ impl AppState {
             return Err("All LLM providers failed".to_string());
         }
 
+        // If an AI answer was previously selected, try to keep the selection on regeneration
+        // by re-selecting the new answer from the same provider.
+        let selected_ai_provider: Option<String> = {
+            let selected_id = {
+                let rounds = self.rounds.read().await;
+                rounds
+                    .get(round_id)
+                    .and_then(|r| r.ai_submission_id.clone())
+            };
+            if let Some(id) = selected_id {
+                let submissions = self.submissions.read().await;
+                submissions
+                    .get(&id)
+                    .and_then(|s| s.author_ref.clone())
+                    .and_then(|r| r.split(':').next().map(|p| p.to_string()))
+            } else {
+                None
+            }
+        };
+
         // Track generated submission IDs for auto-selection
         let mut generated_submission_ids = Vec::new();
 
         // Store each AI submission with provider metadata
         for (provider_name, response) in responses {
+            // Remove older submissions from this provider to avoid duplicates on regeneration.
+            let provider_prefix = format!("{}:", provider_name);
+            let removed_ids: HashSet<SubmissionId> = {
+                let submissions = self.submissions.read().await;
+                submissions
+                    .values()
+                    .filter(|s| {
+                        s.round_id == round_id
+                            && s.author_kind == AuthorKind::Ai
+                            && s.author_ref
+                                .as_deref()
+                                .is_some_and(|r| r.starts_with(&provider_prefix))
+                    })
+                    .map(|s| s.id.clone())
+                    .collect()
+            };
+
+            if !removed_ids.is_empty() {
+                let mut submissions = self.submissions.write().await;
+                for id in &removed_ids {
+                    submissions.remove(id);
+                }
+                drop(submissions);
+                self.cleanup_round_after_submission_removals(round_id, &removed_ids)
+                    .await;
+            }
+
             let submission_id = ulid::Ulid::new().to_string();
 
             // Truncate if needed
@@ -318,6 +366,15 @@ impl AppState {
                 .insert(submission_id.clone(), submission.clone());
 
             generated_submission_ids.push(submission_id.clone());
+
+            // If the host had selected an AI answer previously, keep the selection on the same
+            // provider when regenerating (as long as that provider returned a new answer).
+            if selected_ai_provider.as_deref() == Some(provider_name.as_str()) {
+                let mut rounds = self.rounds.write().await;
+                if let Some(round) = rounds.get_mut(round_id) {
+                    round.ai_submission_id = Some(submission_id.clone());
+                }
+            }
 
             tracing::info!(
                 "Generated AI submission from {}: {} chars in {}ms",

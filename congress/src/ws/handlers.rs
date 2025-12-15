@@ -166,6 +166,11 @@ pub async fn handle_message(
             host::handle_regenerate_ai(state).await
         }
 
+        ClientMessage::HostRemoveSubmission { submission_id } => {
+            check_host!(role, "remove submissions");
+            host::handle_remove_submission(state, submission_id).await
+        }
+
         ClientMessage::HostWriteAiSubmission { text } => {
             check_host!(role, "write AI submissions");
             host::handle_write_ai_submission(state, text).await

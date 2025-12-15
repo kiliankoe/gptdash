@@ -401,6 +401,18 @@ pub async fn handle_regenerate_ai(state: &Arc<AppState>) -> Option<ServerMessage
         }
     };
 
+    // Regenerating AI after revealing/voting can invalidate reveal order and votes.
+    // Keep this operation constrained to the collecting phase.
+    if round.state != crate::types::RoundState::Collecting {
+        return Some(ServerMessage::Error {
+            code: "INVALID_ROUND_STATE".to_string(),
+            msg: format!(
+                "Can only regenerate AI submissions while collecting (currently: {:?})",
+                round.state
+            ),
+        });
+    }
+
     // Notify host that generation is starting
     let is_multimodal = prompt.image_url.is_some();
     state.broadcast_to_host(ServerMessage::AiGenerationStatus {
@@ -439,6 +451,29 @@ pub async fn handle_regenerate_ai(state: &Arc<AppState>) -> Option<ServerMessage
     });
 
     None
+}
+
+pub async fn handle_remove_submission(
+    state: &Arc<AppState>,
+    submission_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host removing submission: {}", submission_id);
+
+    match state.remove_submission(&submission_id).await {
+        Ok(player_id) => {
+            if let Some(pid) = player_id {
+                state.broadcast_to_all(ServerMessage::SubmissionRejected {
+                    player_id: pid,
+                    reason: "removed".to_string(),
+                });
+            }
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "REMOVE_SUBMISSION_FAILED".to_string(),
+            msg: e,
+        }),
+    }
 }
 
 pub async fn handle_write_ai_submission(

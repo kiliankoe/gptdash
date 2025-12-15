@@ -1,9 +1,21 @@
 use super::AppState;
 use crate::types::*;
+use std::collections::HashSet;
 
 /// Normalize text for duplicate comparison (trim whitespace, lowercase)
 fn normalize(text: &str) -> String {
     text.trim().to_lowercase()
+}
+
+fn clamp_reveal_index(round: &mut Round) {
+    if round.reveal_order.is_empty() {
+        round.reveal_index = 0;
+        return;
+    }
+
+    if round.reveal_index >= round.reveal_order.len() {
+        round.reveal_index = round.reveal_order.len() - 1;
+    }
 }
 
 impl AppState {
@@ -152,10 +164,132 @@ impl AppState {
             }
         };
 
+        // Clean up any round references to the removed submission
+        let removed_ids: HashSet<SubmissionId> = [submission_id.to_string()].into_iter().collect();
+        self.cleanup_round_after_submission_removals(&round_id, &removed_ids)
+            .await;
+
         // Broadcast updated submissions list
         self.broadcast_submissions(&round_id).await;
 
         Ok(player_id)
+    }
+
+    /// Remove a submission from the current round (host only).
+    /// Returns the player_id if it was a player submission, so we can notify them.
+    pub async fn remove_submission(&self, submission_id: &str) -> Result<Option<PlayerId>, String> {
+        let round = self
+            .get_current_round()
+            .await
+            .ok_or_else(|| "No active round".to_string())?;
+
+        // Validate the submission exists and belongs to the current round
+        let belongs_to_round = {
+            let submissions = self.submissions.read().await;
+            submissions
+                .get(submission_id)
+                .map(|s| s.round_id == round.id)
+                .unwrap_or(false)
+        };
+
+        if !belongs_to_round {
+            return Err("Submission not found in current round".to_string());
+        }
+
+        // Removing submissions once voting has started can strand audience clients in "already voted"
+        // UI state. Keep this constrained to pre-voting phases.
+        if !matches!(
+            round.state,
+            RoundState::Setup | RoundState::Collecting | RoundState::Revealing
+        ) {
+            return Err(format!(
+                "Can only remove submissions during setup/collecting/revealing (currently: {:?})",
+                round.state
+            ));
+        }
+
+        // Don't allow removal if any votes already exist (they would be invalidated).
+        let has_votes = {
+            let votes = self.votes.read().await;
+            votes.values().any(|v| v.round_id == round.id)
+        };
+        if has_votes {
+            return Err("Cannot remove submissions after votes have been cast".to_string());
+        }
+
+        // Don't allow removing the last submission while revealing.
+        if round.state == RoundState::Revealing {
+            let submission_count = {
+                let submissions = self.submissions.read().await;
+                submissions
+                    .values()
+                    .filter(|s| s.round_id == round.id)
+                    .count()
+            };
+            if submission_count <= 1 {
+                return Err("Cannot remove the last submission during reveal".to_string());
+            }
+        }
+
+        let (round_id, player_id) = {
+            let mut submissions = self.submissions.write().await;
+            let submission = submissions
+                .remove(submission_id)
+                .ok_or_else(|| "Submission not found".to_string())?;
+
+            let player_id = if submission.author_kind == AuthorKind::Player {
+                submission.author_ref.clone()
+            } else {
+                None
+            };
+
+            (submission.round_id, player_id)
+        };
+
+        let removed_ids: HashSet<SubmissionId> = [submission_id.to_string()].into_iter().collect();
+        self.cleanup_round_after_submission_removals(&round_id, &removed_ids)
+            .await;
+
+        // Broadcast updated submissions list
+        self.broadcast_submissions(&round_id).await;
+
+        Ok(player_id)
+    }
+
+    pub(super) async fn cleanup_round_after_submission_removals(
+        &self,
+        round_id: &str,
+        removed_ids: &HashSet<SubmissionId>,
+    ) {
+        let mut rounds = self.rounds.write().await;
+        let Some(round) = rounds.get_mut(round_id) else {
+            return;
+        };
+
+        round.reveal_order.retain(|id| !removed_ids.contains(id));
+        clamp_reveal_index(round);
+
+        if round
+            .ai_submission_id
+            .as_ref()
+            .is_some_and(|id| removed_ids.contains(id))
+        {
+            round.ai_submission_id = None;
+        }
+        if round
+            .manual_ai_winner
+            .as_ref()
+            .is_some_and(|id| removed_ids.contains(id))
+        {
+            round.manual_ai_winner = None;
+        }
+        if round
+            .manual_funny_winner
+            .as_ref()
+            .is_some_and(|id| removed_ids.contains(id))
+        {
+            round.manual_funny_winner = None;
+        }
     }
 
     /// Create a manual AI submission (host override when LLM fails)

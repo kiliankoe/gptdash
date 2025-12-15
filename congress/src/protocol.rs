@@ -74,6 +74,10 @@ pub enum ClientMessage {
     },
     /// Regenerate AI submissions (retry after failure or get new options)
     HostRegenerateAi,
+    /// Remove an existing submission (host only)
+    HostRemoveSubmission {
+        submission_id: SubmissionId,
+    },
     /// Manually write an AI submission (host override)
     HostWriteAiSubmission {
         text: String,
