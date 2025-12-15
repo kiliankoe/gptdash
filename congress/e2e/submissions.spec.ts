@@ -76,8 +76,8 @@ test.describe("Submissions", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Duplicate detection test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector("#hostPromptsList .prompt-row");
-    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -223,10 +223,7 @@ test.describe("Submissions", () => {
     // ============================================
     console.log("Typo correction test: Setting up game...");
 
-    await Promise.all([
-      host.goto("/host"),
-      players[0].goto("/player.html"),
-    ]);
+    await Promise.all([host.goto("/host"), players[0].goto("/player.html")]);
 
     await waitForConnection(host);
 
@@ -251,8 +248,8 @@ test.describe("Submissions", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Typo correction test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector("#hostPromptsList .prompt-row");
-    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {

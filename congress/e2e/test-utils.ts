@@ -157,10 +157,10 @@ export async function setupGameToWriting(
   await host.waitForSelector("#prompts.active");
   await host.fill("#promptText", "Test prompt question");
   await host.click('#prompts button:has-text("Prompt hinzufügen")');
-  await host.waitForSelector("#hostPromptsList .prompt-row");
+  await host.waitForSelector("#hostPromptsList [data-prompt-id]");
 
   // Queue the prompt
-  await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
+  await host.locator("#hostPromptsList .queue-btn").first().click();
   await host.waitForSelector("#startPromptSelectionBtn", {
     state: "visible",
     timeout: 5000,

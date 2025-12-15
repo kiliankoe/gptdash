@@ -100,8 +100,8 @@ test.describe("Audience", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Panic mode test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector("#hostPromptsList .prompt-row");
-    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {

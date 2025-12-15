@@ -175,12 +175,10 @@ impl Default for LlmConfig {
 impl LlmConfig {
     /// Load configuration from environment variables
     pub fn from_env() -> Self {
-        let openai_api_key = std::env::var("OPENAI_API_KEY")
-            .ok()
-            .and_then(|key| {
-                let trimmed = key.trim();
-                (!trimmed.is_empty()).then(|| trimmed.to_string())
-            });
+        let openai_api_key = std::env::var("OPENAI_API_KEY").ok().and_then(|key| {
+            let trimmed = key.trim();
+            (!trimmed.is_empty()).then(|| trimmed.to_string())
+        });
 
         let openai_model = std::env::var("OPENAI_MODEL")
             .ok()

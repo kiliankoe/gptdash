@@ -99,11 +99,13 @@ test.describe("Player", () => {
     console.log("Player status test: Checking initial state...");
 
     // Should show "Nicht registriert" for unregistered players
-    const playerCards = host.locator(".player-status-card");
+    const playerCards = host.locator("#playerTokensList .player-status-card");
     await expect(playerCards).toHaveCount(2);
 
     // Check for waiting status badges
-    const waitingBadges = host.locator(".status-badge.waiting");
+    const waitingBadges = host.locator(
+      "#playerTokensList .status-badge.waiting",
+    );
     await expect(waitingBadges).toHaveCount(2);
 
     // Get tokens for players
@@ -130,7 +132,9 @@ test.describe("Player", () => {
 
     // Check that Alice's name appears
     await expect(
-      host.locator('.player-name:has-text("StatusTestAlice")'),
+      host.locator(
+        '#playerTokensList .player-name:has-text("StatusTestAlice")',
+      ),
     ).toBeVisible();
 
     // ============================================
@@ -148,7 +152,7 @@ test.describe("Player", () => {
 
     await host.waitForTimeout(500);
     await expect(
-      host.locator('.player-name:has-text("StatusTestBob")'),
+      host.locator('#playerTokensList .player-name:has-text("StatusTestBob")'),
     ).toBeVisible();
 
     // Add prompt
@@ -156,8 +160,8 @@ test.describe("Player", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Status test prompt");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector("#hostPromptsList .prompt-row");
-    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -182,7 +186,9 @@ test.describe("Player", () => {
     await host.waitForSelector("#players.active");
 
     // Both should be waiting
-    await expect(host.locator(".status-badge.waiting")).toHaveCount(2);
+    await expect(
+      host.locator("#playerTokensList .status-badge.waiting"),
+    ).toHaveCount(2);
 
     // Player 1 submits
     await players[0].waitForSelector("#writingScreen.active", {
@@ -196,11 +202,15 @@ test.describe("Player", () => {
     await host.waitForTimeout(1000);
 
     // Alice should now show submitted
-    const submittedBadges = host.locator(".status-badge.submitted");
+    const submittedBadges = host.locator(
+      "#playerTokensList .status-badge.submitted",
+    );
     await expect(submittedBadges).toHaveCount(1);
 
     // Bob should still be waiting
-    const stillWaitingBadges = host.locator(".status-badge.waiting");
+    const stillWaitingBadges = host.locator(
+      "#playerTokensList .status-badge.waiting",
+    );
     await expect(stillWaitingBadges).toHaveCount(1);
 
     // ============================================
@@ -219,11 +229,15 @@ test.describe("Player", () => {
     await host.waitForTimeout(1000);
 
     // Both should now show submitted
-    const allSubmittedBadges = host.locator(".status-badge.submitted");
+    const allSubmittedBadges = host.locator(
+      "#playerTokensList .status-badge.submitted",
+    );
     await expect(allSubmittedBadges).toHaveCount(2);
 
     // No more waiting badges
-    const noWaitingBadges = host.locator(".status-badge.waiting");
+    const noWaitingBadges = host.locator(
+      "#playerTokensList .status-badge.waiting",
+    );
     await expect(noWaitingBadges).toHaveCount(0);
 
     console.log("Player status test completed successfully!");
@@ -285,8 +299,8 @@ test.describe("Player", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Remove player test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector("#hostPromptsList .prompt-row");
-    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -325,7 +339,10 @@ test.describe("Player", () => {
     // Use the host's manual AI override so tests don't depend on external LLMs.
     await host.click('summary:has-text("Manuelle KI-Antwort")');
     await host.waitForSelector("#manualAiText", { state: "visible" });
-    await host.fill("#manualAiText", "Manual AI answer for remove-player test.");
+    await host.fill(
+      "#manualAiText",
+      "Manual AI answer for remove-player test.",
+    );
     await host.click('button:has-text("Als KI-Antwort speichern")');
     await host.waitForSelector(".ai-submission-card", { timeout: 5000 });
     await host.locator(".ai-submission-card").first().click();
@@ -373,7 +390,9 @@ test.describe("Player", () => {
     await host.waitForSelector("#players.active");
 
     // Verify we see 2 players
-    const playerCardsBefore = host.locator(".player-status-card");
+    const playerCardsBefore = host.locator(
+      "#playerTokensList .player-status-card",
+    );
     await expect(playerCardsBefore).toHaveCount(2);
 
     // Handle confirmation dialog
@@ -381,7 +400,7 @@ test.describe("Player", () => {
 
     // Find and click the remove button for the first player (ToBeRemoved)
     const playerToRemoveCard = host.locator(
-      '.player-status-card:has-text("ToBeRemoved")',
+      '#playerTokensList .player-status-card:has-text("ToBeRemoved")',
     );
     const removeButton = playerToRemoveCard.locator(".remove-btn");
     await expect(removeButton).toBeVisible();
@@ -396,15 +415,19 @@ test.describe("Player", () => {
     console.log("Remove player test: Verifying player removal...");
 
     // Should now only see 1 player
-    const playerCardsAfter = host.locator(".player-status-card");
+    const playerCardsAfter = host.locator(
+      "#playerTokensList .player-status-card",
+    );
     await expect(playerCardsAfter).toHaveCount(1);
 
     // The remaining player should be RemainingPlayer
     await expect(
-      host.locator('.player-name:has-text("RemainingPlayer")'),
+      host.locator(
+        '#playerTokensList .player-name:has-text("RemainingPlayer")',
+      ),
     ).toBeVisible();
     await expect(
-      host.locator('.player-name:has-text("ToBeRemoved")'),
+      host.locator('#playerTokensList .player-name:has-text("ToBeRemoved")'),
     ).not.toBeVisible();
 
     // ============================================
@@ -461,10 +484,7 @@ test.describe("Player", () => {
     // ============================================
     console.log("Add player mid-round test: Setting up game...");
 
-    await Promise.all([
-      host.goto("/host"),
-      players[0].goto("/player.html"),
-    ]);
+    await Promise.all([host.goto("/host"), players[0].goto("/player.html")]);
 
     await waitForConnection(host);
 
@@ -491,8 +511,8 @@ test.describe("Player", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Add player mid-round test");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector("#hostPromptsList .prompt-row");
-    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -593,15 +613,17 @@ test.describe("Player", () => {
     await host.waitForSelector("#players.active");
 
     // Both players should be shown with submitted status
-    const submittedBadges = host.locator(".status-badge.submitted");
+    const submittedBadges = host.locator(
+      "#playerTokensList .status-badge.submitted",
+    );
     await expect(submittedBadges).toHaveCount(2);
 
     // Both names should appear
     await expect(
-      host.locator('.player-name:has-text("FirstPlayer")'),
+      host.locator('#playerTokensList .player-name:has-text("FirstPlayer")'),
     ).toBeVisible();
     await expect(
-      host.locator('.player-name:has-text("LateArrival")'),
+      host.locator('#playerTokensList .player-name:has-text("LateArrival")'),
     ).toBeVisible();
 
     console.log("Add player mid-round test completed successfully!");

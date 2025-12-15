@@ -23,8 +23,14 @@ impl AuthConfig {
     /// Load auth config from environment variables
     /// HOST_USERNAME and HOST_PASSWORD must both be set to enable auth
     pub fn from_env() -> Self {
-        let username = std::env::var("HOST_USERNAME").ok();
-        let password = std::env::var("HOST_PASSWORD").ok();
+        let username = std::env::var("HOST_USERNAME")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        let password = std::env::var("HOST_PASSWORD")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
 
         // Both must be set to enable auth
         if username.is_some() && password.is_some() {

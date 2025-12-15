@@ -4,6 +4,17 @@ import { config } from "dotenv";
 // Load .env file for webServer process
 config();
 
+const webServerEnv = {
+  ...process.env,
+  OPENAI_API_KEY: "",
+  OLLAMA_BASE_URL: "",
+  OLLAMA_MODEL: "",
+  // E2E tests drive the host UI without credentials.
+  // Force-disable host basic auth even if it's set in the developer environment.
+  HOST_USERNAME: "",
+  HOST_PASSWORD: "",
+};
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false, // Tests coordinate multiple roles, run sequentially
@@ -33,12 +44,7 @@ export default defineConfig({
     timeout: 120000, // 2 minutes for cargo build + server start
     stdout: "pipe",
     stderr: "pipe",
-    env: {
-      ...process.env,
-      OPENAI_API_KEY: "",
-      OLLAMA_BASE_URL: "",
-      OLLAMA_MODEL: "",
-    },
+    env: webServerEnv,
   },
 
   // Increase timeout for multi-role coordination

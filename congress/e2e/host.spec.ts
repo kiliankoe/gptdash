@@ -73,10 +73,7 @@ test.describe("Host", () => {
     // ============================================
     console.log("Host state restoration test: Setting up game state...");
 
-    await Promise.all([
-      host.goto("/host"),
-      players[0].goto("/player.html"),
-    ]);
+    await Promise.all([host.goto("/host"), players[0].goto("/player.html")]);
 
     await waitForConnection(host);
 
@@ -104,28 +101,39 @@ test.describe("Host", () => {
 
     await host.fill("#promptText", "Restoration: Alpha penguin telescope");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await expect(host.locator("#hostPromptsList .prompt-row")).toHaveCount(1, {
-      timeout: 5000,
-    });
+    await expect(host.locator("#hostPromptsList [data-prompt-id]")).toHaveCount(
+      1,
+      {
+        timeout: 5000,
+      },
+    );
 
     await host.fill("#promptText", "Restoration: Quantum pizza bicycle");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await expect(host.locator("#hostPromptsList .prompt-row")).toHaveCount(2, {
-      timeout: 5000,
-    });
+    await expect(host.locator("#hostPromptsList [data-prompt-id]")).toHaveCount(
+      2,
+      {
+        timeout: 5000,
+      },
+    );
 
     await host.fill("#promptText", "Restoration: Volcano jazz umbrella");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await expect(host.locator("#hostPromptsList .prompt-row")).toHaveCount(3, {
-      timeout: 5000,
-    });
+    await expect(host.locator("#hostPromptsList [data-prompt-id]")).toHaveCount(
+      3,
+      {
+        timeout: 5000,
+      },
+    );
 
     // Verify prompts are listed before reload
-    const promptsBeforeReload = host.locator("#hostPromptsList .prompt-row");
+    const promptsBeforeReload = host.locator(
+      "#hostPromptsList [data-prompt-id]",
+    );
     await expect(promptsBeforeReload).toHaveCount(3);
 
     // Queue the first prompt
-    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
+    await host.locator("#hostPromptsList .queue-btn").first().click();
 
     // Wait for start button to become visible (indicates queue operation completed)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -134,7 +142,9 @@ test.describe("Host", () => {
     });
 
     // Queued prompt should appear in the queue list
-    await expect(host.locator("#queuedPromptsList .prompt-card")).toHaveCount(1);
+    await expect(host.locator("#queuedPromptsList .prompt-card")).toHaveCount(
+      1,
+    );
 
     // Start prompt selection (auto-advances to WRITING with 1 prompt)
     await host.click("#startPromptSelectionBtn");
@@ -164,9 +174,13 @@ test.describe("Host", () => {
     await host.click('.sidebar-item:has-text("Spieler")');
     await host.waitForSelector("#players.active");
     await expect(
-      host.locator('.player-name:has-text("StateTestPlayer")'),
+      host.locator(
+        '#playerTokensList .player-name:has-text("StateTestPlayer")',
+      ),
     ).toBeVisible();
-    await expect(host.locator(".status-badge.submitted")).toHaveCount(1);
+    await expect(
+      host.locator("#playerTokensList .status-badge.submitted"),
+    ).toHaveCount(1);
 
     // ============================================
     // TEST: Reload host page
@@ -185,18 +199,20 @@ test.describe("Host", () => {
     await host.waitForSelector("#prompts.active");
 
     // Should still have the remaining prompts in the pool (the first one was selected and assigned to the round)
-    const promptsAfterReload = host.locator("#hostPromptsList .prompt-row");
+    const promptsAfterReload = host.locator(
+      "#hostPromptsList [data-prompt-id]",
+    );
     await expect(promptsAfterReload).toHaveCount(2, { timeout: 5000 });
 
     // Verify prompt content is preserved (the queued prompt was used; the other two remain in pool)
     await expect(
       host.locator(
-        '#hostPromptsList .prompt-row:has-text("Quantum pizza bicycle")',
+        '#hostPromptsList [data-prompt-id]:has-text("Quantum pizza bicycle")',
       ),
     ).toBeVisible();
     await expect(
       host.locator(
-        '#hostPromptsList .prompt-row:has-text("Alpha penguin telescope")',
+        '#hostPromptsList [data-prompt-id]:has-text("Alpha penguin telescope")',
       ),
     ).toBeVisible();
 
@@ -236,11 +252,15 @@ test.describe("Host", () => {
 
     // Player should still be shown with their name
     await expect(
-      host.locator('.player-name:has-text("StateTestPlayer")'),
+      host.locator(
+        '#playerTokensList .player-name:has-text("StateTestPlayer")',
+      ),
     ).toBeVisible({ timeout: 5000 });
 
     // Player should still show submitted status
-    await expect(host.locator(".status-badge.submitted")).toHaveCount(1);
+    await expect(
+      host.locator("#playerTokensList .status-badge.submitted"),
+    ).toHaveCount(1);
 
     // ============================================
     // VERIFY: Game phase is restored after reload

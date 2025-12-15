@@ -50,45 +50,126 @@
             <div class="panel active" id="overview">
                 <h2>Übersicht</h2>
 
-                <div class="card">
-                    <div class="card-header">Spiel-Status</div>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <div class="label">Aktuelle Phase</div>
-                            <div class="value" id="overviewPhase">LOBBY</div>
+                <div class="overview-grid">
+                    <div class="overview-main">
+                        <div class="card">
+                            <div class="card-header">Spielverlauf</div>
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <div class="label">Aktuelle Phase</div>
+                                    <div class="value" id="overviewPhase">LOBBY</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="label">Runde</div>
+                                    <div class="value" id="overviewRound">0</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="label">Spieler</div>
+                                    <div class="value" id="overviewPlayers">0</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="label">Antworten</div>
+                                    <div class="value" id="overviewSubmissions">0</div>
+                                </div>
+                            </div>
+
+                            <div class="overview-actions">
+                                <button id="overviewPrimaryActionBtn" class="primary" onclick="runOverviewPrimaryAction()">…</button>
+                                <button id="overviewSecondaryActionBtn" class="secondary" onclick="runOverviewSecondaryAction()">…</button>
+                                <button class="secondary" onclick="showPanel('game')">Erweitert…</button>
+                            </div>
+                            <div class="overview-hint" id="overviewFlowHint"></div>
                         </div>
-                        <div class="info-item">
-                            <div class="label">Runden-Nummer</div>
-                            <div class="value" id="overviewRound">0</div>
+
+                        <div class="card">
+                            <div class="card-header">Aktuelle Runde & Timer</div>
+                            <div id="overviewCurrentRoundInfo" style="margin-bottom: 10px;">
+                                <p style="opacity: 0.6;">Keine aktive Runde. Füge einen Prompt hinzu und starte eine Runde.</p>
+                            </div>
+                            <div class="overview-timer-row">
+                                <span>Verbleibend: <strong id="hostTimer" style="font-size: 1.5em; font-family: monospace;">--:--</strong></span>
+                                <div class="button-group" style="margin: 0;">
+                                    <button onclick="extendTimer(10)" class="secondary">+10 Sekunden</button>
+                                    <button onclick="closeWriting()" class="secondary">Schreib-Phase beenden</button>
+                                </div>
+                            </div>
+                            <p class="overview-muted">Timer gilt für Schreiben/Abstimmen. Abstimmen wechselt automatisch zur Auflösung.</p>
                         </div>
-                        <div class="info-item">
-                            <div class="label">Spieler</div>
-                            <div class="value" id="overviewPlayers">0</div>
+
+                        <div class="card">
+                            <div class="card-header">Prompts (Normal-Flow)</div>
+                            <textarea id="overviewPromptText" placeholder="Prompt-Text eingeben (oder nur Bild)..." style="margin-bottom: 10px;"></textarea>
+                            <details style="margin: 10px 0;">
+                                <summary style="cursor: pointer; opacity: 0.8;">Bild hinzufügen (Multimodal)</summary>
+                                <div style="margin-top: 10px;">
+                                    <input type="url" id="overviewPromptImageUrl" placeholder="https://example.com/image.png" style="width: 100%; margin-bottom: 10px;">
+                                    <div id="overviewPromptImagePreview" style="margin-bottom: 10px; text-align: center;"></div>
+                                </div>
+                            </details>
+                            <div class="button-group">
+                                <button onclick="addPromptFromOverview(false)" class="secondary">Prompt hinzufügen</button>
+                                <button onclick="addPromptFromOverview(true)" class="primary">+ In Warteschlange</button>
+                                <button onclick="showPanel('prompts')" class="secondary">Erweitert…</button>
+                            </div>
+
+                            <div class="overview-split">
+                                <div>
+                                    <div class="overview-subtitle">Warteschlange (max. 3)</div>
+                                    <div id="overviewQueuedPromptsList">
+                                        <p style="opacity: 0.6;">Keine Prompts in der Warteschlange.</p>
+                                    </div>
+                                    <button id="overviewStartPromptSelectionBtn" onclick="startPromptSelection()" style="display: none; margin-top: 10px;" class="primary">▶ Runde starten</button>
+                                </div>
+                                <div>
+                                    <div class="overview-subtitle">Prompt-Pool (Kurzansicht)</div>
+                                    <div class="overview-prompt-search">
+                                        <input type="text" id="overviewPromptSearchInput" placeholder="Prompts durchsuchen..." oninput="filterOverviewPrompts()">
+                                        <select id="overviewPromptSourceFilter" onchange="filterOverviewPrompts()">
+                                            <option value="all">Alle</option>
+                                            <option value="host">Host</option>
+                                            <option value="audience">Publikum</option>
+                                        </select>
+                                    </div>
+                                    <div id="overviewPromptPoolList">
+                                        <p style="opacity: 0.6;">Lade Prompts…</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="info-item">
-                            <div class="label">Antworten</div>
-                            <div class="value" id="overviewSubmissions">0</div>
+
+                        <div class="card">
+                            <div class="card-header">Antworten zeigen (Reveal)</div>
+                            <div class="button-group">
+                                <button onclick="revealPrev()" class="secondary">← Zurück</button>
+                                <button onclick="revealNext()">Weiter →</button>
+                                <button onclick="transitionPhase('VOTING')" class="secondary">→ Abstimmen</button>
+                                <button onclick="showPanel('submissions')" class="secondary">Erweitert…</button>
+                            </div>
+                            <div class="overview-muted" id="overviewRevealStatus"></div>
                         </div>
                     </div>
-                </div>
 
-                <div class="card">
-                    <div class="card-header">Schnellzugriff</div>
-                    <div class="button-group">
-                        <button onclick="hostCreatePlayers(3)">3 Spieler erstellen</button>
-                        <button onclick="hostStartRound()">Runde starten</button>
-                        <button onclick="transitionPhase('WRITING')">→ Schreiben</button>
-                        <button onclick="transitionPhase('VOTING')">→ Abstimmen</button>
-                        <button onclick="transitionPhase('RESULTS')">→ Auflösung</button>
-                    </div>
-                </div>
+                    <div class="overview-side">
+                        <div class="card">
+                            <div class="card-header">Spieler</div>
+                            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                                <input type="number" id="overviewPlayerCount" value="3" min="1" max="10" style="max-width: 100px; margin-bottom: 0;">
+                                <button onclick="hostCreatePlayersFromOverview()">Spieler erstellen</button>
+                                <button onclick="showPanel('players')" class="secondary">Erweitert…</button>
+                            </div>
+                            <div id="overviewPlayerTokensList">
+                                <p style="opacity: 0.6;">Noch keine Spieler erstellt</p>
+                            </div>
+                        </div>
 
-                <div class="card">
-                    <div class="card-header">Publikum beitreten lassen</div>
-                    <div style="text-align: center; padding: 20px;">
-                        <div id="audienceQRCode" style="display: inline-block; margin-bottom: 15px;"></div>
-                        <div style="font-size: 18px; font-weight: bold;" id="audienceJoinUrl">Laden...</div>
-                        <button onclick="copyAudienceUrl()" style="margin-top: 10px;">URL kopieren</button>
+                        <div class="card">
+                            <div class="card-header">Publikum beitreten lassen</div>
+                            <div style="text-align: center; padding: 20px;">
+                                <div id="audienceQRCode" style="display: inline-block; margin-bottom: 15px;"></div>
+                                <div style="font-size: 18px; font-weight: bold;" id="audienceJoinUrl">Laden...</div>
+                                <button onclick="copyAudienceUrl()" style="margin-top: 10px;">URL kopieren</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -111,25 +192,6 @@
                         <button data-phase="INTERMISSION" onclick="transitionPhase('INTERMISSION')">Pause</button>
                         <button data-phase="ENDED" onclick="transitionPhase('ENDED')" class="danger">Spiel beenden</button>
                     </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">Aktuelle Runde</div>
-                    <div id="currentRoundInfo" style="margin-bottom: 10px;">
-                        <p style="opacity: 0.6;">Keine aktive Runde. Wähle einen Prompt aus dem "Prompts"-Panel aus, um eine neue Runde zu starten.</p>
-                    </div>
-                    <div class="button-group">
-                        <button onclick="closeWriting()">Schreib-Phase beenden</button>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">Timer</div>
-                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                        <span>Verbleibend: <strong id="hostTimer" style="font-size: 1.5em; font-family: monospace;">--:--</strong></span>
-                        <button onclick="extendTimer(10)" class="secondary">+10 Sekunden</button>
-                    </div>
-                    <p style="opacity: 0.6; font-size: 0.9em;">Timer für Schreib- und Abstimmungsphase. Der Abstimmungstimer wechselt automatisch zur Auflösung.</p>
                 </div>
 
                 <div class="card">

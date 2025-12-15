@@ -73,14 +73,14 @@ test.describe("Multimodal Prompts", () => {
     await host.fill("#promptText", "Was siehst du auf diesem Bild?");
 
     // Expand the multimodal image details section
-    await host.click('summary:has-text("Bild hinzufügen")');
+    await host.click('#prompts summary:has-text("Bild hinzufügen")');
     await host.waitForSelector("#promptImageUrl", { state: "visible" });
     await host.fill("#promptImageUrl", imageUrl);
 
     // Add prompt to pool and queue it
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector("#hostPromptsList .prompt-row");
-    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -181,15 +181,15 @@ test.describe("Multimodal Prompts", () => {
     await host.fill("#promptText", "");
 
     // Expand the multimodal image details section
-    await host.click('summary:has-text("Bild hinzufügen")');
+    await host.click('#prompts summary:has-text("Bild hinzufügen")');
     await host.waitForSelector("#promptImageUrl", { state: "visible" });
     const imageUrl = "/img/manekineko.gif";
     await host.fill("#promptImageUrl", imageUrl);
 
     // Add prompt to pool and queue it
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector("#hostPromptsList .prompt-row");
-    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {

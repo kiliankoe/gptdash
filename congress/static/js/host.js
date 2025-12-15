@@ -4,6 +4,9 @@
 
 let wsConn = null;
 let hostTimer = null;
+const overviewActions = { primary: null, secondary: null };
+let pendingOverviewPromptAutoQueue = null;
+
 const gameState = {
   phase: "LOBBY",
   roundNo: 0,
@@ -12,7 +15,12 @@ const gameState = {
   submissions: [],
   revealOrder: [], // Current reveal order (submission IDs)
   prompts: [], // Prompt candidates from audience (filtered by shadowban)
-  promptStats: { total: 0, host_count: 0, audience_count: 0, top_submitters: [] }, // Stats about prompt pool
+  promptStats: {
+    total: 0,
+    host_count: 0,
+    audience_count: 0,
+    top_submitters: [],
+  }, // Stats about prompt pool
   queuedPrompts: [], // Prompts queued for next round (max 3)
   scores: { players: [], audience_top: [] },
   validTransitions: [], // Populated by server
@@ -26,8 +34,10 @@ const gameState = {
 
 // Prompt section collapse state (persisted in localStorage)
 const promptSectionState = {
-  hostPrompts: localStorage.getItem('promptSection_hostPrompts') !== 'collapsed',
-  audiencePrompts: localStorage.getItem('promptSection_audiencePrompts') !== 'collapsed',
+  hostPrompts:
+    localStorage.getItem("promptSection_hostPrompts") !== "collapsed",
+  audiencePrompts:
+    localStorage.getItem("promptSection_audiencePrompts") !== "collapsed",
 };
 
 // Drag-and-drop state
@@ -74,8 +84,12 @@ function handleMessage(message) {
 
     case "phase":
       gameState.phase = message.phase;
+      gameState.roundNo = message.round_no;
       gameState.validTransitions = message.valid_transitions || [];
       gameState.deadline = message.deadline || null;
+      if (message.prompt) {
+        gameState.currentPrompt = message.prompt;
+      }
       updateUI();
       // Update timer
       if (gameState.deadline && message.server_now) {
@@ -86,6 +100,13 @@ function handleMessage(message) {
         document.getElementById("hostTimer").textContent = "--:--";
       }
       showAlert(`Phase gewechselt zu: ${message.phase}`, "success");
+      break;
+
+    case "reveal_update":
+      if (gameState.currentRound) {
+        gameState.currentRound.reveal_index = message.reveal_index;
+      }
+      updateOverviewRevealStatus();
       break;
 
     case "deadline_update":
@@ -100,6 +121,7 @@ function handleMessage(message) {
       // Extract tokens from PlayerToken objects
       gameState.players = (message.players || []).map((p) => p.token);
       updatePlayersList();
+      updateOverviewFlow();
       showAlert(`${gameState.players.length} Spieler erstellt`, "success");
       break;
 
@@ -112,11 +134,14 @@ function handleMessage(message) {
       gameState.submissions = message.list || [];
       updateSubmissionsList();
       updatePanicModeUI();
+      updateOverviewFlow();
+      updateOverviewRevealStatus();
       break;
 
     case "host_player_status":
       gameState.playerStatus = message.players || [];
       updatePlayersList();
+      updateOverviewFlow();
       break;
 
     case "scores":
@@ -160,14 +185,24 @@ function handleMessage(message) {
 
     case "host_prompts":
       gameState.prompts = message.prompts || [];
-      gameState.promptStats = message.stats || { total: 0, host_count: 0, audience_count: 0, top_submitters: [] };
+      gameState.promptStats = message.stats || {
+        total: 0,
+        host_count: 0,
+        audience_count: 0,
+        top_submitters: [],
+      };
       updatePromptsList();
+      updateOverviewPromptPool();
+      maybeAutoQueueOverviewPrompt();
       break;
 
     case "host_queued_prompts":
       gameState.queuedPrompts = message.prompts || [];
       updateQueuedPromptsList();
       updatePromptsList(); // Update pool to show queue status
+      updateOverviewPromptPool();
+      maybeAutoQueueOverviewPrompt();
+      updateOverviewFlow();
       break;
 
     case "round_started":
@@ -178,6 +213,7 @@ function handleMessage(message) {
       }
       updateCurrentRoundInfo();
       updateUI();
+      updateOverviewRevealStatus();
       log(`Runde ${message.round.number} gestartet`, "info");
       break;
 
@@ -227,8 +263,7 @@ function updateUI() {
   // Update overview
   document.getElementById("overviewPhase").textContent = gameState.phase;
   document.getElementById("overviewRound").textContent = gameState.roundNo;
-  document.getElementById("overviewPlayers").textContent =
-    gameState.players.length;
+  document.getElementById("overviewPlayers").textContent = getPlayerCount();
   document.getElementById("overviewSubmissions").textContent =
     gameState.submissions.length;
 
@@ -237,15 +272,23 @@ function updateUI() {
 
   // Update current round info
   updateCurrentRoundInfo();
+
+  // Update overview helpers
+  updateOverviewFlow();
+  updateOverviewRevealStatus();
 }
 
 function updateCurrentRoundInfo() {
-  const container = document.getElementById("currentRoundInfo");
-  if (!container) return;
+  const containers = [
+    document.getElementById("overviewCurrentRoundInfo"),
+  ].filter(Boolean);
+  if (containers.length === 0) return;
 
   if (!gameState.currentPrompt) {
-    container.innerHTML =
-      '<p style="opacity: 0.6;">Keine aktive Runde. Wähle einen Prompt aus dem "Prompts"-Panel aus, um eine neue Runde zu starten.</p>';
+    containers.forEach((container) => {
+      container.innerHTML =
+        '<p style="opacity: 0.6;">Keine aktive Runde. Füge einen Prompt hinzu und starte eine Runde.</p>';
+    });
     return;
   }
 
@@ -264,7 +307,9 @@ function updateCurrentRoundInfo() {
   }
 
   html += `</div>`;
-  container.innerHTML = html;
+  containers.forEach((container) => {
+    container.innerHTML = html;
+  });
 }
 
 /**
@@ -297,6 +342,16 @@ function transitionPhase(phase) {
 
 function hostCreatePlayers(count) {
   wsConn.send({ t: "host_create_players", count: count });
+}
+
+function hostCreatePlayersFromOverview() {
+  const count = parseInt(
+    document.getElementById("overviewPlayerCount")?.value ?? "0",
+    10,
+  );
+  if (count > 0) {
+    hostCreatePlayers(count);
+  }
 }
 
 function hostCreatePlayersCustom() {
@@ -338,16 +393,54 @@ function addPrompt() {
   }
 }
 
+function addPromptFromOverview(queueAfterAdd) {
+  const text =
+    document.getElementById("overviewPromptText")?.value.trim() ?? "";
+  const imageUrl =
+    document.getElementById("overviewPromptImageUrl")?.value.trim() || null;
+
+  // Require at least text or image
+  if (!text && !imageUrl) {
+    alert("Bitte gib einen Prompt-Text oder eine Bild-URL ein");
+    return;
+  }
+
+  if (queueAfterAdd) {
+    pendingOverviewPromptAutoQueue = {
+      text: text || null,
+      image_url: imageUrl || null,
+    };
+  }
+
+  wsConn.send({
+    t: "host_add_prompt",
+    text: text || null,
+    image_url: imageUrl || null,
+  });
+
+  const textEl = document.getElementById("overviewPromptText");
+  if (textEl) textEl.value = "";
+  const imageEl = document.getElementById("overviewPromptImageUrl");
+  if (imageEl) imageEl.value = "";
+  const preview = document.getElementById("overviewPromptImagePreview");
+  if (preview) preview.innerHTML = "";
+}
+
 // Preview image when URL is entered
 function setupImagePreview() {
-  const imageUrlInput = document.getElementById("promptImageUrl");
+  setupImagePreviewFor("promptImageUrl", "promptImagePreview");
+  setupImagePreviewFor("overviewPromptImageUrl", "overviewPromptImagePreview");
+}
+
+function setupImagePreviewFor(inputId, previewId) {
+  const imageUrlInput = document.getElementById(inputId);
   if (!imageUrlInput) return;
 
   imageUrlInput.addEventListener(
     "input",
     debounce((e) => {
       const url = e.target.value.trim();
-      const preview = document.getElementById("promptImagePreview");
+      const preview = document.getElementById(previewId);
       if (!preview) return;
 
       if (!url) {
@@ -397,7 +490,6 @@ function setRevealOrder() {
   });
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: Called from HTML onclick
 function revealNext() {
   wsConn.send({ t: "host_reveal_next" });
   log("Zur nächsten Antwort gewechselt", "info");
@@ -664,9 +756,286 @@ function closeWriting() {
   transitionPhase("REVEAL");
 }
 
+function getPlayerCount() {
+  if (gameState.playerStatus.length > 0) return gameState.playerStatus.length;
+  return gameState.players.length;
+}
+
+function runOverviewPrimaryAction() {
+  if (typeof overviewActions.primary === "function") {
+    overviewActions.primary();
+  }
+}
+
+function runOverviewSecondaryAction() {
+  if (typeof overviewActions.secondary === "function") {
+    overviewActions.secondary();
+  }
+}
+
+function setOverviewActions({ primary, secondary, hint }) {
+  overviewActions.primary = primary?.action ?? null;
+  overviewActions.secondary = secondary?.action ?? null;
+
+  const primaryBtn = document.getElementById("overviewPrimaryActionBtn");
+  const secondaryBtn = document.getElementById("overviewSecondaryActionBtn");
+  const hintEl = document.getElementById("overviewFlowHint");
+
+  if (primaryBtn) {
+    primaryBtn.textContent = primary?.label ?? "—";
+    primaryBtn.disabled = !(primary?.enabled ?? false);
+  }
+  if (secondaryBtn) {
+    secondaryBtn.textContent = secondary?.label ?? "—";
+    secondaryBtn.disabled = !(secondary?.enabled ?? false);
+    secondaryBtn.style.display = secondary?.label ? "inline-flex" : "none";
+  }
+  if (hintEl) {
+    hintEl.textContent = hint ?? "";
+  }
+}
+
+function updateOverviewFlow() {
+  const phase = gameState.phase;
+  const validTargets = gameState.validTransitions || [];
+  const queuedCount = gameState.queuedPrompts.length;
+  const playerCount = getPlayerCount();
+
+  const canTransitionTo = (target) => validTargets.includes(target);
+  const canStartPromptSelection =
+    queuedCount > 0 && canTransitionTo("PROMPT_SELECTION");
+
+  if (phase === "LOBBY" || phase === "RESULTS" || phase === "PODIUM") {
+    if (playerCount === 0) {
+      setOverviewActions({
+        primary: {
+          label: "Spieler erstellen",
+          enabled: true,
+          action: () => hostCreatePlayersFromOverview(),
+        },
+        secondary: {
+          label: "3 Spieler (schnell)",
+          enabled: true,
+          action: () => hostCreatePlayers(3),
+        },
+        hint: "Erst Spieler erstellen, dann Prompt(s) in die Warteschlange legen.",
+      });
+      return;
+    }
+
+    setOverviewActions({
+      primary: {
+        label: queuedCount > 1 ? "▶ Prompt-Voting starten" : "▶ Runde starten",
+        enabled: canStartPromptSelection,
+        action: () => startPromptSelection(),
+      },
+      secondary: {
+        label:
+          canTransitionTo("LOBBY") && phase !== "LOBBY" ? "Zur Lobby" : null,
+        enabled: canTransitionTo("LOBBY") && phase !== "LOBBY",
+        action: () => transitionPhase("LOBBY"),
+      },
+      hint:
+        queuedCount === 0
+          ? "Füge einen Prompt hinzu und lege ihn in die Warteschlange."
+          : queuedCount === 1
+            ? "1 Prompt → startet direkt die Schreibphase."
+            : "Mehrere Prompts → Publikum stimmt ab, Gewinner geht in Schreiben.",
+    });
+    return;
+  }
+
+  if (phase === "PROMPT_SELECTION") {
+    setOverviewActions({
+      primary: {
+        label: "→ Schreiben starten",
+        enabled: canTransitionTo("WRITING"),
+        action: () => transitionPhase("WRITING"),
+      },
+      secondary: {
+        label: "Pause",
+        enabled: canTransitionTo("INTERMISSION"),
+        action: () => transitionPhase("INTERMISSION"),
+      },
+      hint: "Wenn genug Votes da sind (oder du abkürzen willst), starte Schreiben.",
+    });
+    return;
+  }
+
+  if (phase === "WRITING") {
+    setOverviewActions({
+      primary: {
+        label: "→ Antworten zeigen",
+        enabled: canTransitionTo("REVEAL"),
+        action: () => closeWriting(),
+      },
+      secondary: {
+        label: "+10 Sekunden",
+        enabled: !!gameState.deadline,
+        action: () => extendTimer(10),
+      },
+      hint: "Warte bis alle eingereicht haben, dann Reveal starten.",
+    });
+    return;
+  }
+
+  if (phase === "REVEAL") {
+    setOverviewActions({
+      primary: {
+        label: "Weiter →",
+        enabled: true,
+        action: () => revealNext(),
+      },
+      secondary: {
+        label: "→ Abstimmen",
+        enabled: canTransitionTo("VOTING"),
+        action: () => transitionPhase("VOTING"),
+      },
+      hint: "Mit „Weiter“ durch die Antworten blättern, dann Abstimmen starten.",
+    });
+    return;
+  }
+
+  if (phase === "VOTING") {
+    setOverviewActions({
+      primary: {
+        label: "→ Auflösung",
+        enabled: canTransitionTo("RESULTS"),
+        action: () => transitionPhase("RESULTS"),
+      },
+      secondary: {
+        label: "+10 Sekunden",
+        enabled: !!gameState.deadline,
+        action: () => extendTimer(10),
+      },
+      hint: "Voting läuft; Timer wechselt automatisch zur Auflösung, falls aktiv.",
+    });
+    return;
+  }
+
+  if (phase === "INTERMISSION") {
+    setOverviewActions({
+      primary: {
+        label: "Zur Lobby",
+        enabled: canTransitionTo("LOBBY"),
+        action: () => transitionPhase("LOBBY"),
+      },
+      secondary: {
+        label: "Spiel beenden",
+        enabled: canTransitionTo("ENDED"),
+        action: () => transitionPhase("ENDED"),
+      },
+      hint: "Pause-Modus.",
+    });
+    return;
+  }
+
+  if (phase === "ENDED") {
+    setOverviewActions({
+      primary: { label: "—", enabled: false, action: null },
+      secondary: { label: null, enabled: false, action: null },
+      hint: "Spiel beendet.",
+    });
+  }
+}
+
+function updateOverviewRevealStatus() {
+  const el = document.getElementById("overviewRevealStatus");
+  if (!el) return;
+
+  if (gameState.phase !== "REVEAL") {
+    el.textContent = "";
+    return;
+  }
+
+  const round = gameState.currentRound;
+  const total =
+    round?.reveal_order?.length ??
+    (Array.isArray(gameState.revealOrder) ? gameState.revealOrder.length : 0);
+  const idx = round?.reveal_index ?? 0;
+
+  if (!total) {
+    el.textContent = "Keine Antworten zum Anzeigen.";
+    return;
+  }
+
+  el.textContent = `Position: ${Math.min(idx + 1, total)}/${total}`;
+}
+
+function filterOverviewPrompts() {
+  updateOverviewPromptPool();
+}
+
+function updateOverviewPromptPool() {
+  const container = document.getElementById("overviewPromptPoolList");
+  if (!container) return;
+
+  const query =
+    document
+      .getElementById("overviewPromptSearchInput")
+      ?.value.trim()
+      .toLowerCase() ?? "";
+  const sourceFilter =
+    document.getElementById("overviewPromptSourceFilter")?.value ?? "all";
+
+  const queuedIds = new Set(gameState.queuedPrompts.map((p) => p.id));
+  const queueFull = gameState.queuedPrompts.length >= 3;
+
+  const prompts = (gameState.prompts || [])
+    .filter((p) => {
+      if (sourceFilter !== "all" && p.source !== sourceFilter) return false;
+      if (!query) return true;
+      const haystack = `${p.text ?? ""} ${p.image_url ?? ""}`.toLowerCase();
+      return haystack.includes(query);
+    })
+    .sort((a, b) => {
+      const at = a.created_at ?? "";
+      const bt = b.created_at ?? "";
+      return bt.localeCompare(at);
+    })
+    .slice(0, 15);
+
+  container.innerHTML = "";
+
+  if (prompts.length === 0) {
+    container.innerHTML =
+      '<p style="opacity: 0.6;">Keine passenden Prompts.</p>';
+    return;
+  }
+
+  prompts.forEach((prompt) => {
+    container.appendChild(renderPromptRow(prompt, queuedIds, queueFull));
+  });
+}
+
+function maybeAutoQueueOverviewPrompt() {
+  if (!pendingOverviewPromptAutoQueue) return;
+
+  const queuedIds = new Set(gameState.queuedPrompts.map((p) => p.id));
+  const { text, image_url } = pendingOverviewPromptAutoQueue;
+
+  const candidates = (gameState.prompts || [])
+    .filter((p) => p.source === "host")
+    .filter((p) => !queuedIds.has(p.id))
+    .filter((p) => (p.text ?? null) === (text ?? null))
+    .filter((p) => (p.image_url ?? null) === (image_url ?? null))
+    .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+
+  if (candidates.length === 0) return;
+
+  queuePrompt(candidates[0].id);
+  pendingOverviewPromptAutoQueue = null;
+}
+
 // UI Updates
 function updatePlayersList() {
-  const container = document.getElementById("playerTokensList");
+  updatePlayersListInto("playerTokensList");
+  updatePlayersListInto("overviewPlayerTokensList");
+}
+
+function updatePlayersListInto(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
   container.innerHTML = "";
 
   // Use playerStatus if available, fall back to legacy players array
@@ -731,7 +1100,7 @@ function updatePlayersList() {
   // Update overview count
   const overviewPlayers = document.getElementById("overviewPlayers");
   if (overviewPlayers) {
-    overviewPlayers.textContent = players.length;
+    overviewPlayers.textContent = getPlayerCount();
   }
 }
 
@@ -744,7 +1113,8 @@ function updatePromptStats() {
   // Update stat values
   document.getElementById("promptStatTotal").textContent = stats.total || 0;
   document.getElementById("promptStatHost").textContent = stats.host_count || 0;
-  document.getElementById("promptStatAudience").textContent = stats.audience_count || 0;
+  document.getElementById("promptStatAudience").textContent =
+    stats.audience_count || 0;
 
   // Update top submitters section
   const topSection = document.getElementById("topSubmittersSection");
@@ -752,16 +1122,18 @@ function updatePromptStats() {
 
   if (stats.top_submitters && stats.top_submitters.length > 0) {
     topSection.style.display = "block";
-    topList.innerHTML = stats.top_submitters.map(s => {
-      const shortId = s.voter_id.substring(0, 8);
-      return `
+    topList.innerHTML = stats.top_submitters
+      .map((s) => {
+        const shortId = s.voter_id.substring(0, 8);
+        return `
         <div class="top-submitter-item">
           <span class="submitter-id" title="${escapeHtml(s.voter_id)}">${shortId}...</span>
           <span class="submitter-count">${s.count} Prompts</span>
           <button class="danger small" onclick="shadowbanAudience('${s.voter_id}')" title="Shadowban">🚫</button>
         </div>
       `;
-    }).join("");
+      })
+      .join("");
   } else {
     topSection.style.display = "none";
   }
@@ -775,20 +1147,27 @@ function togglePromptSection(sectionKey) {
   promptSectionState[sectionKey] = !isExpanded;
 
   // Persist state
-  localStorage.setItem(`promptSection_${sectionKey}`, isExpanded ? 'collapsed' : 'expanded');
+  localStorage.setItem(
+    `promptSection_${sectionKey}`,
+    isExpanded ? "collapsed" : "expanded",
+  );
 
   // Update UI
-  const listId = sectionKey === 'hostPrompts' ? 'hostPromptsList' : 'audiencePromptsList';
-  const toggleId = sectionKey === 'hostPrompts' ? 'hostPromptsToggle' : 'audiencePromptsToggle';
+  const listId =
+    sectionKey === "hostPrompts" ? "hostPromptsList" : "audiencePromptsList";
+  const toggleId =
+    sectionKey === "hostPrompts"
+      ? "hostPromptsToggle"
+      : "audiencePromptsToggle";
 
   const list = document.getElementById(listId);
   const toggle = document.getElementById(toggleId);
 
   if (list) {
-    list.classList.toggle('collapsed', isExpanded);
+    list.classList.toggle("collapsed", isExpanded);
   }
   if (toggle) {
-    toggle.textContent = isExpanded ? '▶' : '▼';
+    toggle.textContent = isExpanded ? "▶" : "▼";
   }
 }
 
@@ -796,10 +1175,13 @@ function togglePromptSection(sectionKey) {
  * Filter prompts by search query
  */
 function filterPrompts() {
-  const query = document.getElementById("promptSearchInput").value.toLowerCase().trim();
+  const query = document
+    .getElementById("promptSearchInput")
+    .value.toLowerCase()
+    .trim();
 
   // Filter all prompt rows
-  document.querySelectorAll(".prompt-row").forEach(row => {
+  document.querySelectorAll(".prompt-row").forEach((row) => {
     const text = row.dataset.searchText || "";
     const matches = !query || text.toLowerCase().includes(query);
     row.style.display = matches ? "" : "none";
@@ -810,8 +1192,10 @@ function filterPrompts() {
  * Pick a random prompt from visible prompts and add to queue
  */
 function pickRandomPrompt() {
-  const queuedIds = new Set(gameState.queuedPrompts.map(p => p.id));
-  const availablePrompts = gameState.prompts.filter(p => !queuedIds.has(p.id));
+  const queuedIds = new Set(gameState.queuedPrompts.map((p) => p.id));
+  const availablePrompts = gameState.prompts.filter(
+    (p) => !queuedIds.has(p.id),
+  );
 
   if (availablePrompts.length === 0) {
     showAlert("Keine verfügbaren Prompts zum Auswählen", "warning");
@@ -823,7 +1207,8 @@ function pickRandomPrompt() {
     return;
   }
 
-  const randomPrompt = availablePrompts[Math.floor(Math.random() * availablePrompts.length)];
+  const randomPrompt =
+    availablePrompts[Math.floor(Math.random() * availablePrompts.length)];
   queuePrompt(randomPrompt.id);
 }
 
@@ -831,13 +1216,14 @@ function pickRandomPrompt() {
  * Shadowban all submitters of a deduplicated prompt
  */
 function shadowbanPromptSubmitters(promptId) {
-  const prompt = gameState.prompts.find(p => p.id === promptId);
+  const prompt = gameState.prompts.find((p) => p.id === promptId);
   if (!prompt) return;
 
   const submitterCount = prompt.submitter_ids?.length || 0;
-  const message = submitterCount > 1
-    ? `Alle ${submitterCount} Einreicher dieses Prompts shadowbannen?\n\nDiese Nutzer können weiterhin Prompts einreichen, aber sie werden ignoriert.`
-    : "Diesen Einreicher shadowbannen?\n\nDer Nutzer kann weiterhin Prompts einreichen, aber sie werden ignoriert.";
+  const message =
+    submitterCount > 1
+      ? `Alle ${submitterCount} Einreicher dieses Prompts shadowbannen?\n\nDiese Nutzer können weiterhin Prompts einreichen, aber sie werden ignoriert.`
+      : "Diesen Einreicher shadowbannen?\n\nDer Nutzer kann weiterhin Prompts einreichen, aber sie werden ignoriert.";
 
   if (confirm(message)) {
     wsConn.send({
@@ -868,9 +1254,10 @@ function renderPromptRow(prompt, queuedIds, queueFull) {
   }
 
   // Truncate for display
-  const truncatedText = displayText.length > 60
-    ? `${displayText.substring(0, 60)}...`
-    : displayText;
+  const truncatedText =
+    displayText.length > 60
+      ? `${displayText.substring(0, 60)}...`
+      : displayText;
 
   // Build tooltip content
   let tooltipContent = displayText;
@@ -879,9 +1266,10 @@ function renderPromptRow(prompt, queuedIds, queueFull) {
   }
 
   // Submitter info for audience prompts
-  const submitterInfo = prompt.source === "audience" && prompt.submitter_ids?.length > 0
-    ? `<span class="submitter-count" title="${prompt.submitter_ids.length} Einreicher">${submitterCount}x</span>`
-    : "";
+  const submitterInfo =
+    prompt.source === "audience" && prompt.submitter_ids?.length > 0
+      ? `<span class="submitter-count" title="${prompt.submitter_ids.length} Einreicher">${submitterCount}x</span>`
+      : "";
 
   const div = document.createElement("div");
   div.className = `prompt-row${isQueued ? " queued" : ""}`;
@@ -895,15 +1283,17 @@ function renderPromptRow(prompt, queuedIds, queueFull) {
       ${submitterInfo}
     </div>
     <div class="prompt-row-actions">
-      ${isQueued
-        ? '<span class="queued-badge">✓</span>'
-        : queueFull
-          ? ''
-          : `<button class="action-btn queue-btn" onclick="event.stopPropagation(); queuePrompt('${prompt.id}')" title="In Warteschlange">+</button>`
+      ${
+        isQueued
+          ? '<span class="queued-badge">✓</span>'
+          : queueFull
+            ? ""
+            : `<button class="action-btn queue-btn" onclick="event.stopPropagation(); queuePrompt('${prompt.id}')" title="In Warteschlange">+</button>`
       }
-      ${prompt.source === "audience" && prompt.submitter_ids?.length > 0
-        ? `<button class="action-btn ban-btn" onclick="event.stopPropagation(); shadowbanPromptSubmitters('${prompt.id}')" title="Einreicher shadowbannen">🚫</button>`
-        : ""
+      ${
+        prompt.source === "audience" && prompt.submitter_ids?.length > 0
+          ? `<button class="action-btn ban-btn" onclick="event.stopPropagation(); shadowbanPromptSubmitters('${prompt.id}')" title="Einreicher shadowbannen">🚫</button>`
+          : ""
       }
       <button class="action-btn delete-btn" onclick="event.stopPropagation(); deletePrompt('${prompt.id}')" title="Löschen">×</button>
     </div>
@@ -923,23 +1313,26 @@ function updatePromptsList() {
   if (!hostList || !audienceList) return;
 
   // Get queued prompt IDs
-  const queuedIds = new Set(gameState.queuedPrompts.map(p => p.id));
+  const queuedIds = new Set(gameState.queuedPrompts.map((p) => p.id));
   const queueFull = gameState.queuedPrompts.length >= 3;
 
   // Separate prompts by source
-  const hostPrompts = gameState.prompts.filter(p => p.source === "host");
-  const audiencePrompts = gameState.prompts.filter(p => p.source === "audience");
+  const hostPrompts = gameState.prompts.filter((p) => p.source === "host");
+  const audiencePrompts = gameState.prompts.filter(
+    (p) => p.source === "audience",
+  );
 
   // Update counts
   document.getElementById("hostPromptsCount").textContent = hostPrompts.length;
-  document.getElementById("audiencePromptsCount").textContent = audiencePrompts.length;
+  document.getElementById("audiencePromptsCount").textContent =
+    audiencePrompts.length;
 
   // Render host prompts
   hostList.innerHTML = "";
   if (hostPrompts.length === 0) {
     hostList.innerHTML = '<p class="no-prompts-hint">Keine Host-Prompts</p>';
   } else {
-    hostPrompts.forEach(prompt => {
+    hostPrompts.forEach((prompt) => {
       hostList.appendChild(renderPromptRow(prompt, queuedIds, queueFull));
     });
   }
@@ -947,9 +1340,10 @@ function updatePromptsList() {
   // Render audience prompts
   audienceList.innerHTML = "";
   if (audiencePrompts.length === 0) {
-    audienceList.innerHTML = '<p class="no-prompts-hint">Keine Publikums-Prompts</p>';
+    audienceList.innerHTML =
+      '<p class="no-prompts-hint">Keine Publikums-Prompts</p>';
   } else {
-    audiencePrompts.forEach(prompt => {
+    audiencePrompts.forEach((prompt) => {
       audienceList.appendChild(renderPromptRow(prompt, queuedIds, queueFull));
     });
   }
@@ -959,12 +1353,12 @@ function updatePromptsList() {
   const audienceToggle = document.getElementById("audiencePromptsToggle");
 
   if (!promptSectionState.hostPrompts) {
-    hostList.classList.add('collapsed');
-    if (hostToggle) hostToggle.textContent = '▶';
+    hostList.classList.add("collapsed");
+    if (hostToggle) hostToggle.textContent = "▶";
   }
   if (!promptSectionState.audiencePrompts) {
-    audienceList.classList.add('collapsed');
-    if (audienceToggle) audienceToggle.textContent = '▶';
+    audienceList.classList.add("collapsed");
+    if (audienceToggle) audienceToggle.textContent = "▶";
   }
 
   // Apply search filter if there's a query
@@ -975,12 +1369,20 @@ function updatePromptsList() {
 }
 
 function updateQueuedPromptsList() {
-  const container = document.getElementById("queuedPromptsList");
+  updateQueuedPromptsListInto("queuedPromptsList", "startPromptSelectionBtn");
+  updateQueuedPromptsListInto(
+    "overviewQueuedPromptsList",
+    "overviewStartPromptSelectionBtn",
+  );
+}
+
+function updateQueuedPromptsListInto(containerId, startBtnId) {
+  const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = "";
 
   // Always update start button visibility first
-  const startBtn = document.getElementById("startPromptSelectionBtn");
+  const startBtn = document.getElementById(startBtnId);
   if (startBtn) {
     startBtn.style.display =
       gameState.queuedPrompts.length > 0 ? "block" : "none";
@@ -1566,9 +1968,11 @@ if (typeof window !== "undefined") {
   Object.assign(window, {
     transitionPhase,
     hostCreatePlayers,
+    hostCreatePlayersFromOverview,
     hostCreatePlayersCustom,
     hostStartRound,
     addPrompt,
+    addPromptFromOverview,
     selectPrompt,
     selectPromptById,
     queuePrompt,
@@ -1593,6 +1997,10 @@ if (typeof window !== "undefined") {
     togglePromptSection,
     filterPrompts,
     pickRandomPrompt,
+    // Overview helpers
+    runOverviewPrimaryAction,
+    runOverviewSecondaryAction,
+    filterOverviewPrompts,
     // State export/import
     refreshStateView,
     downloadStateExport,

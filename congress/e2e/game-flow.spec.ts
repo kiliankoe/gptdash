@@ -148,10 +148,10 @@ test.describe("Game Flow", () => {
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
 
     // Wait for prompt to appear in the pool list (compact rows)
-    await host.waitForSelector(".prompt-row");
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
 
     // Queue the prompt (new flow: queue -> start -> auto-advance to WRITING)
-    await host.locator(".prompt-row .queue-btn").first().click();
+    await host.locator("#hostPromptsList .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -253,7 +253,7 @@ test.describe("Game Flow", () => {
     await host.click('.sidebar-item:has-text("Antworten")');
 
     // Click next to reveal first answer
-    await host.click('button:has-text("Weiter")');
+    await host.click('#submissions button:has-text("Weiter")');
     await host.waitForTimeout(500);
 
     // Verify beamer shows reveal card
@@ -261,7 +261,7 @@ test.describe("Game Flow", () => {
     expect(revealText.length).toBeGreaterThan(10);
 
     // Navigate to next answer
-    await host.click('button:has-text("Weiter")');
+    await host.click('#submissions button:has-text("Weiter")');
     await host.waitForTimeout(500);
 
     // ============================================
