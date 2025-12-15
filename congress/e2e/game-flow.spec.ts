@@ -34,7 +34,9 @@ test.describe("Game Flow", () => {
     await closeContexts(contexts);
   });
 
-  test("complete game from lobby to results with multiple players and audience", async () => {
+  test("complete game from lobby to results with multiple players and audience", async ({
+    browser,
+  }) => {
     const { host, beamer, players, audience } = clients;
 
     // ============================================
@@ -117,12 +119,16 @@ test.describe("Game Flow", () => {
     // ============================================
     console.log("Step 4: Audience joining...");
 
-    // Audience 1 joins
-    await audience[0].click("#joinButton");
+    // Audience 1 joins (may auto-advance to waiting screen after WS connect)
+    if (await audience[0].locator("#joinButton").isVisible()) {
+      await audience[0].click("#joinButton");
+    }
     await audience[0].waitForSelector("#waitingScreen.active");
 
-    // Audience 2 joins
-    await audience[1].click("#joinButton");
+    // Audience 2 joins (may auto-advance to waiting screen after WS connect)
+    if (await audience[1].locator("#joinButton").isVisible()) {
+      await audience[1].click("#joinButton");
+    }
     await audience[1].waitForSelector("#waitingScreen.active");
 
     // ============================================
@@ -141,11 +147,11 @@ test.describe("Game Flow", () => {
     );
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
 
-    // Wait for prompt to appear in the list
-    await host.waitForSelector(".prompt-card");
+    // Wait for prompt to appear in the pool list (compact rows)
+    await host.waitForSelector(".prompt-row");
 
     // Queue the prompt (new flow: queue -> start -> auto-advance to WRITING)
-    await host.click('.prompt-card button:has-text("+ Warteschlange")');
+    await host.locator(".prompt-row .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -272,6 +278,18 @@ test.describe("Game Flow", () => {
       timeout: 5000,
     });
     await waitForBeamerScene(beamer, "sceneVoting");
+
+    // Late-joining audience member should immediately see voting options
+    const lateAudienceContext = await browser.newContext();
+    contexts.push(lateAudienceContext);
+    const lateAudience = await lateAudienceContext.newPage();
+    await lateAudience.goto("/");
+    await lateAudience.waitForSelector("#votingScreen.active", {
+      timeout: 5000,
+    });
+    await lateAudience.waitForSelector("#votingScreen.active .answer-option", {
+      timeout: 5000,
+    });
 
     // Audience should see voting screen
     await audience[0].waitForSelector("#votingScreen.active", {

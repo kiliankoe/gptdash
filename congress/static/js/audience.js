@@ -95,12 +95,12 @@ function handleMessage(message) {
           updateVoteSummary();
         }
       }
-      // Auto-join if we have a token
-      if (voterToken) {
-        updateConnectionStatus(true, "connected");
-        if (currentPhase !== "VOTING" || !hasVoted) {
-          showScreen("waitingScreen");
-        }
+      // Don't override the current phase screen (e.g. a late-joining audience member
+      // should stay on the voting screen and receive submissions via state recovery).
+      // Only force confirmed screen if we already voted in the current voting phase.
+      if (currentPhase === "VOTING" && hasVoted) {
+        showScreen("confirmedScreen");
+        updateVoteSummary();
       }
       break;
 
@@ -203,7 +203,12 @@ function joinAudience() {
 
   updateConnectionStatus(true, "connected");
   hideError("welcomeError");
-  showScreen("waitingScreen");
+  // Show the appropriate screen based on current phase (important for late joiners)
+  if (currentPhase === "VOTING" && !hasVoted) {
+    showVotingScreen();
+  } else {
+    showScreen("waitingScreen");
+  }
 }
 
 function updatePhase(phase) {
