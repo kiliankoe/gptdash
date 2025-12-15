@@ -467,22 +467,22 @@ function initVotingBars() {
   aiContainer.innerHTML = "";
   funnyContainer.innerHTML = "";
 
-  submissions.forEach((sub, index) => {
-    const label = String.fromCharCode(65 + index); // A, B, C, ...
-
+  submissions.forEach((sub) => {
     // AI vote bar
-    aiContainer.appendChild(createVoteBar(sub.id, label, "ai"));
+    aiContainer.appendChild(createVoteBar(sub.id, sub.display_text, "ai"));
     // Funny vote bar
-    funnyContainer.appendChild(createVoteBar(sub.id, label, "funny"));
+    funnyContainer.appendChild(
+      createVoteBar(sub.id, sub.display_text, "funny"),
+    );
   });
 }
 
-function createVoteBar(id, label, type) {
+function createVoteBar(id, text, type) {
   const bar = document.createElement("div");
   bar.className = "vote-bar";
   bar.dataset.submissionId = id;
   bar.innerHTML = `
-        <div class="vote-bar-label">${escapeHtml(label)}</div>
+        <marquee scrollamount="3" class="vote-bar-marquee">${escapeHtml(text)}</marquee>
         <div class="vote-bar-track">
             <div class="vote-bar-fill ${type}" style="width: 0%"></div>
             <div class="vote-bar-count">0</div>

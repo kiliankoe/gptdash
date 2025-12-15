@@ -741,31 +741,27 @@ body {
 .vote-bars {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 12px;
   flex: 1;
 }
 
 .vote-bar {
   display: flex;
-  align-items: center;
-  gap: 20px;
-  height: 60px;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.vote-bar-label {
-  width: 60px;
-  font-family: var(--font-headline);
-  font-size: 28px;
-  font-variation-settings:
-    "wght" 100,
-    "wdth" 100;
-  text-align: center;
-  flex-shrink: 0;
+.vote-bar-marquee {
+  font-family: var(--font-body);
+  font-size: 18px;
+  color: var(--color-neutral);
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .vote-bar-track {
-  flex: 1;
-  height: 100%;
+  height: 40px;
   background: rgba(250, 245, 245, 0.1);
   border-radius: 6px;
   overflow: hidden;
@@ -797,11 +793,11 @@ body {
 
 .vote-bar-count {
   position: absolute;
-  right: 15px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   font-family: var(--font-headline);
-  font-size: 24px;
+  font-size: 20px;
   font-variation-settings:
     "wght" 100,
     "wdth" 100;
