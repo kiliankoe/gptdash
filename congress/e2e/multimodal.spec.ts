@@ -33,7 +33,7 @@ test.describe("Multimodal Prompts", () => {
     const { host, beamer, players } = clients;
 
     // Setup: Navigate to host page (game already reset by beforeEach)
-    await host.goto("/host.html");
+    await host.goto("/host");
     await waitForConnection(host);
 
     // Create player
@@ -143,7 +143,7 @@ test.describe("Multimodal Prompts", () => {
     const { host, beamer, players } = clients;
 
     // Setup: Navigate to host page (game already reset by beforeEach)
-    await host.goto("/host.html");
+    await host.goto("/host");
     await waitForConnection(host);
 
     // Create player

@@ -39,7 +39,7 @@ test.describe("Submissions", () => {
 
     // Navigate to pages
     await Promise.all([
-      host.goto("/host.html"),
+      host.goto("/host"),
       beamer.goto("/beamer.html"),
       players[0].goto("/player.html"),
       players[1].goto("/player.html"),
@@ -224,7 +224,7 @@ test.describe("Submissions", () => {
     console.log("Typo correction test: Setting up game...");
 
     await Promise.all([
-      host.goto("/host.html"),
+      host.goto("/host"),
       players[0].goto("/player.html"),
     ]);
 

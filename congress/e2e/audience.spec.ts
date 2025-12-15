@@ -32,7 +32,7 @@ test.describe("Audience", () => {
     const { host, audience } = clients;
 
     // Setup minimal game - just start game
-    await host.goto("/host.html");
+    await host.goto("/host");
     await waitForConnection(host);
 
     // Audience joins during LOBBY phase
@@ -61,7 +61,7 @@ test.describe("Audience", () => {
 
     // Navigate to pages
     await Promise.all([
-      host.goto("/host.html"),
+      host.goto("/host"),
       beamer.goto("/beamer.html"),
       players[0].goto("/player.html"),
       audience[0].goto("/"),

@@ -31,7 +31,7 @@ test.describe("Beamer", () => {
   test("displays correct scenes for each phase", async () => {
     const { host, beamer } = clients;
 
-    await host.goto("/host.html");
+    await host.goto("/host");
     await beamer.goto("/beamer.html");
 
     await waitForConnection(host);

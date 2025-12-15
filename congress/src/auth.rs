@@ -6,6 +6,7 @@ use axum::{
     http::{header, Request, Response, StatusCode},
     middleware::Next,
     response::IntoResponse,
+    response::Redirect,
 };
 use std::sync::Arc;
 
@@ -146,6 +147,74 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, ()> {
     Ok(output)
 }
 
+fn query_param_equals(request: &Request<Body>, key: &str, expected: &str) -> bool {
+    let Some(query) = request.uri().query() else {
+        return false;
+    };
+    for pair in query.split('&') {
+        let Some((k, v)) = pair.split_once('=') else {
+            continue;
+        };
+        if k == key && v == expected {
+            return true;
+        }
+    }
+    false
+}
+
+/// Middleware to require HTTP Basic Auth for host WebSocket connections.
+///
+/// This prevents clients from taking over by connecting to `/ws?role=host`.
+pub async fn host_ws_auth_middleware(
+    State(auth_config): State<Arc<AuthConfig>>,
+    request: Request<Body>,
+    next: Next,
+) -> Response<Body> {
+    let is_host_ws = request.uri().path() == "/ws" && query_param_equals(&request, "role", "host");
+
+    if !is_host_ws {
+        return next.run(request).await;
+    }
+
+    // If host auth is disabled, keep dev behavior (allow) but log loudly.
+    if !auth_config.is_enabled() {
+        tracing::warn!(
+            "Host WebSocket requested but host authentication is DISABLED; set HOST_USERNAME and HOST_PASSWORD to prevent host takeover"
+        );
+        return next.run(request).await;
+    }
+
+    // Check Authorization header
+    if let Some(auth_header) = request.headers().get(header::AUTHORIZATION) {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(credentials) = auth_str.strip_prefix("Basic ") {
+                if let Ok(decoded) = base64_decode(credentials) {
+                    if let Ok(decoded_str) = String::from_utf8(decoded) {
+                        if let Some((username, password)) = decoded_str.split_once(':') {
+                            if auth_config.validate(username, password) {
+                                return next.run(request).await;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Response::builder()
+        .status(StatusCode::UNAUTHORIZED)
+        .header(
+            header::WWW_AUTHENTICATE,
+            "Basic realm=\"GPTDash Host (WebSocket)\"",
+        )
+        .body(Body::from("Unauthorized"))
+        .unwrap()
+}
+
+pub async fn redirect_host_html() -> Redirect {
+    Redirect::temporary("/host")
+}
+
 /// Handler to serve host.html (used with auth middleware)
 pub async fn serve_host() -> impl IntoResponse {
     match tokio::fs::read_to_string("static/host.html").await {
@@ -194,6 +263,17 @@ pub async fn serve_player() -> impl IntoResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_query_param_equals() {
+        let req = Request::builder()
+            .uri("/ws?role=host&token=abc")
+            .body(Body::empty())
+            .unwrap();
+        assert!(query_param_equals(&req, "role", "host"));
+        assert!(!query_param_equals(&req, "role", "audience"));
+        assert!(!query_param_equals(&req, "missing", "x"));
+    }
 
     #[test]
     fn test_auth_config_disabled_when_incomplete() {

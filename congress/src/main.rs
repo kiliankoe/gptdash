@@ -79,16 +79,21 @@ async fn main() {
     // Public page routes (beamer and player)
     let page_routes = Router::new()
         .route("/beamer", get(auth::serve_beamer))
-        .route("/player", get(auth::serve_player));
+        .route("/player", get(auth::serve_player))
+        // Prevent bypassing the protected `/host` route via static file serving.
+        .route("/host.html", get(auth::redirect_host_html));
 
     // WebSocket route with anti-abuse protection
-    let ws_routes =
-        Router::new()
-            .route("/ws", get(ws::ws_handler))
-            .layer(middleware::from_fn_with_state(
-                abuse_config.clone(),
-                abuse::ws_abuse_middleware,
-            ));
+    let ws_routes = Router::new()
+        .route("/ws", get(ws::ws_handler))
+        .layer(middleware::from_fn_with_state(
+            auth_config.clone(),
+            auth::host_ws_auth_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            abuse_config.clone(),
+            abuse::ws_abuse_middleware,
+        ));
 
     let app = Router::new()
         .merge(ws_routes)

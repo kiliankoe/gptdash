@@ -54,7 +54,7 @@ export async function getPlayerTokens(host: Page): Promise<string[]> {
 export async function resetGameState(browser: Browser): Promise<void> {
   const resetContext = await browser.newContext();
   const resetPage = await resetContext.newPage();
-  await resetPage.goto("/host.html");
+  await resetPage.goto("/host");
   await waitForConnection(resetPage);
 
   // Handle reset confirmation dialog

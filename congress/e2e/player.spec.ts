@@ -32,7 +32,7 @@ test.describe("Player", () => {
     const { host, players } = clients;
 
     // Setup: Connect host, create token
-    await host.goto("/host.html");
+    await host.goto("/host");
     await waitForConnection(host);
 
     // Navigate to Players panel
@@ -79,7 +79,7 @@ test.describe("Player", () => {
     console.log("Player status test: Setting up game...");
 
     await Promise.all([
-      host.goto("/host.html"),
+      host.goto("/host"),
       players[0].goto("/player.html"),
       players[1].goto("/player.html"),
     ]);
@@ -239,7 +239,7 @@ test.describe("Player", () => {
 
     // Navigate to pages
     await Promise.all([
-      host.goto("/host.html"),
+      host.goto("/host"),
       beamer.goto("/beamer.html"),
       players[0].goto("/player.html"),
       players[1].goto("/player.html"),
@@ -467,7 +467,7 @@ test.describe("Player", () => {
     console.log("Add player mid-round test: Setting up game...");
 
     await Promise.all([
-      host.goto("/host.html"),
+      host.goto("/host"),
       players[0].goto("/player.html"),
     ]);
 

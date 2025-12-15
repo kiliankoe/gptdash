@@ -44,7 +44,7 @@ test.describe("Game Flow", () => {
 
     // Navigate to pages in parallel
     await Promise.all([
-      host.goto("/host.html"),
+      host.goto("/host"),
       beamer.goto("/beamer.html"),
       players[0].goto("/player.html"),
       players[1].goto("/player.html"),

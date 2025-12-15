@@ -32,7 +32,7 @@ test.describe("Host", () => {
   test("can reset game", async () => {
     const { host, beamer } = clients;
 
-    await host.goto("/host.html");
+    await host.goto("/host");
     await beamer.goto("/beamer.html");
 
     await waitForConnection(host);
@@ -74,7 +74,7 @@ test.describe("Host", () => {
     console.log("Host state restoration test: Setting up game state...");
 
     await Promise.all([
-      host.goto("/host.html"),
+      host.goto("/host"),
       players[0].goto("/player.html"),
     ]);
 
