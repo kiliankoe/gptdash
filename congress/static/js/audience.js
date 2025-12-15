@@ -6,6 +6,7 @@ let wsConn = null;
 let voterToken = null;
 let displayName = null; // Auto-generated friendly name from server
 let currentPhase = null;
+let currentRoundNo = null;
 let submissions = [];
 let selectedAiAnswer = null;
 let selectedFunnyAnswer = null;
@@ -62,6 +63,7 @@ function handleMessage(message) {
       console.log("Welcome message:", message);
       if (message.game) {
         panicMode = message.game.panic_mode || false;
+        currentRoundNo = message.game.round_no;
         updatePhase(message.game.phase);
         // Start timer if in VOTING phase with deadline
         if (
@@ -105,6 +107,17 @@ function handleMessage(message) {
       break;
 
     case "phase":
+      // Detect new round via phase message (covers implicit round starts)
+      if (
+        typeof message.round_no === "number" &&
+        currentRoundNo !== null &&
+        message.round_no !== currentRoundNo
+      ) {
+        resetRoundUiState();
+      }
+      if (typeof message.round_no === "number") {
+        currentRoundNo = message.round_no;
+      }
       // Update timer for VOTING phase
       if (
         message.phase === "VOTING" &&
@@ -183,6 +196,17 @@ function handleMessage(message) {
       handleError(message.code, message.msg);
       break;
   }
+}
+
+function resetRoundUiState() {
+  submissions = [];
+  hasVoted = false;
+  selectedAiAnswer = null;
+  selectedFunnyAnswer = null;
+  promptCandidates = [];
+  hasPromptVoted = false;
+  selectedPrompt = null;
+  updateVoteButtonState();
 }
 
 function joinAudience() {

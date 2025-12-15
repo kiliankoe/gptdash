@@ -103,8 +103,15 @@ async fn main() {
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
-    // 6573 is ascii for "AI"
-    let addr = SocketAddr::from(([0, 0, 0, 0], 6573));
+    // 6573 is ASCII for "AI"
+    let bind_addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(6573);
+    let addr: SocketAddr = format!("{bind_addr}:{port}")
+        .parse()
+        .expect("Invalid BIND_ADDR/PORT");
     tracing::info!("Listening on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

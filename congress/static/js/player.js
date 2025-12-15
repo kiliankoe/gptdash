@@ -8,6 +8,7 @@ let playerId = null;
 let playerName = null;
 let currentPhase = null;
 let currentPrompt = null;
+let currentRoundNo = null;
 let hasSubmitted = false;
 let playerTimer = null;
 let pendingTypoCheck = null; // Track pending typo check data
@@ -41,7 +42,12 @@ function init() {
 
   // Create WS connection manager.
   // Only connect once we have a token (server requires it for player connections).
-  wsConn = new WSConnection("player", handleMessage, updateConnectionStatus, playerToken);
+  wsConn = new WSConnection(
+    "player",
+    handleMessage,
+    updateConnectionStatus,
+    playerToken,
+  );
   if (playerToken) {
     wsConn.connect();
   } else {
@@ -64,6 +70,7 @@ function handleMessage(message) {
     case "welcome":
       if (message.game) {
         currentPhase = message.game.phase;
+        currentRoundNo = message.game.round_no;
         // Start timer if in WRITING phase with deadline
         if (
           currentPhase === "WRITING" &&
@@ -102,7 +109,18 @@ function handleMessage(message) {
       break;
 
     case "phase":
+      // Detect new round via phase message (covers implicit round starts)
+      if (
+        typeof message.round_no === "number" &&
+        currentRoundNo !== null &&
+        message.round_no !== currentRoundNo
+      ) {
+        resetRoundUiState();
+      }
       currentPhase = message.phase;
+      if (typeof message.round_no === "number") {
+        currentRoundNo = message.round_no;
+      }
       // Update timer for WRITING phase
       if (
         currentPhase === "WRITING" &&
@@ -132,14 +150,24 @@ function handleMessage(message) {
 
     case "prompt_selected":
       currentPrompt = message.prompt;
+      // If we're already showing the writing screen, update the displayed prompt immediately
+      if (
+        currentPhase === "WRITING" &&
+        document.getElementById("writingScreen")?.classList.contains("active")
+      ) {
+        showWritingScreen();
+      }
       break;
 
     case "round_started":
       // Reset submission state for new round
-      hasSubmitted = false;
-      if (message.round?.selected_prompt) {
-        currentPrompt = message.round.selected_prompt;
+      if (typeof message.round?.number === "number") {
+        currentRoundNo = message.round.number;
       }
+      hasSubmitted = false;
+      pendingTypoCheck = null;
+      currentPrompt = message.round?.selected_prompt || null;
+      resetAnswerInput();
       break;
 
     case "submission_confirmed":
@@ -225,6 +253,23 @@ function handleMessage(message) {
       }
       break;
   }
+}
+
+function resetAnswerInput() {
+  const answerInput = document.getElementById("answerInput");
+  if (answerInput) {
+    answerInput.value = "";
+    updateCharCounter();
+  }
+  hideError("submitError");
+  hideError("typoError");
+}
+
+function resetRoundUiState() {
+  hasSubmitted = false;
+  pendingTypoCheck = null;
+  currentPrompt = null;
+  resetAnswerInput();
 }
 
 function joinGame() {
@@ -367,28 +412,39 @@ function updateScreen(phase) {
 }
 
 function showWritingScreen() {
-  if (currentPrompt) {
-    const promptEl = document.getElementById("promptText");
-    const promptImageEl = document.getElementById("promptImage");
+  const promptEl = document.getElementById("promptText");
+  const promptImageEl = document.getElementById("promptImage");
 
-    // Handle text
+  if (!currentPrompt) {
     if (promptEl) {
-      const text =
-        currentPrompt.text ||
-        (typeof currentPrompt === "string" ? currentPrompt : "");
-      promptEl.textContent = text || "(Bildfrage - siehe Bild oben)";
-      promptEl.style.display = text ? "block" : "none";
+      promptEl.textContent = "";
+      promptEl.style.display = "none";
     }
-
-    // Handle image
     if (promptImageEl) {
-      if (currentPrompt.image_url) {
-        promptImageEl.innerHTML = `<img src="${escapeHtml(currentPrompt.image_url)}" alt="Prompt-Bild" class="prompt-image-display">`;
-        promptImageEl.style.display = "block";
-      } else {
-        promptImageEl.innerHTML = "";
-        promptImageEl.style.display = "none";
-      }
+      promptImageEl.innerHTML = "";
+      promptImageEl.style.display = "none";
+    }
+    showScreen("writingScreen");
+    return;
+  }
+
+  // Handle text
+  if (promptEl) {
+    const text =
+      currentPrompt.text ||
+      (typeof currentPrompt === "string" ? currentPrompt : "");
+    promptEl.textContent = text || "(Bildfrage - siehe Bild oben)";
+    promptEl.style.display = text ? "block" : "none";
+  }
+
+  // Handle image
+  if (promptImageEl) {
+    if (currentPrompt.image_url) {
+      promptImageEl.innerHTML = `<img src="${escapeHtml(currentPrompt.image_url)}" alt="Prompt-Bild" class="prompt-image-display">`;
+      promptImageEl.style.display = "block";
+    } else {
+      promptImageEl.innerHTML = "";
+      promptImageEl.style.display = "none";
     }
   }
   showScreen("writingScreen");

@@ -1,5 +1,6 @@
 use super::AppState;
 use crate::llm::GenerateRequest;
+use crate::protocol::ServerMessage;
 use crate::types::*;
 
 impl AppState {
@@ -84,6 +85,22 @@ impl AppState {
             g.round_no = round.number;
             g.version += 1;
         }
+        drop(game);
+
+        // Reset per-round player status (submitted/checking) for the new round.
+        self.clear_player_statuses().await;
+        let players = self.get_all_player_status().await;
+        self.broadcast_to_host(ServerMessage::HostPlayerStatus { players });
+
+        // Broadcast round change so all clients can reset per-round UI state,
+        // even when the round is started implicitly during phase transitions.
+        self.broadcast_to_all(ServerMessage::RoundStarted {
+            round: round.clone(),
+        });
+
+        // Clear per-round views on clients by broadcasting an empty submissions list
+        // for the new round (host + beamer + audience).
+        self.broadcast_submissions(&round.id).await;
 
         Ok(round)
     }
@@ -197,6 +214,13 @@ impl AppState {
                 return Err("Round not found".to_string());
             }
         }
+
+        // Broadcast updated prompt pool to host and selected prompt to all clients
+        // (needed for prompts selected implicitly during phase transitions).
+        self.broadcast_prompts_to_host().await;
+        self.broadcast_to_all(ServerMessage::PromptSelected {
+            prompt: prompt.clone(),
+        });
 
         // Kick off LLM generation in the background (don't block)
         // Only generate if there's text or an image to work with

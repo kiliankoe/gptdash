@@ -83,6 +83,13 @@ function handleMessage(message) {
       break;
 
     case "phase":
+      // Detect round change via phase broadcast (covers implicit round starts)
+      if (
+        typeof message.round_no === "number" &&
+        message.round_no !== gameState.roundNo
+      ) {
+        resetRoundUiState();
+      }
       gameState.phase = message.phase;
       gameState.roundNo = message.round_no;
       gameState.validTransitions = message.valid_transitions || [];
@@ -208,9 +215,8 @@ function handleMessage(message) {
     case "round_started":
       gameState.currentRound = message.round;
       gameState.roundNo = message.round.number;
-      if (message.round.selected_prompt) {
-        gameState.currentPrompt = message.round.selected_prompt;
-      }
+      gameState.currentPrompt = message.round.selected_prompt || null;
+      resetRoundUiState();
       updateCurrentRoundInfo();
       updateUI();
       updateOverviewRevealStatus();
@@ -236,6 +242,17 @@ function handleMessage(message) {
       console.log("Unhandled message type:", message.t, message);
       break;
   }
+}
+
+function resetRoundUiState() {
+  gameState.submissions = [];
+  gameState.revealOrder = [];
+  gameState.selectedAiSubmissionId = null;
+  gameState.aiGenerationStatus = "idle";
+  updateSubmissionsList();
+  updatePanicModeUI();
+  updateOverviewFlow();
+  updateOverviewRevealStatus();
 }
 
 function updateStatus(connected) {

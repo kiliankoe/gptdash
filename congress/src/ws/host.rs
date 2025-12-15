@@ -80,13 +80,13 @@ pub async fn handle_select_prompt(
     tracing::info!("Host selecting prompt: {}", prompt_id);
 
     // Ensure we have a round to select the prompt for
-    let (round, is_new_round) = match state.get_current_round().await {
+    let round = match state.get_current_round().await {
         Some(r) => {
             // Check if round is in Setup state, if not start a new one
             if r.state != crate::types::RoundState::Setup {
                 tracing::info!("Current round not in Setup state, starting new round");
                 match state.start_round().await {
-                    Ok(new_round) => (new_round, true),
+                    Ok(new_round) => new_round,
                     Err(e) => {
                         return Some(ServerMessage::Error {
                             code: "PROMPT_SELECT_FAILED".to_string(),
@@ -95,14 +95,14 @@ pub async fn handle_select_prompt(
                     }
                 }
             } else {
-                (r, false)
+                r
             }
         }
         None => {
             // No round exists, create one
             tracing::info!("No current round, creating one for prompt selection");
             match state.start_round().await {
-                Ok(new_round) => (new_round, true),
+                Ok(new_round) => new_round,
                 Err(e) => {
                     return Some(ServerMessage::Error {
                         code: "PROMPT_SELECT_FAILED".to_string(),
@@ -113,24 +113,9 @@ pub async fn handle_select_prompt(
         }
     };
 
-    // If we created a new round, broadcast it to all clients
-    if is_new_round {
-        state.broadcast_to_all(ServerMessage::RoundStarted {
-            round: round.clone(),
-        });
-    }
-
     // Select prompt from pool (removes it from pool)
     match state.select_prompt(&round.id, &prompt_id).await {
-        Ok(prompt) => {
-            // Broadcast updated pool to host
-            state.broadcast_prompts_to_host().await;
-            // Broadcast to all clients so beamer and players can update their displays
-            state.broadcast_to_all(ServerMessage::PromptSelected {
-                prompt: prompt.clone(),
-            });
-            Some(ServerMessage::PromptSelected { prompt })
-        }
+        Ok(prompt) => Some(ServerMessage::PromptSelected { prompt }),
         Err(e) => Some(ServerMessage::Error {
             code: "PROMPT_SELECT_FAILED".to_string(),
             msg: e,

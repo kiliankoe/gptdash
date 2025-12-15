@@ -154,6 +154,10 @@ function handleWelcome(msg) {
 
 function handlePhaseChange(msg) {
   const previousPhase = gameState.phase;
+  // Detect round changes via phase broadcast (covers implicit round starts)
+  if (typeof msg.round_no === "number" && msg.round_no !== gameState.roundNo) {
+    resetRoundUiState();
+  }
   gameState.phase = msg.phase;
   gameState.roundNo = msg.round_no;
   updateRoundBadge();
@@ -192,6 +196,7 @@ function handlePhaseChange(msg) {
 }
 
 function handleRoundStarted(msg) {
+  resetRoundUiState();
   gameState.currentRound = msg.round;
   gameState.roundNo = msg.round.number;
   updateRoundBadge();
@@ -199,6 +204,34 @@ function handleRoundStarted(msg) {
   // Update prompt candidates for selection
   if (msg.round.prompt_candidates && msg.round.prompt_candidates.length > 0) {
     updatePromptCandidates(msg.round.prompt_candidates);
+  }
+}
+
+function resetRoundUiState() {
+  gameState.currentRound = null;
+  gameState.submissions = [];
+  gameState.revealIndex = 0;
+  gameState.currentRevealSubmission = null;
+  gameState.voteCounts = { ai: {}, funny: {} };
+  gameState.promptCandidates = [];
+  gameState.promptVoteCounts = {};
+  lastSpokenSubmissionId = null;
+  updateSubmissionCounter();
+  updateRevealIndicator();
+  clearPromptDisplay();
+}
+
+function clearPromptDisplay() {
+  const promptText = document.getElementById("writingPromptText");
+  const promptImage = document.getElementById("writingPromptImage");
+
+  if (promptText) {
+    promptText.textContent = "";
+    promptText.style.display = "none";
+  }
+  if (promptImage) {
+    promptImage.innerHTML = "";
+    promptImage.style.display = "none";
   }
 }
 

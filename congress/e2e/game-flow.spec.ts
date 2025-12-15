@@ -380,6 +380,65 @@ test.describe("Game Flow", () => {
     const leaderboard = beamer.locator("#leaderboardList");
     await expect(leaderboard).toBeVisible();
 
-    console.log("Full game flow completed successfully!");
+    // ============================================
+    // STEP 14: Start a second round and verify UI resets
+    // ============================================
+    console.log("Step 14: Starting second round and verifying state reset...");
+
+    // Add a second prompt to the pool
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+    await host.fill(
+      "#promptText",
+      "Round 2: Describe a futuristic parliament.",
+    );
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+
+    // Queue and start (single prompt -> auto-advance to WRITING)
+    await host.locator("#hostPromptsList .queue-btn").first().click();
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+    await host.click("#startPromptSelectionBtn");
+
+    await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
+      timeout: 5000,
+    });
+    await expect(host.locator("#overviewRound")).toHaveText("2", {
+      timeout: 5000,
+    });
+    await waitForBeamerScene(beamer, "sceneWriting");
+
+    // Host submissions should be cleared for the new round
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.waitForSelector("#submissions.active");
+    await expect(host.locator(".submission-card")).toHaveCount(0);
+
+    // Players should see WRITING with the new prompt and an empty textbox (no prefill)
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+    await players[1].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+    await expect(players[0].locator("#answerInput")).toHaveValue("");
+    await expect(players[1].locator("#answerInput")).toHaveValue("");
+    await expect(players[0].locator("#promptText")).toHaveText(
+      "Round 2: Describe a futuristic parliament.",
+    );
+    await expect(players[1].locator("#promptText")).toHaveText(
+      "Round 2: Describe a futuristic parliament.",
+    );
+
+    // Beamer should show the new prompt
+    await expect(beamer.locator("#writingPromptText")).toHaveText(
+      "Round 2: Describe a futuristic parliament.",
+    );
+
+    console.log(
+      "Full game flow (including round 2 start) completed successfully!",
+    );
   });
 });

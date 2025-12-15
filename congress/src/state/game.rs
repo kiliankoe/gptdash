@@ -175,6 +175,7 @@ impl AppState {
                     self.prompt_pool.write().await.push(prompt.clone());
                     self.queued_prompts.write().await.clear();
                     self.prompt_votes.write().await.clear();
+                    self.broadcast_queued_prompts_to_host().await;
 
                     // Create a new round BEFORE phase changes (start_round checks current phase)
                     match self.start_round().await {
@@ -209,6 +210,7 @@ impl AppState {
                         // Clear queue and votes (may already be cleared by select_winning_prompt)
                         self.queued_prompts.write().await.clear();
                         self.prompt_votes.write().await.clear();
+                        self.broadcast_queued_prompts_to_host().await;
 
                         // Create a new round BEFORE phase changes
                         match self.start_round().await {
@@ -256,6 +258,26 @@ impl AppState {
 
                 let round_id = g.current_round_id.clone();
                 drop(game);
+
+                // Keep RoundState in sync with the game phase so subsequent rounds can start
+                // cleanly (start_round requires the previous round to be Closed).
+                if let Some(rid) = &round_id {
+                    let mut rounds = self.rounds.write().await;
+                    if let Some(round) = rounds.get_mut(rid) {
+                        round.state = match effective_phase {
+                            GamePhase::Writing => RoundState::Collecting,
+                            GamePhase::Reveal => RoundState::Revealing,
+                            GamePhase::Voting => RoundState::OpenForVotes,
+                            // Once we reach results, the round is effectively finished and
+                            // must be startable from Results/Podium.
+                            GamePhase::Results
+                            | GamePhase::Podium
+                            | GamePhase::PromptSelection
+                            | GamePhase::Lobby => RoundState::Closed,
+                            _ => round.state.clone(),
+                        };
+                    }
+                }
 
                 // Handle phase-specific actions
                 if effective_phase == GamePhase::PromptSelection {

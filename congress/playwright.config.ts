@@ -6,6 +6,7 @@ config();
 
 const webServerEnv = {
   ...process.env,
+  BIND_ADDR: "127.0.0.1",
   OPENAI_API_KEY: "",
   OLLAMA_BASE_URL: "",
   OLLAMA_MODEL: "",
