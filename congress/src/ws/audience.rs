@@ -46,6 +46,13 @@ pub async fn handle_vote(
                 msg: "Voting is only allowed during the voting phase".to_string(),
             })
         }
+        VoteResult::InvalidPick => {
+            tracing::info!("Vote rejected: invalid pick(s)");
+            Some(ServerMessage::Error {
+                code: "INVALID_VOTE".to_string(),
+                msg: "Invalid vote. Please pick two different answers from this round.".to_string(),
+            })
+        }
     }
 }
 

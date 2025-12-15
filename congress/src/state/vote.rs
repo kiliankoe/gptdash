@@ -15,6 +15,8 @@ pub enum VoteResult {
     PanicModeActive,
     /// Game is not in VOTING phase
     WrongPhase,
+    /// Vote is invalid (e.g., picks don't exist for this round)
+    InvalidPick,
 }
 
 impl AppState {
@@ -49,6 +51,25 @@ impl AppState {
             Some(r) => r,
             None => return VoteResult::NoActiveRound,
         };
+
+        // Validate vote content: picks must exist and belong to the current round.
+        {
+            let submissions = self.submissions.read().await;
+            let ai_ok = submissions
+                .get(&ai_pick)
+                .is_some_and(|s| s.round_id == round.id);
+            let funny_ok = submissions
+                .get(&funny_pick)
+                .is_some_and(|s| s.round_id == round.id);
+            if !ai_ok || !funny_ok {
+                tracing::warn!(
+                    "Vote rejected: invalid pick(s) (ai_ok={}, funny_ok={})",
+                    ai_ok,
+                    funny_ok
+                );
+                return VoteResult::InvalidPick;
+            }
+        }
 
         // Check for duplicate msg_id (idempotency)
         {
@@ -281,13 +302,18 @@ mod tests {
     async fn test_submit_vote_records_new_vote() {
         let state = setup_voting_phase().await;
 
+        let round = state.get_current_round().await.unwrap();
+        let sub1 = state
+            .submit_answer(&round.id, None, "A".to_string())
+            .await
+            .unwrap();
+        let sub2 = state
+            .submit_answer(&round.id, None, "B".to_string())
+            .await
+            .unwrap();
+
         let result = state
-            .submit_vote(
-                "voter1".to_string(),
-                "sub1".to_string(),
-                "sub2".to_string(),
-                "msg1".to_string(),
-            )
+            .submit_vote("voter1".to_string(), sub1.id, sub2.id, "msg1".to_string())
             .await;
 
         assert_eq!(result, VoteResult::Recorded);
@@ -298,12 +324,30 @@ mod tests {
     async fn test_submit_vote_duplicate_msg_id() {
         let state = setup_voting_phase().await;
 
+        let round = state.get_current_round().await.unwrap();
+        let sub1 = state
+            .submit_answer(&round.id, None, "A".to_string())
+            .await
+            .unwrap();
+        let sub2 = state
+            .submit_answer(&round.id, None, "B".to_string())
+            .await
+            .unwrap();
+        let sub3 = state
+            .submit_answer(&round.id, None, "C".to_string())
+            .await
+            .unwrap();
+        let sub4 = state
+            .submit_answer(&round.id, None, "D".to_string())
+            .await
+            .unwrap();
+
         // First vote
         let result1 = state
             .submit_vote(
                 "voter1".to_string(),
-                "sub1".to_string(),
-                "sub2".to_string(),
+                sub1.id.clone(),
+                sub2.id.clone(),
                 "msg1".to_string(),
             )
             .await;
@@ -311,41 +355,49 @@ mod tests {
 
         // Same msg_id - should be duplicate
         let result2 = state
-            .submit_vote(
-                "voter1".to_string(),
-                "sub3".to_string(),
-                "sub4".to_string(),
-                "msg1".to_string(),
-            )
+            .submit_vote("voter1".to_string(), sub3.id, sub4.id, "msg1".to_string())
             .await;
         assert_eq!(result2, VoteResult::Duplicate);
 
         // Vote should not have changed
         assert_eq!(state.votes.read().await.len(), 1);
         let vote = state.votes.read().await.values().next().unwrap().clone();
-        assert_eq!(vote.ai_pick_submission_id, "sub1");
+        assert_eq!(vote.ai_pick_submission_id, sub1.id);
     }
 
     #[tokio::test]
     async fn test_submit_vote_new_msg_id_replaces_vote() {
         let state = setup_voting_phase().await;
 
+        let round = state.get_current_round().await.unwrap();
+        let sub1 = state
+            .submit_answer(&round.id, None, "A".to_string())
+            .await
+            .unwrap();
+        let sub2 = state
+            .submit_answer(&round.id, None, "B".to_string())
+            .await
+            .unwrap();
+        let sub3 = state
+            .submit_answer(&round.id, None, "C".to_string())
+            .await
+            .unwrap();
+        let sub4 = state
+            .submit_answer(&round.id, None, "D".to_string())
+            .await
+            .unwrap();
+
         // First vote
         state
-            .submit_vote(
-                "voter1".to_string(),
-                "sub1".to_string(),
-                "sub2".to_string(),
-                "msg1".to_string(),
-            )
+            .submit_vote("voter1".to_string(), sub1.id, sub2.id, "msg1".to_string())
             .await;
 
         // New msg_id - should replace
         let result = state
             .submit_vote(
                 "voter1".to_string(),
-                "sub3".to_string(),
-                "sub4".to_string(),
+                sub3.id.clone(),
+                sub4.id.clone(),
                 "msg2".to_string(),
             )
             .await;
@@ -354,8 +406,8 @@ mod tests {
         // Should still only have 1 vote, but updated
         assert_eq!(state.votes.read().await.len(), 1);
         let vote = state.votes.read().await.values().next().unwrap().clone();
-        assert_eq!(vote.ai_pick_submission_id, "sub3");
-        assert_eq!(vote.funny_pick_submission_id, "sub4");
+        assert_eq!(vote.ai_pick_submission_id, sub3.id);
+        assert_eq!(vote.funny_pick_submission_id, sub4.id);
     }
 
     #[tokio::test]
@@ -454,6 +506,47 @@ mod tests {
             .await;
 
         assert_eq!(result, VoteResult::WrongPhase);
+        assert_eq!(state.votes.read().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_allows_same_submission_for_both_categories() {
+        let state = setup_voting_phase().await;
+
+        // Add a submission to the current round so the pick exists
+        let round = state.get_current_round().await.unwrap();
+        let sub = state
+            .submit_answer(&round.id, None, "AI".to_string())
+            .await
+            .unwrap();
+
+        let result = state
+            .submit_vote(
+                "voter1".to_string(),
+                sub.id.clone(),
+                sub.id.clone(),
+                "msg1".to_string(),
+            )
+            .await;
+
+        assert_eq!(result, VoteResult::Recorded);
+        assert_eq!(state.votes.read().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_rejected_when_picks_not_in_current_round() {
+        let state = setup_voting_phase().await;
+
+        let result = state
+            .submit_vote(
+                "voter1".to_string(),
+                "nonexistent1".to_string(),
+                "nonexistent2".to_string(),
+                "msg1".to_string(),
+            )
+            .await;
+
+        assert_eq!(result, VoteResult::InvalidPick);
         assert_eq!(state.votes.read().await.len(), 0);
     }
 }

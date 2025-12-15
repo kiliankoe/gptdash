@@ -688,7 +688,12 @@ function updateAiGenerationStatusUI(message) {
       statusClass = "";
   }
 
-  statusEl.innerHTML = `<p class="${statusClass}" style="margin: 0;">${statusText}</p>`;
+  statusEl.innerHTML = "";
+  const p = document.createElement("p");
+  p.className = statusClass;
+  p.style.margin = "0";
+  p.textContent = statusText;
+  statusEl.appendChild(p);
 }
 
 function updateAiSubmissionsList() {
@@ -1311,9 +1316,10 @@ function renderPromptRow(prompt, queuedIds, queueFull) {
       : displayText;
 
   // Build tooltip content
-  let tooltipContent = displayText;
+  const escapedTooltipText = escapeHtml(displayText);
+  let tooltipContent = escapedTooltipText;
   if (hasImage) {
-    tooltipContent = `<img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" style="max-width: 300px; max-height: 200px;"><br>${tooltipContent}`;
+    tooltipContent = `<img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" style="max-width: 300px; max-height: 200px;"><br>${escapedTooltipText}`;
   }
 
   // Submitter info for audience prompts
@@ -1775,7 +1781,13 @@ function updateScores() {
 
 function showAlert(message, type = "info") {
   const container = document.getElementById("overviewAlert");
-  container.innerHTML = `<div class="alert ${type}">${message}</div>`;
+  if (!container) return;
+  container.innerHTML = "";
+
+  const alert = document.createElement("div");
+  alert.className = `alert ${type}`;
+  alert.textContent = message;
+  container.appendChild(alert);
 
   // Auto-hide after 5 seconds
   setTimeout(() => {
@@ -1785,11 +1797,17 @@ function showAlert(message, type = "info") {
 
 function log(message, type = "info") {
   const logDiv = document.getElementById("messageLog");
+  if (!logDiv) return;
   const entry = document.createElement("div");
   entry.className = `log-entry ${type}`;
 
   const timestamp = formatTime();
-  entry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+  const ts = document.createElement("span");
+  ts.className = "timestamp";
+  ts.textContent = `[${timestamp}]`;
+
+  entry.appendChild(ts);
+  entry.appendChild(document.createTextNode(` ${message}`));
 
   logDiv.appendChild(entry);
   logDiv.scrollTop = logDiv.scrollHeight;
@@ -2010,7 +2028,13 @@ async function executeStateImport() {
  */
 function showImportStatus(message, type) {
   const el = document.getElementById("stateImportStatus");
-  el.innerHTML = `<div class="alert ${type}" style="margin: 0;">${message}</div>`;
+  if (!el) return;
+  el.innerHTML = "";
+  const alert = document.createElement("div");
+  alert.className = `alert ${type}`;
+  alert.style.margin = "0";
+  alert.textContent = message;
+  el.appendChild(alert);
 }
 
 // Initialize on page load

@@ -9,6 +9,7 @@ const gameState = {
   roundNo: 0,
   currentRound: null,
   submissions: [],
+  submissionCount: 0, // Used when texts are intentionally not broadcast (anti-spoiler)
   revealIndex: 0,
   currentRevealSubmission: null,
   scores: { players: [], audienceTop: [] },
@@ -105,6 +106,9 @@ function handleMessage(msg) {
       break;
     case "submissions":
       handleSubmissions(msg);
+      break;
+    case "submission_count":
+      handleSubmissionCount(msg);
       break;
     case "reveal_update":
       handleRevealUpdate(msg);
@@ -210,6 +214,7 @@ function handleRoundStarted(msg) {
 function resetRoundUiState() {
   gameState.currentRound = null;
   gameState.submissions = [];
+  gameState.submissionCount = 0;
   gameState.revealIndex = 0;
   gameState.currentRevealSubmission = null;
   gameState.voteCounts = { ai: {}, funny: {} };
@@ -278,6 +283,7 @@ function updatePromptDisplay(prompt) {
 
 function handleSubmissions(msg) {
   gameState.submissions = msg.list || [];
+  gameState.submissionCount = gameState.submissions.length;
   updateSubmissionCounter();
 
   // Reinitialize vote bars if we're in voting phase
@@ -286,6 +292,12 @@ function handleSubmissions(msg) {
     updateVoteBarsAnimated();
   }
 
+  updateRevealIndicator();
+}
+
+function handleSubmissionCount(msg) {
+  gameState.submissionCount = msg.count || 0;
+  updateSubmissionCounter();
   updateRevealIndicator();
 }
 
@@ -432,10 +444,14 @@ function updateWritingScene() {
 function updateSubmissionCounter() {
   const counter = document.getElementById("submissionCounter");
   if (counter) {
-    const count = gameState.submissions.length;
-    const text =
+    const count =
+      gameState.submissions.length || gameState.submissionCount || 0;
+    if (count === 0) {
+      counter.textContent = "Antworten werden gesammelt…";
+      return;
+    }
+    counter.textContent =
       count === 1 ? "1 Antwort eingereicht" : `${count} Antworten eingereicht`;
-    counter.textContent = text;
   }
 }
 
@@ -571,7 +587,7 @@ function updateRevealIndicator() {
   const container = document.getElementById("revealIndicator");
   if (!container) return;
 
-  const count = gameState.submissions.length;
+  const count = gameState.submissions.length || gameState.submissionCount || 0;
   const current = gameState.revealIndex;
 
   container.innerHTML = "";
@@ -594,8 +610,12 @@ function updateRevealScene() {
   if (!numberEl || !textEl) return;
 
   if (gameState.currentRevealSubmission) {
-    const total = gameState.submissions.length;
-    numberEl.textContent = `Antwort ${gameState.revealIndex + 1} von ${total}`;
+    const total =
+      gameState.submissions.length || gameState.submissionCount || 0;
+    numberEl.textContent =
+      total > 0
+        ? `Antwort ${gameState.revealIndex + 1} von ${total}`
+        : `Antwort ${gameState.revealIndex + 1}`;
     textEl.textContent = gameState.currentRevealSubmission.display_text;
   } else {
     numberEl.textContent = "Warte auf Antworten";
@@ -605,11 +625,14 @@ function updateRevealScene() {
 }
 
 function showRevealCard(submission, index) {
-  const total = gameState.submissions.length;
+  const total = gameState.submissions.length || gameState.submissionCount || 0;
   const numberEl = document.getElementById("revealNumber");
   const textEl = document.getElementById("revealText");
 
-  if (numberEl) numberEl.textContent = `Antwort ${index + 1} von ${total}`;
+  if (numberEl) {
+    numberEl.textContent =
+      total > 0 ? `Antwort ${index + 1} von ${total}` : `Antwort ${index + 1}`;
+  }
   if (textEl) textEl.textContent = submission.display_text;
 
   // Animate card

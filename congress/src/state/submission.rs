@@ -110,7 +110,7 @@ impl AppState {
 
     /// Broadcast submissions list for a round
     /// During VOTING/RESULTS/PODIUM: broadcasts to all clients (audience needs to vote/see results)
-    /// During other phases: broadcasts only to host and beamer (audience shouldn't see submissions early)
+    /// During other phases: does not broadcast the public submissions list (host gets HostSubmissions)
     pub async fn broadcast_submissions(&self, round_id: &str) {
         let submissions = self.get_submissions(round_id).await;
         tracing::info!(
@@ -133,11 +133,11 @@ impl AppState {
                     list: public_infos,
                 });
             }
-            // During other phases, only host and beamer need submission updates
-            // Audience should NOT see submissions during WRITING (timing attack) or REVEAL (spoilers)
+            // Outside of voting/results, avoid broadcasting the full submissions list publicly
+            // (including to the beamer role) to prevent leaks/spoilers.
             _ => {
-                self.broadcast_to_beamer(crate::protocol::ServerMessage::Submissions {
-                    list: public_infos,
+                self.broadcast_to_beamer(crate::protocol::ServerMessage::SubmissionCount {
+                    count: submissions.len() as u32,
                 });
             }
         }

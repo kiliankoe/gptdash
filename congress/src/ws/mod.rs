@@ -382,6 +382,13 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
             GamePhase::Writing => {
                 // Send current prompt for display
                 if let Some(round) = state.get_current_round().await {
+                    // Also send submission count without revealing texts
+                    let count = state.get_submissions(&round.id).await.len() as u32;
+                    let count_msg = ServerMessage::SubmissionCount { count };
+                    if let Ok(msg) = serde_json::to_string(&count_msg) {
+                        let _ = sender.send(Message::Text(msg.into())).await;
+                    }
+
                     if let Some(prompt) = round.selected_prompt {
                         let prompt_msg = ServerMessage::PromptSelected { prompt };
                         if let Ok(msg) = serde_json::to_string(&prompt_msg) {
@@ -392,13 +399,12 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                 }
             }
             GamePhase::Reveal => {
-                // Send submissions and current reveal state
+                // Send current reveal state (avoid sending full submissions list to prevent spoilers)
                 if let Some(round) = state.get_current_round().await {
-                    let submissions = state.get_submissions(&round.id).await;
-                    let submissions_msg = ServerMessage::Submissions {
-                        list: submissions.iter().map(SubmissionInfo::from).collect(),
-                    };
-                    if let Ok(msg) = serde_json::to_string(&submissions_msg) {
+                    // Send submission count without revealing texts
+                    let count = state.get_submissions(&round.id).await.len() as u32;
+                    let count_msg = ServerMessage::SubmissionCount { count };
+                    if let Ok(msg) = serde_json::to_string(&count_msg) {
                         let _ = sender.send(Message::Text(msg.into())).await;
                     }
 

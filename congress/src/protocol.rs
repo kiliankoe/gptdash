@@ -154,6 +154,10 @@ pub enum ServerMessage {
     Submissions {
         list: Vec<SubmissionInfo>,
     },
+    /// Beamer-only: number of submissions collected so far (without revealing the texts)
+    SubmissionCount {
+        count: u32,
+    },
     HostSubmissions {
         list: Vec<HostSubmissionInfo>,
     },
