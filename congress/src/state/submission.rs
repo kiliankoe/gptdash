@@ -1,5 +1,5 @@
 use super::AppState;
-use crate::types::*;
+use crate::types::{AuthorKind, GamePhase, PlayerId, Round, RoundState, Submission, SubmissionId};
 use std::collections::HashSet;
 
 /// Normalize text for duplicate comparison (trim whitespace, lowercase)
@@ -108,7 +108,9 @@ impl AppState {
         Ok(())
     }
 
-    /// Broadcast submissions list for a round to all clients
+    /// Broadcast submissions list for a round
+    /// During VOTING/RESULTS/PODIUM: broadcasts to all clients (audience needs to vote/see results)
+    /// During other phases: broadcasts only to host and beamer (audience shouldn't see submissions early)
     pub async fn broadcast_submissions(&self, round_id: &str) {
         let submissions = self.get_submissions(round_id).await;
         tracing::info!(
@@ -117,9 +119,28 @@ impl AppState {
             round_id
         );
 
-        // Public broadcast (no author_kind to prevent spoilers)
-        let public_infos: Vec<_> = submissions.iter().map(|s| s.into()).collect();
-        self.broadcast_to_all(crate::protocol::ServerMessage::Submissions { list: public_infos });
+        // Check current phase to determine broadcast scope
+        let phase = self.game.read().await.as_ref().map(|g| g.phase.clone());
+
+        // Public info (no author_kind to prevent spoilers)
+        let public_infos: Vec<crate::protocol::SubmissionInfo> =
+            submissions.iter().map(|s| s.into()).collect();
+
+        match phase {
+            // Audience needs submissions for voting or viewing results
+            Some(GamePhase::Voting) | Some(GamePhase::Results) | Some(GamePhase::Podium) => {
+                self.broadcast_to_all(crate::protocol::ServerMessage::Submissions {
+                    list: public_infos,
+                });
+            }
+            // During other phases, only host and beamer need submission updates
+            // Audience should NOT see submissions during WRITING (timing attack) or REVEAL (spoilers)
+            _ => {
+                self.broadcast_to_beamer(crate::protocol::ServerMessage::Submissions {
+                    list: public_infos,
+                });
+            }
+        }
 
         // Host-only broadcast (includes author_kind for managing the game)
         let host_infos: Vec<crate::protocol::HostSubmissionInfo> =

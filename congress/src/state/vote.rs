@@ -13,6 +13,8 @@ pub enum VoteResult {
     NoActiveRound,
     /// Panic mode is active, voting disabled
     PanicModeActive,
+    /// Game is not in VOTING phase
+    WrongPhase,
 }
 
 impl AppState {
@@ -25,13 +27,20 @@ impl AppState {
         funny_pick: SubmissionId,
         msg_id: String,
     ) -> VoteResult {
-        // Check panic mode first
+        // Check game phase and panic mode
         {
             let game = self.game.read().await;
             if let Some(ref g) = *game {
+                // Only accept votes during VOTING phase
+                if g.phase != GamePhase::Voting {
+                    tracing::warn!("Vote rejected: wrong phase {:?} (expected VOTING)", g.phase);
+                    return VoteResult::WrongPhase;
+                }
                 if g.panic_mode {
                     return VoteResult::PanicModeActive;
                 }
+            } else {
+                return VoteResult::NoActiveRound;
             }
         }
 
@@ -258,11 +267,19 @@ mod tests {
         assert_eq!(ai_counts.get("sub1"), None);
     }
 
-    #[tokio::test]
-    async fn test_submit_vote_records_new_vote() {
+    /// Helper to set up state in VOTING phase
+    async fn setup_voting_phase() -> AppState {
         let state = AppState::new();
         state.create_game().await;
         state.start_round().await.unwrap();
+        // Set game to VOTING phase
+        state.game.write().await.as_mut().unwrap().phase = GamePhase::Voting;
+        state
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_records_new_vote() {
+        let state = setup_voting_phase().await;
 
         let result = state
             .submit_vote(
@@ -279,9 +296,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_submit_vote_duplicate_msg_id() {
-        let state = AppState::new();
-        state.create_game().await;
-        state.start_round().await.unwrap();
+        let state = setup_voting_phase().await;
 
         // First vote
         let result1 = state
@@ -313,9 +328,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_submit_vote_new_msg_id_replaces_vote() {
-        let state = AppState::new();
-        state.create_game().await;
-        state.start_round().await.unwrap();
+        let state = setup_voting_phase().await;
 
         // First vote
         state
@@ -349,7 +362,8 @@ mod tests {
     async fn test_submit_vote_no_active_round() {
         let state = AppState::new();
         state.create_game().await;
-        // Don't start a round
+        // Set phase to VOTING but don't start a round
+        state.game.write().await.as_mut().unwrap().phase = GamePhase::Voting;
 
         let result = state
             .submit_vote(
@@ -361,5 +375,85 @@ mod tests {
             .await;
 
         assert_eq!(result, VoteResult::NoActiveRound);
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_rejected_during_lobby_phase() {
+        let state = AppState::new();
+        state.create_game().await;
+        state.start_round().await.unwrap();
+        // Game starts in LOBBY phase by default
+
+        let result = state
+            .submit_vote(
+                "voter1".to_string(),
+                "sub1".to_string(),
+                "sub2".to_string(),
+                "msg1".to_string(),
+            )
+            .await;
+
+        assert_eq!(result, VoteResult::WrongPhase);
+        assert_eq!(state.votes.read().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_rejected_during_writing_phase() {
+        let state = AppState::new();
+        state.create_game().await;
+        state.start_round().await.unwrap();
+        state.game.write().await.as_mut().unwrap().phase = GamePhase::Writing;
+
+        let result = state
+            .submit_vote(
+                "voter1".to_string(),
+                "sub1".to_string(),
+                "sub2".to_string(),
+                "msg1".to_string(),
+            )
+            .await;
+
+        assert_eq!(result, VoteResult::WrongPhase);
+        assert_eq!(state.votes.read().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_rejected_during_reveal_phase() {
+        let state = AppState::new();
+        state.create_game().await;
+        state.start_round().await.unwrap();
+        state.game.write().await.as_mut().unwrap().phase = GamePhase::Reveal;
+
+        let result = state
+            .submit_vote(
+                "voter1".to_string(),
+                "sub1".to_string(),
+                "sub2".to_string(),
+                "msg1".to_string(),
+            )
+            .await;
+
+        assert_eq!(result, VoteResult::WrongPhase);
+        assert_eq!(state.votes.read().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_rejected_during_results_phase() {
+        let state = AppState::new();
+        state.create_game().await;
+        state.start_round().await.unwrap();
+        state.game.write().await.as_mut().unwrap().phase = GamePhase::Results;
+
+        let result = state
+            .submit_vote(
+                "voter1".to_string(),
+                "sub1".to_string(),
+                "sub2".to_string(),
+                "msg1".to_string(),
+            )
+            .await;
+
+        assert_eq!(result, VoteResult::WrongPhase);
+        assert_eq!(state.votes.read().await.len(), 0);
     }
 }

@@ -90,6 +90,11 @@ impl AppState {
         let _ = self.host_broadcast.send(msg);
     }
 
+    /// Broadcast a message to beamer clients only
+    pub fn broadcast_to_beamer(&self, msg: ServerMessage) {
+        let _ = self.beamer_broadcast.send(msg);
+    }
+
     /// Check if a voter is shadowbanned
     pub async fn is_shadowbanned(&self, voter_id: &str) -> bool {
         self.shadowbanned_audience.read().await.contains(voter_id)
@@ -1672,6 +1677,9 @@ mod tests {
             .submit_answer(&round.id, None, "AI answer".to_string())
             .await
             .unwrap();
+
+        // Set game to VOTING phase (votes only accepted during voting)
+        state.game.write().await.as_mut().unwrap().phase = GamePhase::Voting;
 
         // Add a vote that references the player's submission
         state

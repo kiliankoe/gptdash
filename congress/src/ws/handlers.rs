@@ -438,6 +438,9 @@ mod tests {
         state.create_game().await;
         state.start_round().await.ok();
 
+        // Set game to VOTING phase (votes only accepted during voting)
+        state.game.write().await.as_mut().unwrap().phase = crate::types::GamePhase::Voting;
+
         // Enable panic mode
         state.set_panic_mode(true).await;
 

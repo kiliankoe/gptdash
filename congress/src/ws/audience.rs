@@ -39,6 +39,13 @@ pub async fn handle_vote(
                 msg: "Voting is temporarily disabled".to_string(),
             })
         }
+        VoteResult::WrongPhase => {
+            tracing::info!("Vote rejected: not in voting phase");
+            Some(ServerMessage::Error {
+                code: "WRONG_PHASE".to_string(),
+                msg: "Voting is only allowed during the voting phase".to_string(),
+            })
+        }
     }
 }
 

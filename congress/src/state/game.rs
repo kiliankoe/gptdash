@@ -335,6 +335,13 @@ impl AppState {
                             });
                         }
                     }
+                } else if effective_phase == GamePhase::Voting {
+                    // Broadcast submissions to all clients (audience needs them for voting)
+                    // This is necessary because broadcast_submissions filters by phase
+                    // and audience doesn't receive submissions during WRITING/REVEAL
+                    if let Some(rid) = &round_id {
+                        self.broadcast_submissions(rid).await;
+                    }
                 } else if effective_phase == GamePhase::Results {
                     // Compute scores when entering RESULTS phase (idempotent)
                     if let Some(rid) = round_id {
