@@ -786,6 +786,13 @@ function updateResultReveals() {
 }
 
 function updatePodium() {
+  // Update player podium
+  updatePlayerPodium();
+  // Update audience podium
+  updateAudiencePodium();
+}
+
+function updatePlayerPodium() {
   const players = gameState.scores.players;
   if (players.length === 0) return;
 
@@ -822,6 +829,57 @@ function updatePodium() {
     if (podiumThird) podiumThird.style.visibility = "visible";
   } else if (podiumThird) {
     podiumThird.style.visibility = "hidden";
+  }
+}
+
+function updateAudiencePodium() {
+  const audience = gameState.scores.audienceTop;
+
+  // Hide entire audience section if no audience scores
+  const audienceSection = document.querySelector(".audience-podium-section");
+  if (!audience || audience.length === 0) {
+    if (audienceSection) audienceSection.style.display = "none";
+    return;
+  }
+  if (audienceSection) audienceSection.style.display = "flex";
+
+  // Sort by total score descending (should already be sorted, but ensure)
+  const sorted = [...audience].sort((a, b) => b.total - a.total);
+
+  // First place
+  const audienceFirst = document.getElementById("audiencePodiumFirst");
+  if (sorted[0]) {
+    const name1 = document.getElementById("audiencePodiumFirstName");
+    const score1 = document.getElementById("audiencePodiumFirstScore");
+    if (name1) name1.textContent = sorted[0].display_name || "Detektiv 1";
+    if (score1) score1.textContent = `${sorted[0].total} Punkte`;
+    if (audienceFirst) audienceFirst.style.visibility = "visible";
+  } else if (audienceFirst) {
+    audienceFirst.style.visibility = "hidden";
+  }
+
+  // Second place
+  const audienceSecond = document.getElementById("audiencePodiumSecond");
+  if (sorted[1]) {
+    const name2 = document.getElementById("audiencePodiumSecondName");
+    const score2 = document.getElementById("audiencePodiumSecondScore");
+    if (name2) name2.textContent = sorted[1].display_name || "Detektiv 2";
+    if (score2) score2.textContent = `${sorted[1].total} Punkte`;
+    if (audienceSecond) audienceSecond.style.visibility = "visible";
+  } else if (audienceSecond) {
+    audienceSecond.style.visibility = "hidden";
+  }
+
+  // Third place
+  const audienceThird = document.getElementById("audiencePodiumThird");
+  if (sorted[2]) {
+    const name3 = document.getElementById("audiencePodiumThirdName");
+    const score3 = document.getElementById("audiencePodiumThirdScore");
+    if (name3) name3.textContent = sorted[2].display_name || "Detektiv 3";
+    if (score3) score3.textContent = `${sorted[2].total} Punkte`;
+    if (audienceThird) audienceThird.style.visibility = "visible";
+  } else if (audienceThird) {
+    audienceThird.style.visibility = "hidden";
   }
 }
 

@@ -968,7 +968,25 @@ body {
   justify-content: center;
   align-items: center;
   text-align: center;
-  gap: 60px;
+  gap: 30px;
+}
+
+.podium-sections {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 80px;
+  flex-wrap: wrap;
+}
+
+.podium-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.audience-podium-section {
+  opacity: 0.95;
 }
 
 .podium-container {
@@ -976,7 +994,11 @@ body {
   justify-content: center;
   align-items: flex-end;
   gap: 40px;
-  margin-top: 40px;
+  margin-top: 20px;
+}
+
+.podium-container-audience {
+  gap: 25px;
 }
 
 .podium-place {
@@ -1061,6 +1083,55 @@ body {
   color: var(--color-dark);
 }
 
+/* Audience podium - smaller version */
+.podium-place-audience .podium-avatar {
+  width: 70px;
+  height: 70px;
+  font-size: 32px;
+}
+
+.podium-place-audience .podium-name {
+  font-size: 18px;
+  max-width: 140px;
+}
+
+.podium-place-audience .podium-score {
+  font-size: 20px;
+}
+
+.podium-place-audience .podium-block {
+  width: 120px;
+  font-size: 42px;
+}
+
+.podium-place-audience .podium-block.first {
+  height: 140px;
+}
+
+.podium-place-audience .podium-block.second {
+  height: 105px;
+}
+
+.podium-place-audience .podium-block.third {
+  height: 70px;
+}
+
+.podium-avatar.audience {
+  background: var(--color-additional-02);
+}
+
+.audience-block.first {
+  background: linear-gradient(180deg, #66f2ff, #0099aa) !important;
+}
+
+.audience-block.second {
+  background: linear-gradient(180deg, #99f5ff, #4dc4d1) !important;
+}
+
+.audience-block.third {
+  background: linear-gradient(180deg, #b3f7ff, #66d9e6) !important;
+}
+
 /* ========================
    SCENE: INTERMISSION
    ======================== */
@@ -1138,11 +1209,23 @@ body {
     grid-template-columns: 1fr 1fr;
   }
 
+  .podium-sections {
+    gap: 40px;
+  }
+
   .podium-container {
     gap: 20px;
   }
 
   .podium-block {
     width: 140px;
+  }
+
+  .podium-place-audience .podium-block {
+    width: 100px;
+  }
+
+  .podium-container-audience {
+    gap: 15px;
   }
 }
