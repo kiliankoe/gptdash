@@ -63,8 +63,7 @@ async fn main() {
     // Spawn background task for broadcasting prompt vote counts to Beamer during PROMPT_SELECTION
     broadcast::spawn_prompt_vote_broadcaster(state.clone());
 
-    // Spawn background task for auto-advancing from VOTING to RESULTS when deadline expires
-    broadcast::spawn_voting_deadline_watcher(state.clone());
+    // Note: Voting deadline is a soft/visual timer; the host advances phases manually.
 
     // Protected host routes (with HTTP Basic Auth)
     let host_routes = Router::new()
