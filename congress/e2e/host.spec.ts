@@ -102,26 +102,30 @@ test.describe("Host", () => {
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
 
-    await host.fill("#promptText", "First test prompt for restoration");
+    await host.fill("#promptText", "Restoration: Alpha penguin telescope");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForTimeout(300);
+    await expect(host.locator("#hostPromptsList .prompt-row")).toHaveCount(1, {
+      timeout: 5000,
+    });
 
-    await host.fill("#promptText", "Second test prompt for restoration");
+    await host.fill("#promptText", "Restoration: Quantum pizza bicycle");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForTimeout(300);
+    await expect(host.locator("#hostPromptsList .prompt-row")).toHaveCount(2, {
+      timeout: 5000,
+    });
 
-    await host.fill("#promptText", "Third test prompt for restoration");
+    await host.fill("#promptText", "Restoration: Volcano jazz umbrella");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForTimeout(300);
+    await expect(host.locator("#hostPromptsList .prompt-row")).toHaveCount(3, {
+      timeout: 5000,
+    });
 
-    // Verify prompts are listed before reload (pool prompts only, not queued)
-    const promptsBeforeReload = host.locator("#promptsList .prompt-card");
+    // Verify prompts are listed before reload
+    const promptsBeforeReload = host.locator("#hostPromptsList .prompt-row");
     await expect(promptsBeforeReload).toHaveCount(3);
 
     // Queue the first prompt
-    await host.click(
-      '#promptsList .prompt-card button:has-text("+ Warteschlange")',
-    );
+    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
 
     // Wait for start button to become visible (indicates queue operation completed)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -129,8 +133,8 @@ test.describe("Host", () => {
       timeout: 5000,
     });
 
-    // Now we should have 2 prompts left in the pool (3 - 1 queued)
-    await expect(host.locator("#promptsList .prompt-card")).toHaveCount(2);
+    // Queued prompt should appear in the queue list
+    await expect(host.locator("#queuedPromptsList .prompt-card")).toHaveCount(1);
 
     // Start prompt selection (auto-advances to WRITING with 1 prompt)
     await host.click("#startPromptSelectionBtn");
@@ -180,16 +184,20 @@ test.describe("Host", () => {
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
 
-    // Should still have 2 prompts in the pool (the first one was selected and assigned to the round)
-    const promptsAfterReload = host.locator("#promptsList .prompt-card");
+    // Should still have the remaining prompts in the pool (the first one was selected and assigned to the round)
+    const promptsAfterReload = host.locator("#hostPromptsList .prompt-row");
     await expect(promptsAfterReload).toHaveCount(2, { timeout: 5000 });
 
-    // Verify prompt content is preserved (Second and Third prompts remain in pool)
+    // Verify prompt content is preserved (the queued prompt was used; the other two remain in pool)
     await expect(
-      host.locator('#promptsList .prompt-card:has-text("Second test prompt")'),
+      host.locator(
+        '#hostPromptsList .prompt-row:has-text("Quantum pizza bicycle")',
+      ),
     ).toBeVisible();
     await expect(
-      host.locator('#promptsList .prompt-card:has-text("Third test prompt")'),
+      host.locator(
+        '#hostPromptsList .prompt-row:has-text("Alpha penguin telescope")',
+      ),
     ).toBeVisible();
 
     // ============================================

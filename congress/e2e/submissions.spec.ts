@@ -76,8 +76,8 @@ test.describe("Submissions", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Duplicate detection test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("+ Warteschlange")');
+    await host.waitForSelector("#hostPromptsList .prompt-row");
+    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -251,8 +251,8 @@ test.describe("Submissions", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Typo correction test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("+ Warteschlange")');
+    await host.waitForSelector("#hostPromptsList .prompt-row");
+    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {

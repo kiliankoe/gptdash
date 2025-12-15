@@ -52,10 +52,10 @@ test.describe("Beamer", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Scene test prompt");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector(".prompt-card");
+    await host.waitForSelector("#hostPromptsList .prompt-row");
 
     // Queue the prompt
-    await host.click('.prompt-card button:has-text("+ Warteschlange")');
+    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {

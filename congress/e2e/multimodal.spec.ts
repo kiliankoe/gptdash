@@ -67,9 +67,9 @@ test.describe("Multimodal Prompts", () => {
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
 
-    // Fill in both text and image URL (using the Fairydust rocket from 30C3)
-    const imageUrl =
-      "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
+    // Fill in both text and image URL (use a local static asset so tests don't
+    // depend on external network access).
+    const imageUrl = "/img/manekineko.gif";
     await host.fill("#promptText", "Was siehst du auf diesem Bild?");
 
     // Expand the multimodal image details section
@@ -79,8 +79,8 @@ test.describe("Multimodal Prompts", () => {
 
     // Add prompt to pool and queue it
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("+ Warteschlange")');
+    await host.waitForSelector("#hostPromptsList .prompt-row");
+    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -183,14 +183,13 @@ test.describe("Multimodal Prompts", () => {
     // Expand the multimodal image details section
     await host.click('summary:has-text("Bild hinzufügen")');
     await host.waitForSelector("#promptImageUrl", { state: "visible" });
-    const imageUrl =
-      "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/2013-12-30_30C3_3467.JPG/2560px-2013-12-30_30C3_3467.JPG";
+    const imageUrl = "/img/manekineko.gif";
     await host.fill("#promptImageUrl", imageUrl);
 
     // Add prompt to pool and queue it
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("+ Warteschlange")');
+    await host.waitForSelector("#hostPromptsList .prompt-row");
+    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {

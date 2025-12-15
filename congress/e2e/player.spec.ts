@@ -156,8 +156,8 @@ test.describe("Player", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Status test prompt");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("+ Warteschlange")');
+    await host.waitForSelector("#hostPromptsList .prompt-row");
+    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -275,7 +275,9 @@ test.describe("Player", () => {
     await players[1].waitForSelector("#waitingScreen.active");
 
     // Audience joins
-    await audience[0].click("#joinButton");
+    if (await audience[0].locator("#joinButton").isVisible()) {
+      await audience[0].click("#joinButton");
+    }
     await audience[0].waitForSelector("#waitingScreen.active");
 
     // Add prompt
@@ -283,8 +285,8 @@ test.describe("Player", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Remove player test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("+ Warteschlange")');
+    await host.waitForSelector("#hostPromptsList .prompt-row");
+    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {
@@ -319,15 +321,15 @@ test.describe("Player", () => {
     await host.waitForSelector("#submissions.active");
     await host.waitForSelector(".submission-card", { timeout: 5000 });
 
-    // Mark one submission as AI (required for RESULTS)
-    const aiButtonsWriting = host.locator(
-      'button:has-text("Als KI markieren")',
-    );
-    if ((await aiButtonsWriting.count()) > 0) {
-      // Mark the second one as AI (remaining player's)
-      await aiButtonsWriting.last().click();
-      await host.waitForTimeout(500);
-    }
+    // Ensure there's an AI submission selected (required for RESULTS).
+    // Use the host's manual AI override so tests don't depend on external LLMs.
+    await host.click('summary:has-text("Manuelle KI-Antwort")');
+    await host.waitForSelector("#manualAiText", { state: "visible" });
+    await host.fill("#manualAiText", "Manual AI answer for remove-player test.");
+    await host.click('button:has-text("Als KI-Antwort speichern")');
+    await host.waitForSelector(".ai-submission-card", { timeout: 5000 });
+    await host.locator(".ai-submission-card").first().click();
+    await host.waitForTimeout(300);
 
     // Transition to REVEAL then VOTING
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
@@ -440,13 +442,6 @@ test.describe("Player", () => {
     // Note: They may need to refresh or the UI may automatically update
     // For now, let's verify the game can continue to RESULTS
 
-    // Need to re-mark AI submission since the original may have been removed
-    const aiButtons = host.locator('button:has-text("Als KI markieren")');
-    if ((await aiButtons.count()) > 0) {
-      await aiButtons.first().click();
-      await host.waitForTimeout(500);
-    }
-
     // Go to game control and transition to RESULTS
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await host.click('button[data-phase="RESULTS"]');
@@ -496,8 +491,8 @@ test.describe("Player", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Add player mid-round test");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("+ Warteschlange")');
+    await host.waitForSelector("#hostPromptsList .prompt-row");
+    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {

@@ -33,6 +33,12 @@ export default defineConfig({
     timeout: 120000, // 2 minutes for cargo build + server start
     stdout: "pipe",
     stderr: "pipe",
+    env: {
+      ...process.env,
+      OPENAI_API_KEY: "",
+      OLLAMA_BASE_URL: "",
+      OLLAMA_MODEL: "",
+    },
   },
 
   // Increase timeout for multi-role coordination

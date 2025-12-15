@@ -37,7 +37,11 @@ test.describe("Audience", () => {
 
     // Audience joins during LOBBY phase
     await audience[0].goto("/");
-    await audience[0].click("#joinButton");
+    // Audience auto-creates/stores a voter token on load and will typically
+    // skip the welcome screen during LOBBY once the server sends state.
+    if (await audience[0].locator("#joinButton").isVisible()) {
+      await audience[0].click("#joinButton");
+    }
 
     // Audience should see waiting screen during LOBBY
     await audience[0].waitForSelector("#waitingScreen.active", {
@@ -86,7 +90,9 @@ test.describe("Audience", () => {
     await players[0].waitForSelector("#waitingScreen.active");
 
     // Audience joins
-    await audience[0].click("#joinButton");
+    if (await audience[0].locator("#joinButton").isVisible()) {
+      await audience[0].click("#joinButton");
+    }
     await audience[0].waitForSelector("#waitingScreen.active");
 
     // Add prompt
@@ -94,8 +100,8 @@ test.describe("Audience", () => {
     await host.waitForSelector("#prompts.active");
     await host.fill("#promptText", "Panic mode test question");
     await host.click('#prompts button:has-text("Prompt hinzufügen")');
-    await host.waitForSelector(".prompt-card");
-    await host.click('.prompt-card button:has-text("+ Warteschlange")');
+    await host.waitForSelector("#hostPromptsList .prompt-row");
+    await host.locator("#hostPromptsList .prompt-row .queue-btn").first().click();
 
     // Wait for start button to become visible (triggered by server response)
     await host.waitForSelector("#startPromptSelectionBtn", {

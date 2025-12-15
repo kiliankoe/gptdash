@@ -215,20 +215,18 @@ test.describe("Game Flow", () => {
     const submissionCount = await host.locator(".submission-card").count();
     expect(submissionCount).toBeGreaterThanOrEqual(2);
 
-    // Mark first submission as AI (required for RESULTS phase)
-    // Must be done during WRITING phase while "Als KI markieren" buttons are visible
-    const aiButtonsWriting = host.locator(
-      'button:has-text("Als KI markieren")',
+    // Ensure there's an AI submission selected (required for RESULTS phase).
+    // Use the host's manual AI override so tests don't depend on external LLMs.
+    await host.click('summary:has-text("Manuelle KI-Antwort")');
+    await host.waitForSelector("#manualAiText", { state: "visible" });
+    await host.fill(
+      "#manualAiText",
+      "Manual AI answer for e2e tests (deterministic).",
     );
-    const aiButtonCountWriting = await aiButtonsWriting.count();
-    console.log(
-      `Found ${aiButtonCountWriting} AI marking buttons during WRITING`,
-    );
-    if (aiButtonCountWriting > 0) {
-      await aiButtonsWriting.first().click();
-      await host.waitForTimeout(500);
-      console.log("Marked submission as AI during WRITING phase");
-    }
+    await host.click('button:has-text("Als KI-Antwort speichern")');
+    await host.waitForSelector(".ai-submission-card", { timeout: 5000 });
+    await host.locator(".ai-submission-card").first().click();
+    await host.waitForTimeout(300);
 
     // ============================================
     // STEP 8: Host transitions to REVEAL

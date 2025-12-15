@@ -175,14 +175,42 @@ impl Default for LlmConfig {
 impl LlmConfig {
     /// Load configuration from environment variables
     pub fn from_env() -> Self {
+        let openai_api_key = std::env::var("OPENAI_API_KEY")
+            .ok()
+            .and_then(|key| {
+                let trimmed = key.trim();
+                (!trimmed.is_empty()).then(|| trimmed.to_string())
+            });
+
+        let openai_model = std::env::var("OPENAI_MODEL")
+            .ok()
+            .and_then(|model| {
+                let trimmed = model.trim();
+                (!trimmed.is_empty()).then(|| trimmed.to_string())
+            })
+            .unwrap_or_else(|| "gpt-4o-mini".to_string());
+
+        let ollama_base_url = match std::env::var("OLLAMA_BASE_URL") {
+            Ok(url) => {
+                let trimmed = url.trim();
+                (!trimmed.is_empty()).then(|| trimmed.to_string())
+            }
+            Err(_) => Some("http://localhost:11434".to_string()),
+        };
+
+        let ollama_model = std::env::var("OLLAMA_MODEL")
+            .ok()
+            .and_then(|model| {
+                let trimmed = model.trim();
+                (!trimmed.is_empty()).then(|| trimmed.to_string())
+            })
+            .unwrap_or_else(|| "llama3.2".to_string());
+
         Self {
-            openai_api_key: std::env::var("OPENAI_API_KEY").ok(),
-            openai_model: std::env::var("OPENAI_MODEL")
-                .unwrap_or_else(|_| "gpt-4o-mini".to_string()),
-            ollama_base_url: std::env::var("OLLAMA_BASE_URL")
-                .ok()
-                .or_else(|| Some("http://localhost:11434".to_string())),
-            ollama_model: std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string()),
+            openai_api_key,
+            openai_model,
+            ollama_base_url,
+            ollama_model,
             default_timeout: std::env::var("LLM_TIMEOUT")
                 .ok()
                 .and_then(|s| s.parse().ok())
