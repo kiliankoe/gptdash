@@ -39,6 +39,8 @@ pub struct AppState {
     pub audience_members: Arc<RwLock<HashMap<VoterId, AudienceMember>>>,
     /// Vote challenge nonce (changes per voting round, used for anti-automation)
     pub vote_challenge_nonce: Arc<RwLock<Option<String>>>,
+    /// Timestamp when VOTING phase started (for server-side timing validation)
+    pub voting_phase_started_at: Arc<RwLock<Option<chrono::DateTime<chrono::Utc>>>>,
     /// LLM manager for generating AI answers
     pub llm: Option<Arc<LlmManager>>,
     /// LLM configuration (timeout, max tokens, etc.)
@@ -75,6 +77,7 @@ impl AppState {
             prompt_votes: Arc::new(RwLock::new(HashMap::new())),
             audience_members: Arc::new(RwLock::new(HashMap::new())),
             vote_challenge_nonce: Arc::new(RwLock::new(None)),
+            voting_phase_started_at: Arc::new(RwLock::new(None)),
             llm: llm.map(Arc::new),
             llm_config,
             broadcast: broadcast_tx,
@@ -172,6 +175,23 @@ impl AppState {
         }
 
         true
+    }
+
+    /// Record the current time as the start of VOTING phase
+    /// Used for server-side timing validation of votes
+    pub async fn set_voting_phase_started(&self) {
+        *self.voting_phase_started_at.write().await = Some(chrono::Utc::now());
+        tracing::debug!("Recorded voting phase start time");
+    }
+
+    /// Get the timestamp when VOTING phase started (if any)
+    pub async fn get_voting_phase_started_at(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        *self.voting_phase_started_at.read().await
+    }
+
+    /// Clear the voting phase start time (e.g., when leaving VOTING phase)
+    pub async fn clear_voting_phase_started(&self) {
+        *self.voting_phase_started_at.write().await = None;
     }
 
     // =========================================================================

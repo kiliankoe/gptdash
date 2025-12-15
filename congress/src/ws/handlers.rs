@@ -70,6 +70,7 @@ pub async fn handle_message(
             msg_id,
             challenge_nonce,
             challenge_response,
+            is_webdriver,
         } => {
             audience::handle_vote(
                 state,
@@ -79,6 +80,7 @@ pub async fn handle_message(
                 msg_id,
                 challenge_nonce,
                 challenge_response,
+                is_webdriver,
             )
             .await
         }

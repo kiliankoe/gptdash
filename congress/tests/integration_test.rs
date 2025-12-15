@@ -15,6 +15,9 @@ fn compute_challenge_response(nonce: &str, voter_token: &str) -> String {
 /// End-to-end integration test for a complete game flow
 #[tokio::test]
 async fn test_full_game_flow() {
+    // Skip anti-automation checks (webdriver + timing) for this test
+    std::env::set_var("SKIP_VOTE_ANTI_AUTOMATION", "1");
+
     let state = Arc::new(AppState::new());
     let host_role = Role::Host;
     let player_role = Role::Player;
@@ -267,6 +270,7 @@ async fn test_full_game_flow() {
             msg_id: "vote_1".to_string(),
             challenge_nonce: challenge_nonce.clone(),
             challenge_response: compute_challenge_response(&challenge_nonce, "voter_1"),
+            is_webdriver: false,
         },
         &audience_role,
         &state,
@@ -294,6 +298,7 @@ async fn test_full_game_flow() {
             msg_id: "vote_2".to_string(),
             challenge_nonce: challenge_nonce.clone(),
             challenge_response: compute_challenge_response(&challenge_nonce, "voter_2"),
+            is_webdriver: false,
         },
         &audience_role,
         &state,
@@ -1310,6 +1315,9 @@ async fn test_create_manual_ai_submission_invalid_round() {
 /// Test removing a player mid-round
 #[tokio::test]
 async fn test_remove_player_mid_round() {
+    // Skip anti-automation checks (webdriver + timing) for this test
+    std::env::set_var("SKIP_VOTE_ANTI_AUTOMATION", "1");
+
     let state = Arc::new(AppState::new());
     let host_role = Role::Host;
     let player_role = Role::Player;
@@ -1465,6 +1473,7 @@ async fn test_remove_player_mid_round() {
             msg_id: "vote1".to_string(),
             challenge_nonce: challenge_nonce.clone(),
             challenge_response: compute_challenge_response(&challenge_nonce, "voter1"),
+            is_webdriver: false,
         },
         &audience_role,
         &state,

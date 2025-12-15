@@ -25,6 +25,8 @@ pub enum ClientMessage {
         challenge_nonce: String,
         /// SHA256(nonce + voter_token)[0:16] computed by client
         challenge_response: String,
+        /// True if navigator.webdriver is set (automation detection)
+        is_webdriver: bool,
     },
     SubmitPrompt {
         voter_token: Option<String>,

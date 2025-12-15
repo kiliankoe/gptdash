@@ -14,6 +14,9 @@ const webServerEnv = {
   // Force-disable host basic auth even if it's set in the developer environment.
   HOST_USERNAME: "",
   HOST_PASSWORD: "",
+  // E2E tests use real browsers which set navigator.webdriver=true.
+  // Skip all vote anti-automation checks (webdriver + timing) for tests.
+  SKIP_VOTE_ANTI_AUTOMATION: "1",
 };
 
 export default defineConfig({

@@ -7,6 +7,7 @@ use crate::state::vote::VoteResult;
 use crate::state::AppState;
 use std::sync::Arc;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn handle_vote(
     state: &Arc<AppState>,
     voter_token: String,
@@ -15,6 +16,7 @@ pub async fn handle_vote(
     msg_id: String,
     challenge_nonce: String,
     challenge_response: String,
+    is_webdriver: bool,
 ) -> Option<ServerMessage> {
     tracing::info!("Vote: AI={}, Funny={}, MsgID={}", ai, funny, msg_id);
 
@@ -53,6 +55,44 @@ pub async fn handle_vote(
         }
     }
 
+    // Shadow rejection: silently discard suspicious votes (return VoteAck to not alert attacker)
+    // SKIP_VOTE_ANTI_AUTOMATION=1 disables all anti-automation checks (for e2e/integration tests)
+    let skip_anti_automation = std::env::var("SKIP_VOTE_ANTI_AUTOMATION")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false);
+
+    if !skip_anti_automation {
+        // 1. Webdriver detection (catches unpatched Playwright/Puppeteer)
+        if is_webdriver {
+            tracing::warn!(
+                voter = %voter_token,
+                "Vote silently discarded: webdriver detected"
+            );
+            return Some(ServerMessage::VoteAck {
+                msg_id: msg_id.clone(),
+            });
+        }
+
+        // 2. Server-side timing check (discard impossibly fast votes)
+        if let Some(voting_started) = state.get_voting_phase_started_at().await {
+            let server_delta_ms = chrono::Utc::now()
+                .signed_duration_since(voting_started)
+                .num_milliseconds();
+
+            if (0..500).contains(&server_delta_ms) {
+                tracing::warn!(
+                    voter = %voter_token,
+                    delta_ms = server_delta_ms,
+                    "Vote silently discarded: too fast"
+                );
+                return Some(ServerMessage::VoteAck {
+                    msg_id: msg_id.clone(),
+                });
+            }
+        }
+    }
+
+    // If we get here, vote is legitimate - proceed with actual storage
     match state
         .submit_vote(voter_token, ai, funny, msg_id.clone())
         .await

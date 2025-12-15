@@ -336,6 +336,9 @@ impl AppState {
                         }
                     }
                 } else if effective_phase == GamePhase::Voting {
+                    // Record voting phase start time for server-side timing validation
+                    self.set_voting_phase_started().await;
+
                     // Generate and broadcast vote challenge for anti-automation
                     let nonce = self.generate_vote_challenge().await;
                     if let Some(rid) = &round_id {
