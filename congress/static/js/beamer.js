@@ -23,6 +23,9 @@ let timer = null;
 let tts = null;
 let lastSpokenSubmissionId = null;
 
+const MAX_PLAYER_LEADERBOARD_ROWS = 6;
+const MAX_AUDIENCE_LEADERBOARD_ROWS = 6;
+
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", () => {
   initializeBeamer();
@@ -613,7 +616,8 @@ function updateLeaderboard() {
   // Sort by total score descending
   const sorted = [...players].sort((a, b) => b.total - a.total);
 
-  container.innerHTML = sorted
+  const rows = sorted
+    .slice(0, MAX_PLAYER_LEADERBOARD_ROWS)
     .map((player, index) => {
       const rankClass =
         index === 0
@@ -634,6 +638,14 @@ function updateLeaderboard() {
     })
     .join("");
 
+  const remaining = sorted.length - MAX_PLAYER_LEADERBOARD_ROWS;
+  const more =
+    remaining > 0
+      ? `<div class="leaderboard-more">+${remaining} weitere</div>`
+      : "";
+
+  container.innerHTML = rows + more;
+
   // Also update audience leaderboard
   updateAudienceLeaderboard();
 }
@@ -653,9 +665,8 @@ function updateAudienceLeaderboard() {
   // Sort by total score descending (should already be sorted, but ensure)
   const sorted = [...audience].sort((a, b) => b.total - a.total);
 
-  // Show top 5 audience members
   container.innerHTML = sorted
-    .slice(0, 5)
+    .slice(0, MAX_AUDIENCE_LEADERBOARD_ROWS)
     .map((member, index) => {
       const rankClass =
         index === 0
@@ -676,6 +687,11 @@ function updateAudienceLeaderboard() {
         `;
     })
     .join("");
+
+  const remaining = sorted.length - MAX_AUDIENCE_LEADERBOARD_ROWS;
+  if (remaining > 0) {
+    container.innerHTML += `<div class="leaderboard-more">+${remaining} weitere</div>`;
+  }
 }
 
 function updateResultReveals() {
