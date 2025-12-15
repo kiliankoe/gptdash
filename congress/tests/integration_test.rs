@@ -2,7 +2,15 @@ use gptdash::protocol::{ClientMessage, PlayerSubmissionStatus, ServerMessage};
 use gptdash::state::AppState;
 use gptdash::types::{GamePhase, PromptSource, Role};
 use gptdash::ws::handlers::handle_message;
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
+
+/// Compute the challenge response for a vote (same algorithm as client)
+fn compute_challenge_response(nonce: &str, voter_token: &str) -> String {
+    let input = format!("{}{}", nonce, voter_token);
+    let hash = Sha256::digest(input.as_bytes());
+    hex::encode(&hash[..8]) // First 8 bytes = 16 hex chars
+}
 
 /// End-to-end integration test for a complete game flow
 #[tokio::test]
@@ -245,12 +253,20 @@ async fn test_full_game_flow() {
         .find(|s| s.author_kind == AuthorKind::Player)
         .expect("Should have at least one player submission");
 
+    // Get the challenge nonce (generated when entering VOTING phase)
+    let challenge_nonce = state
+        .get_vote_challenge_nonce()
+        .await
+        .expect("Challenge nonce should exist in VOTING phase");
+
     let vote_result = handle_message(
         ClientMessage::Vote {
             voter_token: "voter_1".to_string(),
             ai: ai_submission.id.clone(),
             funny: player_submission.id.clone(),
             msg_id: "vote_1".to_string(),
+            challenge_nonce: challenge_nonce.clone(),
+            challenge_response: compute_challenge_response(&challenge_nonce, "voter_1"),
         },
         &audience_role,
         &state,
@@ -276,6 +292,8 @@ async fn test_full_game_flow() {
             ai: another_player_submission.id.clone(), // Wrong guess
             funny: player_submission.id.clone(),
             msg_id: "vote_2".to_string(),
+            challenge_nonce: challenge_nonce.clone(),
+            challenge_response: compute_challenge_response(&challenge_nonce, "voter_2"),
         },
         &audience_role,
         &state,
@@ -1433,12 +1451,20 @@ async fn test_remove_player_mid_round() {
         .find(|s| s.author_ref.as_ref() == Some(&player_tokens[0].id))
         .expect("Should find Alice's submission");
 
+    // Get the challenge nonce (generated when entering VOTING phase)
+    let challenge_nonce = state
+        .get_vote_challenge_nonce()
+        .await
+        .expect("Challenge nonce should exist in VOTING phase");
+
     handle_message(
         ClientMessage::Vote {
             voter_token: "voter1".to_string(),
             ai: alice_sub.id.clone(),
             funny: alice_sub.id.clone(),
             msg_id: "vote1".to_string(),
+            challenge_nonce: challenge_nonce.clone(),
+            challenge_response: compute_challenge_response(&challenge_nonce, "voter1"),
         },
         &audience_role,
         &state,

@@ -68,7 +68,20 @@ pub async fn handle_message(
             ai,
             funny,
             msg_id,
-        } => audience::handle_vote(state, voter_token, ai, funny, msg_id).await,
+            challenge_nonce,
+            challenge_response,
+        } => {
+            audience::handle_vote(
+                state,
+                voter_token,
+                ai,
+                funny,
+                msg_id,
+                challenge_nonce,
+                challenge_response,
+            )
+            .await
+        }
 
         ClientMessage::SubmitPrompt { voter_token, text } => {
             audience::handle_submit_prompt(state, voter_token, text).await

@@ -314,6 +314,22 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                         }
                     }
                     GamePhase::Voting => {
+                        // Send vote challenge for anti-automation
+                        if let Some(nonce) = state.get_vote_challenge_nonce().await {
+                            if let Some(round) = state.get_current_round().await {
+                                let challenge_msg = ServerMessage::VoteChallenge {
+                                    nonce,
+                                    round_id: round.id.clone(),
+                                };
+                                if let Ok(msg) = serde_json::to_string(&challenge_msg) {
+                                    let _ = sender.send(Message::Text(msg.into())).await;
+                                }
+                                tracing::info!(
+                                    "Sent vote challenge for audience voting state recovery"
+                                );
+                            }
+                        }
+
                         // Send submissions list for voting
                         if let Some(round) = state.get_current_round().await {
                             let submissions = state.get_submissions(&round.id).await;

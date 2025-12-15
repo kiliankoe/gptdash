@@ -336,6 +336,15 @@ impl AppState {
                         }
                     }
                 } else if effective_phase == GamePhase::Voting {
+                    // Generate and broadcast vote challenge for anti-automation
+                    let nonce = self.generate_vote_challenge().await;
+                    if let Some(rid) = &round_id {
+                        self.broadcast_to_all(crate::protocol::ServerMessage::VoteChallenge {
+                            nonce,
+                            round_id: rid.clone(),
+                        });
+                    }
+
                     // Broadcast submissions to all clients (audience needs them for voting)
                     // This is necessary because broadcast_submissions filters by phase
                     // and audience doesn't receive submissions during WRITING/REVEAL

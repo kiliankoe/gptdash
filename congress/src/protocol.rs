@@ -21,6 +21,10 @@ pub enum ClientMessage {
         ai: SubmissionId,
         funny: SubmissionId,
         msg_id: String,
+        /// Challenge nonce from VoteChallenge message
+        challenge_nonce: String,
+        /// SHA256(nonce + voter_token)[0:16] computed by client
+        challenge_response: String,
     },
     SubmitPrompt {
         voter_token: Option<String>,
@@ -270,6 +274,13 @@ pub enum ServerMessage {
     AudiencePromptVoteState {
         has_voted: bool,
         voted_prompt_id: Option<PromptId>,
+    },
+    /// Challenge for vote anti-automation (sent when entering VOTING phase)
+    VoteChallenge {
+        /// Random nonce that changes each voting round
+        nonce: String,
+        /// Round ID for validation
+        round_id: RoundId,
     },
     Error {
         code: String,

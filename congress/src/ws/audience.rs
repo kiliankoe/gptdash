@@ -13,8 +13,45 @@ pub async fn handle_vote(
     ai: String,
     funny: String,
     msg_id: String,
+    challenge_nonce: String,
+    challenge_response: String,
 ) -> Option<ServerMessage> {
     tracing::info!("Vote: AI={}, Funny={}, MsgID={}", ai, funny, msg_id);
+
+    // Verify challenge first (anti-automation)
+    let expected_nonce = state.get_vote_challenge_nonce().await;
+    match expected_nonce {
+        Some(ref nonce) => {
+            if !AppState::verify_vote_challenge(
+                nonce,
+                &voter_token,
+                &challenge_nonce,
+                &challenge_response,
+            ) {
+                tracing::warn!(
+                    "Vote challenge failed for voter {}: nonce={}, response={}",
+                    voter_token,
+                    challenge_nonce,
+                    challenge_response
+                );
+                return Some(ServerMessage::Error {
+                    code: "CHALLENGE_FAILED".to_string(),
+                    msg: "Ungültige Abstimmung. Bitte Seite neu laden.".to_string(),
+                });
+            }
+        }
+        None => {
+            // No challenge set (shouldn't happen during VOTING phase, but be defensive)
+            tracing::warn!(
+                "No vote challenge nonce set, rejecting vote from {}",
+                voter_token
+            );
+            return Some(ServerMessage::Error {
+                code: "CHALLENGE_FAILED".to_string(),
+                msg: "Ungültige Abstimmung. Bitte Seite neu laden.".to_string(),
+            });
+        }
+    }
 
     match state
         .submit_vote(voter_token, ai, funny, msg_id.clone())

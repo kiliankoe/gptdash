@@ -14,6 +14,7 @@ let hasVoted = false;
 let panicMode = false;
 let audienceTimer = null;
 let promptSubmissionExpanded = false;
+let challengeSolver = null; // Vote challenge solver (anti-automation)
 const STORAGE_KEY = "gptdash_voter_token";
 
 // Prompt voting state
@@ -33,6 +34,9 @@ function init() {
 
   // Initialize timer
   audienceTimer = new CountdownTimer("audienceTimer");
+
+  // Initialize vote challenge solver (anti-automation)
+  challengeSolver = new ChallengeSolver();
 
   // Initialize prompt input event listener
   initPromptInput();
@@ -192,6 +196,14 @@ function handleMessage(message) {
       }
       break;
 
+    case "vote_challenge":
+      // Store vote challenge for anti-automation
+      console.log("Vote challenge received:", message);
+      if (challengeSolver && message.nonce) {
+        challengeSolver.setChallenge(message.nonce, message.round_id);
+      }
+      break;
+
     case "error":
       handleError(message.code, message.msg);
       break;
@@ -206,6 +218,10 @@ function resetRoundUiState() {
   promptCandidates = [];
   hasPromptVoted = false;
   selectedPrompt = null;
+  // Clear challenge for new round
+  if (challengeSolver) {
+    challengeSolver.clear();
+  }
   updateVoteButtonState();
 }
 
@@ -434,7 +450,7 @@ function updateVoteButtonState() {
     panicMode || hasVoted || !(selectedAiAnswer && selectedFunnyAnswer);
 }
 
-function submitVote() {
+async function submitVote() {
   if (hasVoted) {
     showError("voteError", "Du hast in dieser Runde schon abgestimmt");
     return;
@@ -449,16 +465,32 @@ function submitVote() {
     return;
   }
 
+  // Solve vote challenge (anti-automation)
+  let challenge;
+  try {
+    if (!challengeSolver || !challengeSolver.hasChallenge()) {
+      showError("voteError", "Technischer Fehler. Bitte Seite neu laden.");
+      return;
+    }
+    challenge = await challengeSolver.solve(voterToken);
+  } catch (e) {
+    console.error("Challenge solve failed:", e);
+    showError("voteError", "Technischer Fehler. Bitte Seite neu laden.");
+    return;
+  }
+
   // Generate message ID for idempotency
   const msgId = generateId("msg");
 
-  // Send vote
+  // Send vote with challenge response
   const sent = wsConn.send({
     t: "vote",
     voter_token: voterToken,
     ai: selectedAiAnswer,
     funny: selectedFunnyAnswer,
     msg_id: msgId,
+    challenge_nonce: challenge.nonce,
+    challenge_response: challenge.response,
   });
 
   if (!sent) {

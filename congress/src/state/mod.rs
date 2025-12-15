@@ -37,6 +37,8 @@ pub struct AppState {
     pub prompt_votes: Arc<RwLock<HashMap<VoterId, PromptId>>>,
     /// Audience members with auto-generated display names (persists across games)
     pub audience_members: Arc<RwLock<HashMap<VoterId, AudienceMember>>>,
+    /// Vote challenge nonce (changes per voting round, used for anti-automation)
+    pub vote_challenge_nonce: Arc<RwLock<Option<String>>>,
     /// LLM manager for generating AI answers
     pub llm: Option<Arc<LlmManager>>,
     /// LLM configuration (timeout, max tokens, etc.)
@@ -72,6 +74,7 @@ impl AppState {
             queued_prompts: Arc::new(RwLock::new(Vec::new())),
             prompt_votes: Arc::new(RwLock::new(HashMap::new())),
             audience_members: Arc::new(RwLock::new(HashMap::new())),
+            vote_challenge_nonce: Arc::new(RwLock::new(None)),
             llm: llm.map(Arc::new),
             llm_config,
             broadcast: broadcast_tx,
@@ -113,6 +116,62 @@ impl AppState {
             .iter()
             .cloned()
             .collect()
+    }
+
+    // =========================================================================
+    // Vote Challenge (anti-automation)
+    // =========================================================================
+
+    /// Generate a new vote challenge nonce for the current voting round
+    /// Returns the generated nonce (32 hex chars)
+    pub async fn generate_vote_challenge(&self) -> String {
+        use rand::Rng;
+        let bytes: [u8; 16] = rand::rng().random();
+        let nonce = hex::encode(bytes);
+        *self.vote_challenge_nonce.write().await = Some(nonce.clone());
+        tracing::debug!("Generated vote challenge nonce: {}", nonce);
+        nonce
+    }
+
+    /// Get the current vote challenge nonce (if any)
+    pub async fn get_vote_challenge_nonce(&self) -> Option<String> {
+        self.vote_challenge_nonce.read().await.clone()
+    }
+
+    /// Verify a vote challenge response
+    /// Returns true if the response is valid for the given voter_token and nonce
+    pub fn verify_vote_challenge(
+        expected_nonce: &str,
+        voter_token: &str,
+        provided_nonce: &str,
+        response: &str,
+    ) -> bool {
+        // Check nonce matches
+        if expected_nonce != provided_nonce {
+            tracing::debug!(
+                "Challenge nonce mismatch: expected={}, provided={}",
+                expected_nonce,
+                provided_nonce
+            );
+            return false;
+        }
+
+        // Compute expected response: SHA256(nonce + voter_token)[0:16] as hex
+        use sha2::{Digest, Sha256};
+        let input = format!("{}{}", provided_nonce, voter_token);
+        let hash = Sha256::digest(input.as_bytes());
+        let expected_response = hex::encode(&hash[..8]); // First 8 bytes = 16 hex chars
+
+        if response != expected_response {
+            tracing::debug!(
+                "Challenge response mismatch: expected={}, provided={}",
+                expected_response,
+                response
+            );
+            return false;
+        }
+
+        true
     }
 
     // =========================================================================
@@ -1857,5 +1916,105 @@ mod tests {
         assert_eq!(submissions.len(), 1);
         assert_eq!(submissions[0].original_text, "First answer");
         assert_eq!(submissions[0].id, sub3.id);
+    }
+
+    // Vote challenge tests
+
+    #[tokio::test]
+    async fn test_generate_vote_challenge() {
+        let state = AppState::new();
+
+        // Initially no challenge
+        assert!(state.get_vote_challenge_nonce().await.is_none());
+
+        // Generate a challenge
+        let nonce = state.generate_vote_challenge().await;
+        assert_eq!(nonce.len(), 32); // 16 bytes = 32 hex chars
+
+        // Should be stored
+        let stored = state.get_vote_challenge_nonce().await;
+        assert_eq!(stored, Some(nonce));
+    }
+
+    #[test]
+    fn test_verify_vote_challenge_valid() {
+        use sha2::{Digest, Sha256};
+
+        let nonce = "abcdef1234567890abcdef1234567890";
+        let voter_token = "voter_test_token_123";
+
+        // Compute expected response (same algorithm as client)
+        let input = format!("{}{}", nonce, voter_token);
+        let hash = Sha256::digest(input.as_bytes());
+        let expected_response = hex::encode(&hash[..8]); // First 8 bytes = 16 hex chars
+
+        // Should verify successfully
+        assert!(AppState::verify_vote_challenge(
+            nonce,
+            voter_token,
+            nonce,
+            &expected_response
+        ));
+    }
+
+    #[test]
+    fn test_verify_vote_challenge_wrong_response() {
+        let nonce = "abcdef1234567890abcdef1234567890";
+        let voter_token = "voter_test_token_123";
+        let wrong_response = "0000000000000000"; // Wrong response
+
+        // Should fail
+        assert!(!AppState::verify_vote_challenge(
+            nonce,
+            voter_token,
+            nonce,
+            wrong_response
+        ));
+    }
+
+    #[test]
+    fn test_verify_vote_challenge_wrong_nonce() {
+        use sha2::{Digest, Sha256};
+
+        let correct_nonce = "abcdef1234567890abcdef1234567890";
+        let wrong_nonce = "ffffffffffffffffffffffffffffffff";
+        let voter_token = "voter_test_token_123";
+
+        // Compute response with correct nonce
+        let input = format!("{}{}", correct_nonce, voter_token);
+        let hash = Sha256::digest(input.as_bytes());
+        let response = hex::encode(&hash[..8]);
+
+        // Verification should fail because nonce mismatch
+        assert!(!AppState::verify_vote_challenge(
+            correct_nonce,
+            voter_token,
+            wrong_nonce,
+            &response
+        ));
+    }
+
+    #[test]
+    fn test_verify_vote_challenge_different_voter() {
+        use sha2::{Digest, Sha256};
+
+        let nonce = "abcdef1234567890abcdef1234567890";
+        let voter1 = "voter_1";
+        let voter2 = "voter_2";
+
+        // Compute response for voter1
+        let input = format!("{}{}", nonce, voter1);
+        let hash = Sha256::digest(input.as_bytes());
+        let response = hex::encode(&hash[..8]);
+
+        // Should fail for voter2
+        assert!(!AppState::verify_vote_challenge(
+            nonce, voter2, nonce, &response
+        ));
+
+        // But should succeed for voter1
+        assert!(AppState::verify_vote_challenge(
+            nonce, voter1, nonce, &response
+        ));
     }
 }

@@ -546,6 +546,78 @@ class TTSManager {
   }
 }
 
+/**
+ * Vote challenge solver for anti-automation
+ * Computes SHA256(nonce + voter_token) and returns first 16 hex chars
+ */
+class ChallengeSolver {
+  constructor() {
+    this.currentNonce = null;
+    this.currentRoundId = null;
+  }
+
+  /**
+   * Store challenge from server
+   * @param {string} nonce - Challenge nonce from server
+   * @param {string} roundId - Round ID for validation
+   */
+  setChallenge(nonce, roundId) {
+    this.currentNonce = nonce;
+    this.currentRoundId = roundId;
+    console.log("Challenge received:", {
+      nonce: `${nonce?.slice(0, 8)}...`,
+      roundId,
+    });
+  }
+
+  /**
+   * Check if a challenge is available
+   */
+  hasChallenge() {
+    return this.currentNonce !== null;
+  }
+
+  /**
+   * Clear the current challenge
+   */
+  clear() {
+    this.currentNonce = null;
+    this.currentRoundId = null;
+  }
+
+  /**
+   * Solve the current challenge
+   * @param {string} voterToken - The voter's token
+   * @returns {Promise<{nonce: string, response: string}>}
+   */
+  async solve(voterToken) {
+    if (!this.currentNonce) {
+      throw new Error("No challenge set");
+    }
+
+    const input = this.currentNonce + voterToken;
+    const hash = await this.sha256(input);
+    const response = hash.slice(0, 16); // First 16 hex chars (8 bytes)
+
+    return {
+      nonce: this.currentNonce,
+      response: response,
+    };
+  }
+
+  /**
+   * Compute SHA-256 hash using Web Crypto API
+   * @param {string} message - Input message
+   * @returns {Promise<string>} Hex-encoded hash
+   */
+  async sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+}
+
 if (typeof window !== "undefined") {
   Object.assign(window, {
     WSConnection,
@@ -563,5 +635,6 @@ if (typeof window !== "undefined") {
     CountdownTimer,
     QRCodeManager,
     TTSManager,
+    ChallengeSolver,
   });
 }
