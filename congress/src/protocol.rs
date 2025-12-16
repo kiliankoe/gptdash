@@ -284,6 +284,13 @@ pub enum ServerMessage {
         /// Round ID for validation
         round_id: RoundId,
     },
+    /// Connection stats sent to host (periodic updates)
+    HostConnectionStats {
+        players: u32,
+        audience: u32,
+        beamers: u32,
+        hosts: u32,
+    },
     Error {
         code: String,
         msg: String,

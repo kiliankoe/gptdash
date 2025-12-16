@@ -63,6 +63,9 @@ async fn main() {
     // Spawn background task for broadcasting prompt vote counts to Beamer during PROMPT_SELECTION
     broadcast::spawn_prompt_vote_broadcaster(state.clone());
 
+    // Spawn background task for broadcasting connection stats to Host
+    broadcast::spawn_connection_stats_broadcaster(state.clone());
+
     // Note: Voting deadline is a soft/visual timer; the host advances phases manually.
 
     // Protected host routes (with HTTP Basic Auth)

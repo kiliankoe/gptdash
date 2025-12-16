@@ -274,4 +274,62 @@ test.describe("Host", () => {
 
     console.log("Host state restoration test completed successfully!");
   });
+
+  test("shows live connection counts", async () => {
+    const { host, players, audience } = clients;
+
+    // Host connects
+    await host.goto("/host");
+    await waitForConnection(host);
+
+    // Wait for initial connection stats broadcast (runs every 1 second)
+    await host.waitForTimeout(1500);
+
+    // Initially should show 0 players and audience connected
+    await expect(host.locator("#connectedPlayers")).toHaveText("0");
+    await expect(host.locator("#connectedAudience")).toHaveText("0");
+
+    // Create player tokens first
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "2");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForSelector("#playerTokensList .token");
+    const tokens = await getPlayerTokens(host);
+
+    // Players connect (join with tokens)
+    await players[0].goto(`/player.html`);
+    await players[0].fill("#tokenInput", tokens[0]);
+    await players[0].click("#joinButton");
+    await waitForConnection(players[0]);
+
+    await players[1].goto(`/player.html`);
+    await players[1].fill("#tokenInput", tokens[1]);
+    await players[1].click("#joinButton");
+    await waitForConnection(players[1]);
+
+    // Verify player count updated (wait for broadcast, sent every 1 second)
+    await expect(host.locator("#connectedPlayers")).toHaveText("2", {
+      timeout: 3000,
+    });
+
+    // Audience connects
+    await audience[0].goto("/");
+    await waitForConnection(audience[0]);
+    await audience[1].goto("/");
+    await waitForConnection(audience[1]);
+
+    // Verify audience count updated
+    await expect(host.locator("#connectedAudience")).toHaveText("2", {
+      timeout: 3000,
+    });
+
+    // Close one player connection by closing the page
+    await players[0].close();
+
+    // Verify count decreased
+    await expect(host.locator("#connectedPlayers")).toHaveText("1", {
+      timeout: 3000,
+    });
+  });
 });

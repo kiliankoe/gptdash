@@ -11,6 +11,7 @@ use crate::protocol::{PlayerSubmissionStatus, ServerMessage};
 use crate::types::*;
 use export::GameStateExport;
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 
@@ -51,6 +52,14 @@ pub struct AppState {
     pub host_broadcast: broadcast::Sender<ServerMessage>,
     /// Broadcast channel for sending messages to Beamer clients only
     pub beamer_broadcast: broadcast::Sender<ServerMessage>,
+    /// Connected player count
+    pub connected_players: Arc<AtomicU32>,
+    /// Connected audience count
+    pub connected_audience: Arc<AtomicU32>,
+    /// Connected beamer count
+    pub connected_beamers: Arc<AtomicU32>,
+    /// Connected host count
+    pub connected_hosts: Arc<AtomicU32>,
 }
 
 impl AppState {
@@ -83,6 +92,10 @@ impl AppState {
             broadcast: broadcast_tx,
             host_broadcast: host_tx,
             beamer_broadcast: beamer_tx,
+            connected_players: Arc::new(AtomicU32::new(0)),
+            connected_audience: Arc::new(AtomicU32::new(0)),
+            connected_beamers: Arc::new(AtomicU32::new(0)),
+            connected_hosts: Arc::new(AtomicU32::new(0)),
         }
     }
 
@@ -99,6 +112,40 @@ impl AppState {
     /// Broadcast a message to beamer clients only
     pub fn broadcast_to_beamer(&self, msg: ServerMessage) {
         let _ = self.beamer_broadcast.send(msg);
+    }
+
+    // =========================================================================
+    // Connection Tracking
+    // =========================================================================
+
+    /// Increment the connection count for a role
+    pub fn increment_connection(&self, role: &Role) {
+        match role {
+            Role::Player => self.connected_players.fetch_add(1, Ordering::Relaxed),
+            Role::Audience => self.connected_audience.fetch_add(1, Ordering::Relaxed),
+            Role::Beamer => self.connected_beamers.fetch_add(1, Ordering::Relaxed),
+            Role::Host => self.connected_hosts.fetch_add(1, Ordering::Relaxed),
+        };
+    }
+
+    /// Decrement the connection count for a role
+    pub fn decrement_connection(&self, role: &Role) {
+        match role {
+            Role::Player => self.connected_players.fetch_sub(1, Ordering::Relaxed),
+            Role::Audience => self.connected_audience.fetch_sub(1, Ordering::Relaxed),
+            Role::Beamer => self.connected_beamers.fetch_sub(1, Ordering::Relaxed),
+            Role::Host => self.connected_hosts.fetch_sub(1, Ordering::Relaxed),
+        };
+    }
+
+    /// Get current connection counts for all roles
+    pub fn get_connection_counts(&self) -> ConnectionCounts {
+        ConnectionCounts {
+            players: self.connected_players.load(Ordering::Relaxed),
+            audience: self.connected_audience.load(Ordering::Relaxed),
+            beamers: self.connected_beamers.load(Ordering::Relaxed),
+            hosts: self.connected_hosts.load(Ordering::Relaxed),
+        }
     }
 
     /// Check if a voter is shadowbanned

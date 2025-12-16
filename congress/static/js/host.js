@@ -268,6 +268,12 @@ function handleMessage(message) {
       updateOverviewFlow();
       break;
 
+    case "host_connection_stats":
+      document.getElementById("connectedPlayers").textContent = message.players;
+      document.getElementById("connectedAudience").textContent =
+        message.audience;
+      break;
+
     case "round_started":
       gameState.currentRound = message.round;
       gameState.roundNo = message.round.number;

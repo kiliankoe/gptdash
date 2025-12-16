@@ -186,3 +186,12 @@ pub enum Role {
     Player,
     Audience,
 }
+
+/// Connection counts by role
+#[derive(Debug, Clone, Default)]
+pub struct ConnectionCounts {
+    pub players: u32,
+    pub audience: u32,
+    pub beamers: u32,
+    pub hosts: u32,
+}

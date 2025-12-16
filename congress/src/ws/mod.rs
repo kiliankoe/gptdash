@@ -199,6 +199,9 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
 
     tracing::info!("WebSocket connected with role: {:?}", role);
 
+    // Track connection count
+    state.increment_connection(&role);
+
     let connection_token = params.token.as_deref();
 
     // Ensure a game exists
@@ -675,6 +678,9 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
             }
         }
     }
+
+    // Decrement connection count
+    state.decrement_connection(&role);
 
     tracing::info!("WebSocket connection closed for role: {:?}", role);
 }
