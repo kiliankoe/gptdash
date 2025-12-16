@@ -73,7 +73,6 @@ function updatePlayersListInto(containerId) {
     }
 
     const playerId = player.id || `unknown_${token}`;
-    const escapedName = escapeHtml(name).replace(/'/g, "\\'");
     div.innerHTML = `
       <div class="player-info">
         <div class="player-header">
@@ -81,9 +80,9 @@ function updatePlayersListInto(containerId) {
           <span class="status-badge ${statusClass}">${statusBadge}</span>
         </div>
         <div class="player-token">
-          <span class="token">${token}</span>
-          <button onclick="copyToClipboard('${token}')" class="copy-btn" title="Token kopieren"></button>
-          <button onclick="removePlayer('${playerId}', '${escapedName}')" class="remove-btn" title="Spieler entfernen"></button>
+          <span class="token">${escapeHtml(token)}</span>
+          <button class="copy-btn" data-action="copy-token" data-token="${escapeHtml(token)}" title="Token kopieren"></button>
+          <button class="remove-btn" data-action="remove-player" data-player-id="${escapeHtml(playerId)}" data-player-name="${escapeHtml(name)}" title="Spieler entfernen"></button>
         </div>
       </div>
     `;

@@ -116,6 +116,9 @@ function init() {
   // Setup image preview for multimodal prompts
   setupImagePreview();
 
+  // Setup event delegation for data-action attributes (XSS prevention)
+  setupEventDelegation();
+
   // Restore panel from URL if present (allows reload to stay on same panel)
   restorePanelFromUrl();
 }
@@ -321,6 +324,68 @@ const uiCallbacks = {
   updateOverviewRevealStatus,
 };
 
+/**
+ * Setup event delegation for data-action attributes
+ * This replaces inline onclick handlers to prevent XSS vulnerabilities
+ */
+function setupEventDelegation() {
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+
+    // Stop propagation for action buttons inside interactive elements
+    e.stopPropagation();
+
+    switch (action) {
+      // Player actions
+      case "copy-token":
+        copyToClipboard(btn.dataset.token);
+        break;
+      case "remove-player":
+        removePlayer(btn.dataset.playerId, btn.dataset.playerName, wsConn);
+        break;
+
+      // Prompt actions
+      case "queue-prompt":
+        queuePrompt(btn.dataset.id, wsConn);
+        break;
+      case "unqueue-prompt":
+        unqueuePrompt(btn.dataset.id, wsConn);
+        break;
+      case "delete-prompt":
+        deletePrompt(btn.dataset.id, wsConn);
+        break;
+      case "shadowban-audience":
+        shadowbanAudience(btn.dataset.voterId, wsConn);
+        break;
+      case "shadowban-submitters":
+        shadowbanPromptSubmitters(btn.dataset.id, wsConn);
+        break;
+
+      // Submission actions
+      case "select-ai":
+        selectAiSubmission(btn.dataset.submissionId, wsConn);
+        break;
+      case "remove-submission":
+        removeSubmission(btn.dataset.submissionId, wsConn);
+        break;
+      case "mark-duplicate":
+        markDuplicate(btn.dataset.submissionId, wsConn);
+        break;
+      case "edit-submission":
+        editSubmission(btn.dataset.submissionId, wsConn);
+        break;
+
+      // Manual winner (panic mode)
+      case "set-manual-winner":
+        setManualWinner(btn.dataset.winnerType, btn.dataset.submissionId);
+        break;
+    }
+  });
+}
+
 // Host Commands
 function transitionPhase(phase) {
   wsConn.send({ t: "host_transition_phase", phase: phase });
@@ -456,7 +521,7 @@ function updatePanicModeUI() {
         const shortText =
           sub.display_text.substring(0, 30) +
           (sub.display_text.length > 30 ? "..." : "");
-        html += `<button class="secondary" onclick="setManualWinner('ai', '${sub.id}')" title="${escapeHtml(sub.display_text)}">${idx + 1}. ${escapeHtml(shortText)}</button>`;
+        html += `<button class="secondary" data-action="set-manual-winner" data-winner-type="ai" data-submission-id="${escapeHtml(sub.id)}" title="${escapeHtml(sub.display_text)}">${idx + 1}. ${escapeHtml(shortText)}</button>`;
       });
       html += "</div>";
 
@@ -467,7 +532,7 @@ function updatePanicModeUI() {
         const shortText =
           sub.display_text.substring(0, 30) +
           (sub.display_text.length > 30 ? "..." : "");
-        html += `<button class="secondary" onclick="setManualWinner('funny', '${sub.id}')" title="${escapeHtml(sub.display_text)}">${idx + 1}. ${escapeHtml(shortText)}</button>`;
+        html += `<button class="secondary" data-action="set-manual-winner" data-winner-type="funny" data-submission-id="${escapeHtml(sub.id)}" title="${escapeHtml(sub.display_text)}">${idx + 1}. ${escapeHtml(shortText)}</button>`;
       });
       html += "</div>";
 

@@ -86,10 +86,10 @@ export function updateSubmissionsList() {
       </div>
       <div class="text">${escapeHtml(sub.display_text)}</div>
       <div class="actions">
-        ${authorKind === "ai" && !isSelectedAi ? `<button onclick="selectAiSubmission('${sub.id}')">Als KI auswhlen</button>` : ""}
-        ${authorKind === "ai" ? `<button class="remove-btn" onclick="removeSubmission('${sub.id}')">Entfernen</button>` : ""}
-        ${authorKind === "player" ? `<button class="danger" onclick="markDuplicate('${sub.id}')">Dupe</button>` : ""}
-        <button class="secondary" onclick="editSubmission('${sub.id}')">Bearbeiten</button>
+        ${authorKind === "ai" && !isSelectedAi ? `<button data-action="select-ai" data-submission-id="${escapeHtml(sub.id)}">Als KI auswhlen</button>` : ""}
+        ${authorKind === "ai" ? `<button class="remove-btn" data-action="remove-submission" data-submission-id="${escapeHtml(sub.id)}">Entfernen</button>` : ""}
+        ${authorKind === "player" ? `<button class="danger" data-action="mark-duplicate" data-submission-id="${escapeHtml(sub.id)}">Dupe</button>` : ""}
+        <button class="secondary" data-action="edit-submission" data-submission-id="${escapeHtml(sub.id)}">Bearbeiten</button>
       </div>
     `;
 

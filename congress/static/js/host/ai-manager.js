@@ -166,7 +166,7 @@ export function updateAiSubmissionsList() {
     const modelName = providerParts[1] || "";
 
     html += `
-      <div class="ai-submission-card ${isSelected ? "selected" : ""}" onclick="selectAiSubmission('${sub.id}')">
+      <div class="ai-submission-card ${isSelected ? "selected" : ""}" data-action="select-ai" data-submission-id="${escapeHtml(sub.id)}">
         <div class="ai-card-header">
           <span class="provider-badge">${escapeHtml(providerName)}</span>
           ${modelName ? `<span class="model-name">${escapeHtml(modelName)}</span>` : ""}
@@ -174,10 +174,10 @@ export function updateAiSubmissionsList() {
         </div>
         <div class="ai-card-text">${escapeHtml(sub.display_text)}</div>
         <div class="ai-card-actions">
-          <button class="${isSelected ? "" : "secondary"}" onclick="event.stopPropagation(); selectAiSubmission('${sub.id}')">
+          <button class="${isSelected ? "" : "secondary"}" data-action="select-ai" data-submission-id="${escapeHtml(sub.id)}">
             ${isSelected ? "Ausgewhlt" : "Auswhlen"}
           </button>
-          <button class="remove-btn" onclick="event.stopPropagation(); removeSubmission('${sub.id}')">
+          <button class="remove-btn" data-action="remove-submission" data-submission-id="${escapeHtml(sub.id)}">
             Entfernen
           </button>
         </div>

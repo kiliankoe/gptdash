@@ -167,9 +167,9 @@ export function updatePromptStats() {
         const shortId = s.voter_id.substring(0, 8);
         return `
         <div class="top-submitter-item">
-          <span class="submitter-id" title="${escapeHtml(s.voter_id)}">${shortId}...</span>
+          <span class="submitter-id" title="${escapeHtml(s.voter_id)}">${escapeHtml(shortId)}...</span>
           <span class="submitter-count">${s.count} Prompts</span>
-          <button class="danger small" onclick="shadowbanAudience('${s.voter_id}')" title="Shadowban"></button>
+          <button class="danger small" data-action="shadowban-audience" data-voter-id="${escapeHtml(s.voter_id)}" title="Shadowban"></button>
         </div>
       `;
       })
@@ -346,14 +346,14 @@ export function renderPromptRow(promptData, queuedIds, queueFull) {
           ? '<span class="queued-badge"></span>'
           : queueFull
             ? ""
-            : `<button class="action-btn queue-btn" onclick="event.stopPropagation(); queuePrompt('${promptData.id}')" title="In Warteschlange">+</button>`
+            : `<button class="action-btn queue-btn" data-action="queue-prompt" data-id="${escapeHtml(promptData.id)}" title="In Warteschlange">+</button>`
       }
       ${
         promptData.source === "audience" && promptData.submitter_ids?.length > 0
-          ? `<button class="action-btn ban-btn" onclick="event.stopPropagation(); shadowbanPromptSubmitters('${promptData.id}')" title="Einreicher shadowbannen"></button>`
+          ? `<button class="action-btn ban-btn" data-action="shadowban-submitters" data-id="${escapeHtml(promptData.id)}" title="Einreicher shadowbannen"></button>`
           : ""
       }
-      <button class="action-btn delete-btn" onclick="event.stopPropagation(); deletePrompt('${promptData.id}')" title="Lschen"></button>
+      <button class="action-btn delete-btn" data-action="delete-prompt" data-id="${escapeHtml(promptData.id)}" title="Lschen"></button>
     </div>
     <div class="prompt-tooltip">${tooltipContent}</div>
   `;
@@ -486,8 +486,8 @@ function updateQueuedPromptsListInto(containerId, startBtnId) {
       </div>
       ${contentHtml}
       <div class="prompt-actions">
-        <button class="secondary small" onclick="unqueuePrompt('${promptData.id}')" title="Zurck in den Pool"> Pool</button>
-        <button class="danger small" onclick="deletePrompt('${promptData.id}')" title="Prompt lschen"></button>
+        <button class="secondary small" data-action="unqueue-prompt" data-id="${escapeHtml(promptData.id)}" title="Zurck in den Pool"> Pool</button>
+        <button class="danger small" data-action="delete-prompt" data-id="${escapeHtml(promptData.id)}" title="Prompt lschen"></button>
       </div>
     `;
     container.appendChild(div);

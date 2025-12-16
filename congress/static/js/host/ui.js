@@ -207,7 +207,7 @@ export function updateScores() {
       const displayName = score.display_name || score.ref_id.substring(0, 12);
       playerContainer.innerHTML += `
         <div class="info-item">
-          <div class="label">${idx + 1}. ${displayName}</div>
+          <div class="label">${idx + 1}. ${escapeHtml(displayName)}</div>
           <div class="value">${score.total} Pkt</div>
         </div>
       `;
@@ -226,7 +226,7 @@ export function updateScores() {
       const displayName = score.display_name || score.ref_id.substring(0, 12);
       audienceContainer.innerHTML += `
         <div class="info-item">
-          <div class="label">${idx + 1}. ${displayName}</div>
+          <div class="label">${idx + 1}. ${escapeHtml(displayName)}</div>
           <div class="value">${score.total} Pkt</div>
         </div>
       `;
