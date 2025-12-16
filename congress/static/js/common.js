@@ -488,21 +488,46 @@ const QRCodeManager = {
 
 /**
  * Text-to-Speech manager using browser API
+ * Includes workarounds for Chrome bugs (stuck synthesis, 15-second cutoff)
  */
 class TTSManager {
   constructor() {
     this.synthesis = window.speechSynthesis;
     this.currentUtterance = null;
+    this.voicesLoaded = false;
+    this.resumeInterval = null;
+
+    // Wait for voices to load (Chrome loads them asynchronously)
+    if (this.synthesis) {
+      // Try to get voices immediately (Firefox)
+      if (this.synthesis.getVoices().length > 0) {
+        this.voicesLoaded = true;
+      }
+      // Listen for async voice loading (Chrome/Edge)
+      this.synthesis.addEventListener("voiceschanged", () => {
+        this.voicesLoaded = true;
+        console.log(
+          "[TTS] Voices loaded:",
+          this.synthesis.getVoices().length,
+          "voices available",
+        );
+      });
+    }
   }
 
   /**
    * Speak text using browser TTS
    * @param {string} text - Text to speak
-   * @param {object} options - TTS options (rate, pitch, volume, voice)
+   * @param {object} options - TTS options (rate, pitch, volume, voice, onEnd, onError)
    */
   speak(text, options = {}) {
     if (!this.synthesis) {
-      console.warn("Speech synthesis not supported in this browser");
+      console.warn("[TTS] Speech synthesis not supported in this browser");
+      return;
+    }
+
+    if (!text || text.trim().length === 0) {
+      console.warn("[TTS] Empty text, skipping");
       return;
     }
 
@@ -515,8 +540,8 @@ class TTSManager {
     utterance.pitch = options.pitch || 1.0;
     utterance.volume = options.volume || 1.0;
 
-    // Select voice if specified
-    if (options.voiceName) {
+    // Select voice if specified and voices are loaded
+    if (options.voiceName && this.voicesLoaded) {
       const voices = this.synthesis.getVoices();
       const voice = voices.find((v) => v.name === options.voiceName);
       if (voice) {
@@ -524,14 +549,62 @@ class TTSManager {
       }
     }
 
+    // Add event handlers for debugging and error detection
+    utterance.onstart = () => {
+      console.log("[TTS] Speech started");
+    };
+
+    utterance.onend = () => {
+      console.log("[TTS] Speech ended");
+      this._stopResumeWorkaround();
+      if (options.onEnd) options.onEnd();
+    };
+
+    utterance.onerror = (event) => {
+      console.error("[TTS] Speech error:", event.error);
+      this._stopResumeWorkaround();
+      if (options.onError) options.onError(event.error);
+    };
+
     this.currentUtterance = utterance;
-    this.synthesis.speak(utterance);
+
+    // Chrome bug workaround: need a small delay after cancel()
+    // Otherwise the new utterance may not play
+    setTimeout(() => {
+      this.synthesis.speak(utterance);
+
+      // Chrome bug workaround: utterances longer than ~15 seconds get cut off
+      // Periodically calling pause/resume prevents this
+      this._startResumeWorkaround();
+    }, 50);
+  }
+
+  /**
+   * Chrome workaround: pause/resume every 10 seconds to prevent cutoff
+   * See: https://bugs.chromium.org/p/chromium/issues/detail?id=679437
+   */
+  _startResumeWorkaround() {
+    this._stopResumeWorkaround();
+    this.resumeInterval = setInterval(() => {
+      if (this.synthesis?.speaking && !this.synthesis.paused) {
+        this.synthesis.pause();
+        this.synthesis.resume();
+      }
+    }, 10000);
+  }
+
+  _stopResumeWorkaround() {
+    if (this.resumeInterval) {
+      clearInterval(this.resumeInterval);
+      this.resumeInterval = null;
+    }
   }
 
   /**
    * Stop any ongoing speech
    */
   stop() {
+    this._stopResumeWorkaround();
     if (this.synthesis) {
       this.synthesis.cancel();
     }
