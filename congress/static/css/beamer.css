@@ -1141,11 +1141,16 @@ body {
 .intermission-visual {
   font-family: var(--font-headline);
   font-size: clamp(80px, 15vw, 200px);
-  font-variation-settings:
-    "wght" 42,
-    "wdth" 100;
-  animation: fontWeightCycle 4s ease-in-out infinite;
   color: var(--color-primary);
+}
+
+.wave-letter {
+  display: inline-block;
+  font-variation-settings:
+    "wght" 10,
+    "wdth" 100;
+  animation: fontWeightWave 3s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * 0.3s);
 }
 
 .intermission-message {
