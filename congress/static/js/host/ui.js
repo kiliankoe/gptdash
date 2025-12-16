@@ -222,9 +222,10 @@ export function updateScores() {
       '<p style="opacity: 0.6;">Noch keine Publikums-Punkte</p>';
   } else {
     gameState.scores.audience_top.slice(0, 10).forEach((score, idx) => {
+      const displayName = score.display_name || score.ref_id.substring(0, 12);
       audienceContainer.innerHTML += `
         <div class="info-item">
-          <div class="label">${idx + 1}. ${score.ref_id.substring(0, 12)}</div>
+          <div class="label">${idx + 1}. ${displayName}</div>
           <div class="value">${score.total} Pkt</div>
         </div>
       `;
