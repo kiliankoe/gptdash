@@ -34,11 +34,13 @@ function init() {
   const storedToken = localStorage.getItem(STORAGE_KEY);
 
   if (urlToken) {
-    document.getElementById("tokenInput").value = urlToken;
-    playerToken = urlToken;
+    const normalizedToken = urlToken.toUpperCase();
+    document.getElementById("tokenInput").value = normalizedToken;
+    playerToken = normalizedToken;
   } else if (storedToken) {
-    document.getElementById("tokenInput").value = storedToken;
-    playerToken = storedToken;
+    const normalizedToken = storedToken.toUpperCase();
+    document.getElementById("tokenInput").value = normalizedToken;
+    playerToken = normalizedToken;
   }
 
   // Setup char counter
@@ -284,7 +286,7 @@ function resetRoundUiState() {
 
 function joinGame() {
   const tokenInput = document.getElementById("tokenInput");
-  const token = tokenInput.value.trim();
+  const token = tokenInput.value.trim().toUpperCase();
 
   if (!token) {
     showError("joinError", "Bitte gib einen Spieler-Token ein");
@@ -293,6 +295,8 @@ function joinGame() {
 
   // Store token temporarily - will be cleared if invalid
   playerToken = token;
+  // Update input to show uppercase value
+  tokenInput.value = token;
   localStorage.setItem(STORAGE_KEY, token);
 
   // Reconnect with the token to validate it
