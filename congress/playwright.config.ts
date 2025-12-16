@@ -17,6 +17,8 @@ const webServerEnv = {
   // E2E tests use real browsers which set navigator.webdriver=true.
   // Skip all vote anti-automation checks (webdriver + timing) for tests.
   SKIP_VOTE_ANTI_AUTOMATION: "1",
+  // Disable auto-save/load to prevent e2e tests from polluting each other
+  DISABLE_AUTO_SAVE: "1",
 };
 
 export default defineConfig({

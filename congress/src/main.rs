@@ -8,7 +8,9 @@ use std::sync::Arc;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use gptdash::{abuse, api, auth, broadcast, llm, state::AppState, ws};
+use gptdash::{
+    abuse, api, auth, broadcast, llm, state::export::GameStateExport, state::AppState, ws,
+};
 
 #[tokio::main]
 async fn main() {
@@ -53,9 +55,40 @@ async fn main() {
         }
     };
 
-    // Initialize a default game
+    // Initialize app state
     let state = Arc::new(AppState::new_with_llm(llm_manager, llm_config));
-    state.create_game().await;
+
+    // Auto-load state from backup if it exists (unless disabled for tests)
+    let disable_auto_save = std::env::var("DISABLE_AUTO_SAVE")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false);
+
+    let mut loaded_from_backup = false;
+    if !disable_auto_save {
+        let save_path =
+            std::env::var("AUTO_SAVE_PATH").unwrap_or_else(|_| "./state_backup.json".to_string());
+
+        if let Ok(json) = tokio::fs::read_to_string(&save_path).await {
+            match serde_json::from_str::<GameStateExport>(&json) {
+                Ok(export) => match state.import_state(export).await {
+                    Ok(()) => {
+                        tracing::info!("Restored state from {}", save_path);
+                        loaded_from_backup = true;
+                    }
+                    Err(e) => tracing::warn!("Failed to import backup: {}", e),
+                },
+                Err(e) => tracing::warn!("Failed to parse backup file: {}", e),
+            }
+        }
+    }
+
+    // Create a fresh game if we didn't load from backup
+    if !loaded_from_backup {
+        state.create_game().await;
+    }
+
+    // Spawn background task for auto-saving state to disk
+    broadcast::spawn_auto_save_task(state.clone());
 
     // Spawn background task for broadcasting vote counts to Beamer
     broadcast::spawn_vote_broadcaster(state.clone());

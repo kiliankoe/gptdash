@@ -2312,3 +2312,160 @@ async fn test_valid_player_token_flow() {
 
     println!("✅ Valid player token flow test passed!");
 }
+
+// ============================================================================
+// Auto-Save/Load Tests
+// ============================================================================
+
+/// Test that state can be saved to a file and loaded back
+#[tokio::test]
+async fn test_auto_save_writes_state_to_file() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let save_path = temp_dir.path().join("test_state.json");
+
+    let state = Arc::new(AppState::new());
+    state.create_game().await;
+
+    // Add some identifiable data
+    let prompt = state
+        .add_prompt_to_pool(
+            Some("Test prompt for auto-save".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .expect("Should add prompt");
+
+    // Manually trigger save
+    gptdash::broadcast::save_state_to_file(&state, &save_path)
+        .await
+        .expect("Should save state to file");
+
+    // Verify file exists and contains valid JSON
+    let contents = tokio::fs::read_to_string(&save_path)
+        .await
+        .expect("Should read file");
+    let export: gptdash::state::export::GameStateExport =
+        serde_json::from_str(&contents).expect("Should parse JSON");
+
+    // Verify game state was saved
+    assert!(export.game.is_some(), "Should have game in export");
+
+    // Verify prompt pool was saved
+    assert_eq!(export.prompt_pool.len(), 1, "Should have 1 prompt in pool");
+    assert_eq!(export.prompt_pool[0].id, prompt.id);
+
+    println!("✅ Auto-save writes state to file test passed!");
+}
+
+/// Test that state can be loaded from a file
+#[tokio::test]
+async fn test_auto_load_restores_state_from_file() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let save_path = temp_dir.path().join("test_state.json");
+
+    // Create and save initial state with identifiable data
+    let state1 = Arc::new(AppState::new());
+    state1.create_game().await;
+
+    // Add a prompt with unique text
+    state1
+        .add_prompt_to_pool(
+            Some("Unique prompt for restore test".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .expect("Should add prompt");
+
+    // Create a player
+    let player = state1.create_player().await;
+    state1
+        .register_player(&player.token, "TestPlayer".to_string())
+        .await
+        .expect("Should register player");
+
+    // Save state
+    gptdash::broadcast::save_state_to_file(&state1, &save_path)
+        .await
+        .expect("Should save state");
+
+    // Create new state and load from file
+    let state2 = Arc::new(AppState::new());
+    gptdash::broadcast::load_state_from_file(&state2, &save_path)
+        .await
+        .expect("Should load state");
+
+    // Verify game was restored
+    assert!(
+        state2.get_game().await.is_some(),
+        "Should have game after load"
+    );
+
+    // Verify prompt pool was restored
+    let pool = state2.prompt_pool.read().await;
+    assert_eq!(pool.len(), 1, "Should have 1 prompt after restore");
+    assert_eq!(
+        pool[0].text,
+        Some("Unique prompt for restore test".to_string())
+    );
+    drop(pool);
+
+    // Verify player was restored
+    let restored_player = state2.get_player_by_token(&player.token).await;
+    assert!(
+        restored_player.is_some(),
+        "Player should be restored with token"
+    );
+    assert_eq!(
+        restored_player.unwrap().display_name,
+        Some("TestPlayer".to_string())
+    );
+
+    println!("✅ Auto-load restores state from file test passed!");
+}
+
+/// Test that load fails gracefully for non-existent file
+#[tokio::test]
+async fn test_auto_load_nonexistent_file() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let save_path = temp_dir.path().join("nonexistent.json");
+
+    let state = Arc::new(AppState::new());
+
+    let result = gptdash::broadcast::load_state_from_file(&state, &save_path).await;
+
+    assert!(result.is_err(), "Should fail for non-existent file");
+    assert!(
+        result.unwrap_err().contains("Failed to read"),
+        "Error should mention read failure"
+    );
+
+    println!("✅ Auto-load nonexistent file test passed!");
+}
+
+/// Test that load fails gracefully for invalid JSON
+#[tokio::test]
+async fn test_auto_load_invalid_json() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let save_path = temp_dir.path().join("invalid.json");
+
+    // Write invalid JSON to file
+    tokio::fs::write(&save_path, "{ invalid json }")
+        .await
+        .expect("Should write file");
+
+    let state = Arc::new(AppState::new());
+
+    let result = gptdash::broadcast::load_state_from_file(&state, &save_path).await;
+
+    assert!(result.is_err(), "Should fail for invalid JSON");
+    assert!(
+        result.unwrap_err().contains("Failed to parse"),
+        "Error should mention parse failure"
+    );
+
+    println!("✅ Auto-load invalid JSON test passed!");
+}

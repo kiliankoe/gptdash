@@ -1,6 +1,8 @@
 use crate::protocol::ServerMessage;
+use crate::state::export::GameStateExport;
 use crate::state::AppState;
 use crate::types::GamePhase;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -89,6 +91,65 @@ pub fn spawn_connection_stats_broadcaster(state: Arc<AppState>) {
 
             // Ignore send errors (no receivers connected is fine)
             let _ = state.host_broadcast.send(msg);
+        }
+    });
+}
+
+/// Save current state to a file (extracted for testability)
+pub async fn save_state_to_file(state: &AppState, path: &Path) -> Result<(), String> {
+    let export = state.export_state().await;
+    let json =
+        serde_json::to_string_pretty(&export).map_err(|e| format!("Failed to serialize: {}", e))?;
+    tokio::fs::write(path, &json)
+        .await
+        .map_err(|e| format!("Failed to write: {}", e))?;
+    Ok(())
+}
+
+/// Load state from a file (extracted for testability)
+pub async fn load_state_from_file(state: &AppState, path: &Path) -> Result<(), String> {
+    let json = tokio::fs::read_to_string(path)
+        .await
+        .map_err(|e| format!("Failed to read: {}", e))?;
+    let export: GameStateExport =
+        serde_json::from_str(&json).map_err(|e| format!("Failed to parse: {}", e))?;
+    state.import_state(export).await
+}
+
+/// Spawn background task that periodically saves state to disk
+pub fn spawn_auto_save_task(state: Arc<AppState>) {
+    // Check if disabled (for tests)
+    let disable_auto_save = std::env::var("DISABLE_AUTO_SAVE")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false);
+
+    if disable_auto_save {
+        tracing::info!("Auto-save disabled via DISABLE_AUTO_SAVE env var");
+        return;
+    }
+
+    let interval_secs: u64 = std::env::var("AUTO_SAVE_INTERVAL_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5); // Default: every 5 seconds
+
+    let save_path =
+        std::env::var("AUTO_SAVE_PATH").unwrap_or_else(|_| "./state_backup.json".to_string());
+    let save_path = PathBuf::from(save_path);
+
+    tracing::info!(
+        "Auto-save enabled: saving to {:?} every {}s",
+        save_path,
+        interval_secs
+    );
+
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(interval_secs)).await;
+
+            if let Err(e) = save_state_to_file(&state, &save_path).await {
+                tracing::error!("Auto-save failed: {}", e);
+            }
         }
     });
 }
