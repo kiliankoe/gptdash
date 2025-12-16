@@ -285,9 +285,13 @@ test.describe("Host", () => {
     // Wait for initial connection stats broadcast (runs every 1 second)
     await host.waitForTimeout(1500);
 
-    // Initially should show 0 players and audience connected
-    await expect(host.locator("#connectedPlayers")).toHaveText("0");
-    await expect(host.locator("#connectedAudience")).toHaveText("0");
+    // Record initial counts (may not be 0 if previous tests left connections)
+    const initialPlayers = parseInt(
+      (await host.locator("#connectedPlayers").textContent()) || "0",
+    );
+    const initialAudience = parseInt(
+      (await host.locator("#connectedAudience").textContent()) || "0",
+    );
 
     // Create player tokens first
     await host.click('.sidebar-item:has-text("Spieler")');
@@ -308,10 +312,11 @@ test.describe("Host", () => {
     await players[1].click("#joinButton");
     await waitForConnection(players[1]);
 
-    // Verify player count updated (wait for broadcast, sent every 1 second)
-    await expect(host.locator("#connectedPlayers")).toHaveText("2", {
-      timeout: 3000,
-    });
+    // Verify player count increased by 2
+    await expect(host.locator("#connectedPlayers")).toHaveText(
+      String(initialPlayers + 2),
+      { timeout: 3000 },
+    );
 
     // Audience connects
     await audience[0].goto("/");
@@ -319,17 +324,19 @@ test.describe("Host", () => {
     await audience[1].goto("/");
     await waitForConnection(audience[1]);
 
-    // Verify audience count updated
-    await expect(host.locator("#connectedAudience")).toHaveText("2", {
-      timeout: 3000,
-    });
+    // Verify audience count increased by 2
+    await expect(host.locator("#connectedAudience")).toHaveText(
+      String(initialAudience + 2),
+      { timeout: 3000 },
+    );
 
     // Close one player connection by closing the page
     await players[0].close();
 
-    // Verify count decreased
-    await expect(host.locator("#connectedPlayers")).toHaveText("1", {
-      timeout: 3000,
-    });
+    // Verify player count decreased by 1
+    await expect(host.locator("#connectedPlayers")).toHaveText(
+      String(initialPlayers + 1),
+      { timeout: 3000 },
+    );
   });
 });
