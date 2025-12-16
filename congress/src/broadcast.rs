@@ -1,3 +1,4 @@
+use crate::abuse::AbuseConfig;
 use crate::protocol::ServerMessage;
 use crate::state::export::GameStateExport;
 use crate::state::AppState;
@@ -149,6 +150,22 @@ pub fn spawn_auto_save_task(state: Arc<AppState>) {
 
             if let Err(e) = save_state_to_file(&state, &save_path).await {
                 tracing::error!("Auto-save failed: {}", e);
+            }
+        }
+    });
+}
+
+/// Spawn background task that periodically cleans up stale rate limiter entries
+/// This prevents memory leaks from accumulated token entries
+pub fn spawn_rate_limiter_cleanup(abuse_config: Arc<AbuseConfig>) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+
+        loop {
+            interval.tick().await;
+
+            if let Some(ref limiter) = abuse_config.rate_limiter {
+                limiter.cleanup().await;
             }
         }
     });

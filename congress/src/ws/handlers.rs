@@ -148,6 +148,11 @@ pub async fn handle_message(
             host::handle_clear_prompt_pool(state).await
         }
 
+        ClientMessage::HostClearAudienceMembers => {
+            check_host!(role, "clear audience members");
+            host::handle_clear_audience_members(state).await
+        }
+
         ClientMessage::HostAddPrompt { text, image_url } => {
             check_host!(role, "add prompts");
             host::handle_add_prompt(state, text, image_url).await

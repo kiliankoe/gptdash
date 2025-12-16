@@ -246,6 +246,12 @@ pub async fn handle_clear_prompt_pool(state: &Arc<AppState>) -> Option<ServerMes
     None
 }
 
+pub async fn handle_clear_audience_members(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host clearing audience members");
+    state.clear_audience_members().await;
+    None
+}
+
 pub async fn handle_add_prompt(
     state: &Arc<AppState>,
     text: Option<String>,

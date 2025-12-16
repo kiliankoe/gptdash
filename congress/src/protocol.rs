@@ -61,6 +61,8 @@ pub enum ClientMessage {
     HostResetGame,
     /// Clear all prompts from the pool (for fresh start)
     HostClearPromptPool,
+    /// Clear all audience members (for end-of-event cleanup to free memory)
+    HostClearAudienceMembers,
     HostAddPrompt {
         text: Option<String>,
         image_url: Option<String>,

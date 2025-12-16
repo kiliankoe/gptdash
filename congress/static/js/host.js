@@ -5,83 +5,83 @@
 
 // Import from common
 import {
-  WSConnection,
+  copyToClipboard,
   CountdownTimer,
+  escapeHtml,
   restorePanelFromUrl,
   showPanel,
-  copyToClipboard,
-  escapeHtml,
+  WSConnection,
 } from "./common.js";
 
 // Import from host modules
-import { gameState, resetRoundUiState } from "./host/state.js";
 import {
-  updateStatus,
-  updateUI,
-  updateCurrentRoundInfo,
-  showAlert,
-  log,
-  clearLog,
-  generateJoinQRCodes,
-  copyPlayerUrl,
-  updateScores,
-} from "./host/ui.js";
+  handleAiGenerationStatus,
+  regenerateAi,
+  removeSubmission,
+  selectAiSubmission,
+  writeManualAiSubmission,
+} from "./host/ai-manager.js";
+import {
+  filterOverviewPrompts,
+  maybeAutoQueueOverviewPrompt,
+  runOverviewPrimaryAction,
+  runOverviewSecondaryAction,
+  setCallbacks as setOverviewCallbacks,
+  setWsConn as setOverviewWsConn,
+  updateOverviewFlow,
+  updateOverviewPromptPool,
+  updateOverviewRevealStatus,
+} from "./host/overview.js";
 import {
   getPlayerCount,
-  updatePlayersList,
   removePlayer,
+  updatePlayersList,
 } from "./host/players.js";
 import {
   addPrompt,
   addPromptFromOverview,
-  setupImagePreview,
-  selectPrompt,
-  selectPromptById,
-  togglePromptSection,
+  deletePrompt,
   filterPrompts,
   pickRandomPrompt,
-  shadowbanPromptSubmitters,
+  queuePrompt,
+  selectPrompt,
+  selectPromptById,
+  setupImagePreview,
   shadowbanAudience,
+  shadowbanPromptSubmitters,
+  startPromptSelection,
+  togglePromptSection,
+  unqueuePrompt,
   updatePromptsList,
   updateQueuedPromptsList,
-  queuePrompt,
-  unqueuePrompt,
-  deletePrompt,
-  startPromptSelection,
 } from "./host/prompts.js";
 import {
-  regenerateAi,
-  writeManualAiSubmission,
-  selectAiSubmission,
-  removeSubmission,
-  handleAiGenerationStatus,
-} from "./host/ai-manager.js";
+  copyStateToClipboard,
+  downloadStateExport,
+  executeStateImport,
+  handleStateFileSelect,
+  refreshStateView,
+  validateStateImport,
+} from "./host/state-export.js";
+import { gameState, resetRoundUiState } from "./host/state.js";
 import {
-  updateSubmissionsList,
-  markDuplicate,
   editSubmission,
+  markDuplicate,
   setRevealOrder,
   setWsConn as setSubmissionsWsConn,
+  updateSubmissionsList,
 } from "./host/submissions.js";
 import {
-  runOverviewPrimaryAction,
-  runOverviewSecondaryAction,
-  updateOverviewFlow,
-  updateOverviewRevealStatus,
-  filterOverviewPrompts,
-  updateOverviewPromptPool,
-  maybeAutoQueueOverviewPrompt,
-  setWsConn as setOverviewWsConn,
-  setCallbacks as setOverviewCallbacks,
-} from "./host/overview.js";
-import {
-  refreshStateView,
-  downloadStateExport,
-  copyStateToClipboard,
-  handleStateFileSelect,
-  validateStateImport,
-  executeStateImport,
-} from "./host/state-export.js";
+  clearLog,
+  copyPlayerUrl,
+  generateJoinQRCodes,
+  log,
+  showAlert,
+  updateCurrentRoundInfo,
+  updateScores,
+  updateStatus,
+  updateUI,
+} from "./host/ui.js";
 
 // Module-level variables
 let wsConn = null;
@@ -429,7 +429,7 @@ function revealPrev() {
 function resetGame() {
   if (
     confirm(
-      "Willst du das Spiel wirklich zurcksetzen? Das kann nicht rckgngig gemacht werden.",
+      "Willst du das Spiel wirklich zurücksetzen? Das kann nicht rückgängig gemacht werden.",
     )
   ) {
     wsConn.send({ t: "host_reset_game" });
@@ -439,10 +439,20 @@ function resetGame() {
 function clearPromptPool() {
   if (
     confirm(
-      "Willst du alle Prompts aus dem Pool lschen? Das kann nicht rckgngig gemacht werden.",
+      "Willst du alle Prompts aus dem Pool löschen? Das kann nicht rückgängig gemacht werden.",
     )
   ) {
     wsConn.send({ t: "host_clear_prompt_pool" });
+  }
+}
+
+function clearAudienceMembers() {
+  if (
+    confirm(
+      "Willst du alle Publikums-Daten löschen (Namen, IDs)? Das gibt Speicher frei, setzt aber das Leaderboard zurück.",
+    )
+  ) {
+    wsConn.send({ t: "host_clear_audience_members" });
   }
 }
 
@@ -451,7 +461,7 @@ function togglePanicMode() {
   if (
     newState &&
     !confirm(
-      "PANIK-MODUS AKTIVIEREN?\n\nDas Publikum kann dann nicht mehr abstimmen. Du musst die Gewinner manuell auswhlen.",
+      "PANIK-MODUS AKTIVIEREN?\n\nDas Publikum kann dann nicht mehr abstimmen. Du musst die Gewinner manuell auswählen.",
     )
   ) {
     return;
@@ -595,6 +605,7 @@ if (typeof window !== "undefined") {
     // Game control
     resetGame,
     clearPromptPool,
+    clearAudienceMembers,
     togglePanicMode,
     setManualWinner,
     extendTimer,

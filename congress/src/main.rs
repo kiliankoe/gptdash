@@ -99,6 +99,9 @@ async fn main() {
     // Spawn background task for broadcasting connection stats to Host
     broadcast::spawn_connection_stats_broadcaster(state.clone());
 
+    // Spawn background task for cleaning up stale rate limiter entries (prevents memory leaks)
+    broadcast::spawn_rate_limiter_cleanup(abuse_config.clone());
+
     // Note: Voting deadline is a soft/visual timer; the host advances phases manually.
 
     // Protected host routes (with HTTP Basic Auth)

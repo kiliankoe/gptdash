@@ -327,6 +327,13 @@ impl AppState {
         self.audience_members.read().await.clone()
     }
 
+    /// Clear all audience members (for end-of-event cleanup to free memory)
+    pub async fn clear_audience_members(&self) {
+        let count = self.audience_members.read().await.len();
+        self.audience_members.write().await.clear();
+        tracing::info!("Cleared {} audience members", count);
+    }
+
     /// Get prompt pool for host (filtered by shadowban status)
     /// Returns prompts sorted by submission_count (popular first), then by created_at (newest first)
     pub async fn get_prompts_for_host(&self) -> Vec<crate::protocol::HostPromptInfo> {

@@ -383,7 +383,9 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 14: Host transitions to PODIUM and audience winner screen
     // ============================================
-    console.log("Step 14: Transitioning to podium and checking winner screens...");
+    console.log(
+      "Step 14: Transitioning to podium and checking winner screens...",
+    );
 
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await host.click('button[data-phase="PODIUM"]');
