@@ -3,6 +3,14 @@
  * Full-screen stage display for projector/TV
  */
 
+import {
+  WSConnection,
+  CountdownTimer,
+  TTSManager,
+  QRCodeManager,
+  escapeHtml,
+} from "./common.js";
+
 // Game state
 const gameState = {
   phase: "LOBBY",

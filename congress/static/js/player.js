@@ -2,6 +2,16 @@
  * Player-specific JavaScript
  */
 
+import {
+  WSConnection,
+  CountdownTimer,
+  showScreen,
+  showError,
+  hideError,
+  updateConnectionStatus,
+  escapeHtml,
+} from "./common.js";
+
 let wsConn = null;
 let playerToken = null;
 let playerId = null;

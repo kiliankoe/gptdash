@@ -2,6 +2,18 @@
  * Audience-specific JavaScript
  */
 
+import {
+  WSConnection,
+  CountdownTimer,
+  ChallengeSolver,
+  generateId,
+  escapeHtml,
+  showScreen,
+  showError,
+  hideError,
+  updateConnectionStatus,
+} from "./common.js";
+
 let wsConn = null;
 let voterToken = null;
 let displayName = null; // Auto-generated friendly name from server

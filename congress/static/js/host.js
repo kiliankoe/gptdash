@@ -1,55 +1,110 @@
 /**
- * Host-specific JavaScript
+ * Host panel main entry point
+ * Coordinates all modules and handles WebSocket communication
  */
 
+// Import from common
+import {
+  WSConnection,
+  CountdownTimer,
+  restorePanelFromUrl,
+  showPanel,
+  copyToClipboard,
+  escapeHtml,
+} from "./common.js";
+
+// Import from host modules
+import { gameState, resetRoundUiState } from "./host/state.js";
+import {
+  updateStatus,
+  updateUI,
+  updateCurrentRoundInfo,
+  showAlert,
+  log,
+  clearLog,
+  generateJoinQRCodes,
+  copyAudienceUrl,
+  updateScores,
+} from "./host/ui.js";
+import {
+  getPlayerCount,
+  updatePlayersList,
+  removePlayer,
+} from "./host/players.js";
+import {
+  addPrompt,
+  addPromptFromOverview,
+  setupImagePreview,
+  selectPrompt,
+  selectPromptById,
+  togglePromptSection,
+  filterPrompts,
+  pickRandomPrompt,
+  shadowbanPromptSubmitters,
+  shadowbanAudience,
+  updatePromptsList,
+  updateQueuedPromptsList,
+  queuePrompt,
+  unqueuePrompt,
+  deletePrompt,
+  startPromptSelection,
+} from "./host/prompts.js";
+import {
+  regenerateAi,
+  writeManualAiSubmission,
+  selectAiSubmission,
+  removeSubmission,
+  handleAiGenerationStatus,
+} from "./host/ai-manager.js";
+import {
+  updateSubmissionsList,
+  markDuplicate,
+  setRevealOrder,
+  setWsConn as setSubmissionsWsConn,
+} from "./host/submissions.js";
+import {
+  runOverviewPrimaryAction,
+  runOverviewSecondaryAction,
+  updateOverviewFlow,
+  updateOverviewRevealStatus,
+  filterOverviewPrompts,
+  updateOverviewPromptPool,
+  maybeAutoQueueOverviewPrompt,
+  setWsConn as setOverviewWsConn,
+  setCallbacks as setOverviewCallbacks,
+} from "./host/overview.js";
+import {
+  refreshStateView,
+  downloadStateExport,
+  copyStateToClipboard,
+  handleStateFileSelect,
+  validateStateImport,
+  executeStateImport,
+} from "./host/state-export.js";
+
+// Module-level variables
 let wsConn = null;
 let hostTimer = null;
-const overviewActions = { primary: null, secondary: null };
-let pendingOverviewPromptAutoQueue = null;
-
-const gameState = {
-  phase: "LOBBY",
-  roundNo: 0,
-  players: [], // Legacy: just tokens
-  playerStatus: [], // New: full player status with names
-  submissions: [],
-  revealOrder: [], // Current reveal order (submission IDs)
-  prompts: [], // Prompt candidates from audience (filtered by shadowban)
-  promptStats: {
-    total: 0,
-    host_count: 0,
-    audience_count: 0,
-    top_submitters: [],
-  }, // Stats about prompt pool
-  queuedPrompts: [], // Prompts queued for next round (max 3)
-  scores: { players: [], audience_top: [] },
-  validTransitions: [], // Populated by server
-  panicMode: false,
-  deadline: null,
-  selectedAiSubmissionId: null, // Currently selected AI submission
-  aiGenerationStatus: "idle", // idle, generating, completed, failed
-  currentRound: null, // Current round info
-  currentPrompt: null, // Currently selected prompt for the round
-};
-
-// Prompt section collapse state (persisted in localStorage)
-const promptSectionState = {
-  hostPrompts:
-    localStorage.getItem("promptSection_hostPrompts") !== "collapsed",
-  audiencePrompts:
-    localStorage.getItem("promptSection_audiencePrompts") !== "collapsed",
-};
-
-// Drag-and-drop state
-const dragState = {
-  draggedId: null,
-  draggedElement: null,
-};
 
 // Initialize
 function init() {
   wsConn = new WSConnection("host", handleMessage, updateStatus);
   wsConn.connect();
+
+  // Set wsConn on modules that need it
+  setSubmissionsWsConn(wsConn);
+  setOverviewWsConn(wsConn);
+
+  // Set callbacks for overview module
+  setOverviewCallbacks({
+    hostCreatePlayersFromOverview,
+    hostCreatePlayers,
+    startPromptSelection: () => startPromptSelection(wsConn),
+    transitionPhase,
+    closeWriting,
+    extendTimer,
+    revealNext,
+  });
 
   // Initialize timer
   hostTimer = new CountdownTimer("hostTimer");
@@ -73,7 +128,7 @@ function handleMessage(message) {
         gameState.validTransitions = message.valid_transitions || [];
         gameState.panicMode = message.game.panic_mode || false;
         gameState.deadline = message.game.phase_deadline || null;
-        updateUI();
+        updateUI(uiCallbacks);
         updatePanicModeUI();
         // Start timer if deadline exists
         if (gameState.deadline && message.server_now) {
@@ -88,7 +143,7 @@ function handleMessage(message) {
         typeof message.round_no === "number" &&
         message.round_no !== gameState.roundNo
       ) {
-        resetRoundUiState();
+        resetRoundUiState(resetCallbacks);
       }
       gameState.phase = message.phase;
       gameState.roundNo = message.round_no;
@@ -97,7 +152,7 @@ function handleMessage(message) {
       if (message.prompt) {
         gameState.currentPrompt = message.prompt;
       }
-      updateUI();
+      updateUI(uiCallbacks);
       // Update timer
       if (gameState.deadline && message.server_now) {
         hostTimer.start(gameState.deadline, message.server_now);
@@ -121,7 +176,7 @@ function handleMessage(message) {
       if (hostTimer && message.deadline && message.server_now) {
         hostTimer.updateDeadline(message.deadline, message.server_now);
       }
-      showAlert("Timer verlängert!", "success");
+      showAlert("Timer verlngert!", "success");
       break;
 
     case "players_created":
@@ -169,11 +224,11 @@ function handleMessage(message) {
         gameState.scores = { players: [], audience_top: [] };
         gameState.currentRound = null;
         gameState.currentPrompt = null;
-        updateUI();
+        updateUI(uiCallbacks);
         updatePlayersList();
         updateSubmissionsList();
         updateScores();
-        showAlert("Spiel wurde zurückgesetzt", "success");
+        showAlert("Spiel wurde zurckgesetzt", "success");
       }
       break;
 
@@ -216,9 +271,9 @@ function handleMessage(message) {
       gameState.currentRound = message.round;
       gameState.roundNo = message.round.number;
       gameState.currentPrompt = message.round.selected_prompt || null;
-      resetRoundUiState();
+      resetRoundUiState(resetCallbacks);
       updateCurrentRoundInfo();
-      updateUI();
+      updateUI(uiCallbacks);
       updateOverviewRevealStatus();
       log(`Runde ${message.round.number} gestartet`, "info");
       break;
@@ -226,7 +281,7 @@ function handleMessage(message) {
     case "prompt_selected":
       gameState.currentPrompt = message.prompt;
       updateCurrentRoundInfo();
-      showAlert("Prompt ausgewählt - Runde wird vorbereitet", "success");
+      showAlert("Prompt ausgewhlt - Runde wird vorbereitet", "success");
       break;
 
     case "player_removed":
@@ -244,113 +299,20 @@ function handleMessage(message) {
   }
 }
 
-function resetRoundUiState() {
-  gameState.submissions = [];
-  gameState.revealOrder = [];
-  gameState.selectedAiSubmissionId = null;
-  gameState.aiGenerationStatus = "idle";
-  updateSubmissionsList();
-  updatePanicModeUI();
-  updateOverviewFlow();
-  updateOverviewRevealStatus();
-}
+// Callbacks for resetRoundUiState
+const resetCallbacks = {
+  updateSubmissionsList,
+  updatePanicModeUI,
+  updateOverviewFlow,
+  updateOverviewRevealStatus,
+};
 
-function updateStatus(connected) {
-  const dot = document.getElementById("statusDot");
-  const text = document.getElementById("statusText");
-
-  if (connected) {
-    dot.classList.add("connected");
-    text.textContent = "Verbunden";
-    log("Mit Spiel-Server verbunden", "info");
-  } else {
-    dot.classList.remove("connected");
-    text.textContent = "Nicht verbunden";
-    log("Verbindung getrennt", "info");
-  }
-}
-
-function updateUI() {
-  // Update header displays
-  document.getElementById("phaseDisplay").textContent =
-    `Phase: ${gameState.phase}`;
-  document.getElementById("roundDisplay").textContent =
-    `Round: ${gameState.roundNo}`;
-
-  // Update overview
-  document.getElementById("overviewPhase").textContent = gameState.phase;
-  document.getElementById("overviewRound").textContent = gameState.roundNo;
-  document.getElementById("overviewPlayers").textContent = getPlayerCount();
-  document.getElementById("overviewSubmissions").textContent =
-    gameState.submissions.length;
-
-  // Update phase transition buttons
-  updatePhaseButtons();
-
-  // Update current round info
-  updateCurrentRoundInfo();
-
-  // Update overview helpers
-  updateOverviewFlow();
-  updateOverviewRevealStatus();
-}
-
-function updateCurrentRoundInfo() {
-  const containers = [
-    document.getElementById("overviewCurrentRoundInfo"),
-  ].filter(Boolean);
-  if (containers.length === 0) return;
-
-  if (!gameState.currentPrompt) {
-    containers.forEach((container) => {
-      container.innerHTML =
-        '<p style="opacity: 0.6;">Keine aktive Runde. Füge einen Prompt hinzu und starte eine Runde.</p>';
-    });
-    return;
-  }
-
-  const prompt = gameState.currentPrompt;
-  let html = `<div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">`;
-  html += `<div style="font-size: 0.9em; opacity: 0.7; margin-bottom: 5px;">Runde ${gameState.roundNo} - Aktueller Prompt:</div>`;
-
-  if (prompt.image_url) {
-    html += `<img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" style="max-width: 100%; max-height: 150px; border-radius: 4px; margin-bottom: 8px;">`;
-  }
-
-  if (prompt.text) {
-    html += `<div style="font-size: 1.1em; font-weight: 500;">${escapeHtml(prompt.text)}</div>`;
-  } else if (prompt.image_url) {
-    html += `<div style="font-style: italic; opacity: 0.7;">(Nur Bild)</div>`;
-  }
-
-  html += `</div>`;
-  containers.forEach((container) => {
-    container.innerHTML = html;
-  });
-}
-
-/**
- * Update phase transition buttons based on valid transitions from server
- */
-function updatePhaseButtons() {
-  const currentPhase = gameState.phase;
-  const validTargets = gameState.validTransitions || [];
-  const container = document.getElementById("phaseButtons");
-
-  if (!container) return;
-
-  const buttons = container.querySelectorAll("button[data-phase]");
-  buttons.forEach((btn) => {
-    const targetPhase = btn.dataset.phase;
-    const isValid = validTargets.includes(targetPhase);
-    const isCurrent = targetPhase === currentPhase;
-
-    btn.disabled = !isValid || isCurrent;
-
-    // Add visual indicator for current phase
-    btn.classList.toggle("current", isCurrent);
-  });
-}
+// Callbacks for updateUI
+const uiCallbacks = {
+  getPlayerCount,
+  updateOverviewFlow,
+  updateOverviewRevealStatus,
+};
 
 // Host Commands
 function transitionPhase(phase) {
@@ -382,137 +344,11 @@ function hostStartRound() {
   wsConn.send({ t: "host_start_round" });
 }
 
-function addPrompt() {
-  const text = document.getElementById("promptText").value.trim();
-  const imageUrl =
-    document.getElementById("promptImageUrl")?.value.trim() || null;
-
-  // Require at least text or image
-  if (!text && !imageUrl) {
-    alert("Bitte gib einen Prompt-Text oder eine Bild-URL ein");
-    return;
-  }
-
-  wsConn.send({
-    t: "host_add_prompt",
-    text: text || null,
-    image_url: imageUrl || null,
-  });
-
-  document.getElementById("promptText").value = "";
-  if (document.getElementById("promptImageUrl")) {
-    document.getElementById("promptImageUrl").value = "";
-  }
-  // Clear image preview
-  const preview = document.getElementById("promptImagePreview");
-  if (preview) {
-    preview.innerHTML = "";
-  }
-}
-
-function addPromptFromOverview(queueAfterAdd) {
-  const text =
-    document.getElementById("overviewPromptText")?.value.trim() ?? "";
-  const imageUrl =
-    document.getElementById("overviewPromptImageUrl")?.value.trim() || null;
-
-  // Require at least text or image
-  if (!text && !imageUrl) {
-    alert("Bitte gib einen Prompt-Text oder eine Bild-URL ein");
-    return;
-  }
-
-  if (queueAfterAdd) {
-    pendingOverviewPromptAutoQueue = {
-      text: text || null,
-      image_url: imageUrl || null,
-    };
-  }
-
-  wsConn.send({
-    t: "host_add_prompt",
-    text: text || null,
-    image_url: imageUrl || null,
-  });
-
-  const textEl = document.getElementById("overviewPromptText");
-  if (textEl) textEl.value = "";
-  const imageEl = document.getElementById("overviewPromptImageUrl");
-  if (imageEl) imageEl.value = "";
-  const preview = document.getElementById("overviewPromptImagePreview");
-  if (preview) preview.innerHTML = "";
-}
-
-// Preview image when URL is entered
-function setupImagePreview() {
-  setupImagePreviewFor("promptImageUrl", "promptImagePreview");
-  setupImagePreviewFor("overviewPromptImageUrl", "overviewPromptImagePreview");
-}
-
-function setupImagePreviewFor(inputId, previewId) {
-  const imageUrlInput = document.getElementById(inputId);
-  if (!imageUrlInput) return;
-
-  imageUrlInput.addEventListener(
-    "input",
-    debounce((e) => {
-      const url = e.target.value.trim();
-      const preview = document.getElementById(previewId);
-      if (!preview) return;
-
-      if (!url) {
-        preview.innerHTML = "";
-        return;
-      }
-
-      // Show loading state
-      preview.innerHTML = '<p style="opacity: 0.6;">Lade Vorschau...</p>';
-
-      // Create image element to test URL
-      const img = new Image();
-      img.onload = () => {
-        preview.innerHTML = `<img src="${escapeHtml(url)}" style="max-width: 300px; max-height: 200px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);" alt="Prompt-Bild Vorschau">`;
-      };
-      img.onerror = () => {
-        preview.innerHTML =
-          '<p style="color: #ff6b6b;">Bild konnte nicht geladen werden</p>';
-      };
-      img.src = url;
-    }, 500),
-  );
-}
-
-function selectPrompt() {
-  const promptId = prompt("Gib die Prompt-ID ein:");
-  if (promptId) {
-    wsConn.send({
-      t: "host_select_prompt",
-      prompt_id: promptId,
-    });
-  }
-}
-
-function setRevealOrder() {
-  const input = document.getElementById("revealOrderInput").value.trim();
-  if (!input) {
-    alert("Bitte gib Antwort-IDs ein");
-    return;
-  }
-
-  const order = input.split(",").map((s) => s.trim());
-
-  wsConn.send({
-    t: "host_set_reveal_order",
-    order: order,
-  });
-}
-
 function revealNext() {
   wsConn.send({ t: "host_reveal_next" });
-  log("Zur nächsten Antwort gewechselt", "info");
+  log("Zur nchsten Antwort gewechselt", "info");
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: Called from HTML onclick
 function revealPrev() {
   wsConn.send({ t: "host_reveal_prev" });
   log("Zur vorherigen Antwort gewechselt", "info");
@@ -521,18 +357,17 @@ function revealPrev() {
 function resetGame() {
   if (
     confirm(
-      "Willst du das Spiel wirklich zurücksetzen? Das kann nicht rückgängig gemacht werden.",
+      "Willst du das Spiel wirklich zurcksetzen? Das kann nicht rckgngig gemacht werden.",
     )
   ) {
     wsConn.send({ t: "host_reset_game" });
   }
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: Called from onclick in host.html
 function clearPromptPool() {
   if (
     confirm(
-      "Willst du alle Prompts aus dem Pool löschen? Das kann nicht rückgängig gemacht werden.",
+      "Willst du alle Prompts aus dem Pool lschen? Das kann nicht rckgngig gemacht werden.",
     )
   ) {
     wsConn.send({ t: "host_clear_prompt_pool" });
@@ -544,7 +379,7 @@ function togglePanicMode() {
   if (
     newState &&
     !confirm(
-      "PANIK-MODUS AKTIVIEREN?\n\nDas Publikum kann dann nicht mehr abstimmen. Du musst die Gewinner manuell auswählen.",
+      "PANIK-MODUS AKTIVIEREN?\n\nDas Publikum kann dann nicht mehr abstimmen. Du musst die Gewinner manuell auswhlen.",
     )
   ) {
     return;
@@ -564,23 +399,9 @@ function setManualWinner(winnerType, submissionId) {
   );
 }
 
-function markDuplicate(submissionId) {
-  if (
-    confirm(
-      "Diese Antwort als Duplikat markieren?\n\nDer Spieler wird benachrichtigt und muss eine neue Antwort einreichen.",
-    )
-  ) {
-    wsConn.send({
-      t: "host_mark_duplicate",
-      submission_id: submissionId,
-    });
-    showAlert("Antwort als Duplikat markiert", "success");
-  }
-}
-
 function extendTimer(seconds) {
   if (!gameState.deadline) {
-    showAlert("Kein aktiver Timer zum Verlängern", "error");
+    showAlert("Kein aktiver Timer zum Verlngern", "error");
     return;
   }
   wsConn.send({
@@ -589,168 +410,8 @@ function extendTimer(seconds) {
   });
 }
 
-// AI Management Functions
-function regenerateAi() {
-  wsConn.send({ t: "host_regenerate_ai" });
-  showAlert("KI-Generierung gestartet...", "info");
-}
-
-function writeManualAiSubmission() {
-  const text = document.getElementById("manualAiText").value.trim();
-  if (!text) {
-    showAlert("Bitte gib einen Text für die KI-Antwort ein", "error");
-    return;
-  }
-  wsConn.send({
-    t: "host_write_ai_submission",
-    text: text,
-  });
-  document.getElementById("manualAiText").value = "";
-  showAlert("Manuelle KI-Antwort gespeichert", "success");
-}
-
-function selectAiSubmission(submissionId) {
-  wsConn.send({
-    t: "host_set_ai_submission",
-    submission_id: submissionId,
-  });
-  gameState.selectedAiSubmissionId = submissionId;
-  updateAiSubmissionsList();
-  showAlert("KI-Antwort ausgewählt", "success");
-}
-
-// biome-ignore lint/correctness/noUnusedVariables: Called from onclick in host.html / dynamic HTML.
-function removeSubmission(submissionId) {
-  const sub = gameState.submissions.find((s) => s.id === submissionId);
-  const label =
-    sub?.author_kind === "ai"
-      ? "Diese KI-Antwort entfernen?"
-      : "Diese Antwort entfernen?";
-
-  if (!confirm(`${label}\n\nDas kann nicht rückgängig gemacht werden.`)) {
-    return;
-  }
-
-  wsConn.send({
-    t: "host_remove_submission",
-    submission_id: submissionId,
-  });
-
-  if (gameState.selectedAiSubmissionId === submissionId) {
-    gameState.selectedAiSubmissionId = null;
-  }
-
-  showAlert("Antwort entfernt", "success");
-}
-
-function handleAiGenerationStatus(message) {
-  gameState.aiGenerationStatus = message.status;
-  updateAiGenerationStatusUI(message);
-
-  switch (message.status) {
-    case "started":
-      showAlert("KI-Generierung gestartet...", "info");
-      break;
-    case "completed":
-      showAlert("KI-Generierung abgeschlossen!", "success");
-      break;
-    case "all_failed":
-      showAlert(
-        `KI-Generierung fehlgeschlagen: ${message.message || "Unbekannter Fehler"}`,
-        "error",
-      );
-      break;
-  }
-}
-
-function updateAiGenerationStatusUI(message) {
-  const statusEl = document.getElementById("aiGenerationStatus");
-  if (!statusEl) return;
-
-  let statusText = "";
-  let statusClass = "";
-
-  switch (message?.status || gameState.aiGenerationStatus) {
-    case "started":
-      statusText = "KI-Status: Generiere Antworten...";
-      statusClass = "info";
-      break;
-    case "completed":
-      statusText = "KI-Status: Generierung abgeschlossen";
-      statusClass = "success";
-      break;
-    case "all_failed":
-      statusText = `KI-Status: Fehlgeschlagen - ${message?.message || "Alle Provider haben keine Antwort geliefert"}`;
-      statusClass = "error";
-      break;
-    default:
-      statusText = "KI-Status: Warte auf Prompt-Auswahl";
-      statusClass = "";
-  }
-
-  statusEl.innerHTML = "";
-  const p = document.createElement("p");
-  p.className = statusClass;
-  p.style.margin = "0";
-  p.textContent = statusText;
-  statusEl.appendChild(p);
-}
-
-function updateAiSubmissionsList() {
-  const container = document.getElementById("aiSubmissionsList");
-  if (!container) return;
-
-  const aiSubmissions = gameState.submissions.filter(
-    (s) => s.author_kind === "ai",
-  );
-
-  if (
-    gameState.selectedAiSubmissionId &&
-    !aiSubmissions.some((s) => s.id === gameState.selectedAiSubmissionId)
-  ) {
-    gameState.selectedAiSubmissionId = null;
-  }
-
-  if (aiSubmissions.length === 0) {
-    container.innerHTML =
-      '<p style="opacity: 0.6;">Keine KI-Antworten vorhanden</p>';
-    return;
-  }
-
-  let html =
-    '<p style="margin-bottom: 10px; opacity: 0.8;">Wähle die KI-Antwort für diese Runde:</p>';
-  html += '<div class="ai-submissions-grid">';
-
-  aiSubmissions.forEach((sub) => {
-    const isSelected = gameState.selectedAiSubmissionId === sub.id;
-    const provider = sub.author_ref || "unbekannt";
-    // Parse provider info (format: "provider:model")
-    const providerParts = provider.split(":");
-    const providerName = providerParts[0] || "?";
-    const modelName = providerParts[1] || "";
-
-    html += `
-      <div class="ai-submission-card ${isSelected ? "selected" : ""}" onclick="selectAiSubmission('${sub.id}')">
-        <div class="ai-card-header">
-          <span class="provider-badge">${escapeHtml(providerName)}</span>
-          ${modelName ? `<span class="model-name">${escapeHtml(modelName)}</span>` : ""}
-          ${isSelected ? '<span class="selected-badge">AUSGEWÄHLT</span>' : ""}
-        </div>
-        <div class="ai-card-text">${escapeHtml(sub.display_text)}</div>
-        <div class="ai-card-actions">
-          <button class="${isSelected ? "" : "secondary"}" onclick="event.stopPropagation(); selectAiSubmission('${sub.id}')">
-            ${isSelected ? "Ausgewählt" : "Auswählen"}
-          </button>
-          <button class="remove-btn" onclick="event.stopPropagation(); removeSubmission('${sub.id}')">
-            Entfernen
-          </button>
-        </div>
-      </div>
-    `;
-  });
-
-  html += "</div>";
-  container.innerHTML = html;
+function closeWriting() {
+  transitionPhase("REVEAL");
 }
 
 function updatePanicModeUI() {
@@ -779,7 +440,7 @@ function updatePanicModeUI() {
   if (manualWinnerButtons && gameState.panicMode) {
     if (gameState.submissions.length === 0) {
       manualWinnerButtons.innerHTML =
-        '<p style="opacity: 0.6;">Antworten werden hier angezeigt, sobald verfügbar.</p>';
+        '<p style="opacity: 0.6;">Antworten werden hier angezeigt, sobald verfgbar.</p>';
     } else {
       let html =
         '<div style="margin-bottom: 15px;"><strong>Als KI-Gewinner markieren:</strong></div>';
@@ -808,1275 +469,68 @@ function updatePanicModeUI() {
   }
 }
 
-function closeWriting() {
-  transitionPhase("REVEAL");
-}
-
-function getPlayerCount() {
-  if (gameState.playerStatus.length > 0) return gameState.playerStatus.length;
-  return gameState.players.length;
-}
-
-function runOverviewPrimaryAction() {
-  if (typeof overviewActions.primary === "function") {
-    overviewActions.primary();
-  }
-}
-
-function runOverviewSecondaryAction() {
-  if (typeof overviewActions.secondary === "function") {
-    overviewActions.secondary();
-  }
-}
-
-function setOverviewActions({ primary, secondary, hint }) {
-  overviewActions.primary = primary?.action ?? null;
-  overviewActions.secondary = secondary?.action ?? null;
-
-  const primaryBtn = document.getElementById("overviewPrimaryActionBtn");
-  const secondaryBtn = document.getElementById("overviewSecondaryActionBtn");
-  const hintEl = document.getElementById("overviewFlowHint");
-
-  if (primaryBtn) {
-    primaryBtn.textContent = primary?.label ?? "—";
-    primaryBtn.disabled = !(primary?.enabled ?? false);
-  }
-  if (secondaryBtn) {
-    secondaryBtn.textContent = secondary?.label ?? "—";
-    secondaryBtn.disabled = !(secondary?.enabled ?? false);
-    secondaryBtn.style.display = secondary?.label ? "inline-flex" : "none";
-  }
-  if (hintEl) {
-    hintEl.textContent = hint ?? "";
-  }
-}
-
-function updateOverviewFlow() {
-  const phase = gameState.phase;
-  const validTargets = gameState.validTransitions || [];
-  const queuedCount = gameState.queuedPrompts.length;
-  const playerCount = getPlayerCount();
-
-  const canTransitionTo = (target) => validTargets.includes(target);
-  const canStartPromptSelection =
-    queuedCount > 0 && canTransitionTo("PROMPT_SELECTION");
-
-  if (phase === "LOBBY" || phase === "RESULTS" || phase === "PODIUM") {
-    if (playerCount === 0) {
-      setOverviewActions({
-        primary: {
-          label: "Spieler erstellen",
-          enabled: true,
-          action: () => hostCreatePlayersFromOverview(),
-        },
-        secondary: {
-          label: "3 Spieler (schnell)",
-          enabled: true,
-          action: () => hostCreatePlayers(3),
-        },
-        hint: "Erst Spieler erstellen, dann Prompt(s) in die Warteschlange legen.",
-      });
-      return;
-    }
-
-    setOverviewActions({
-      primary: {
-        label: queuedCount > 1 ? "▶ Prompt-Voting starten" : "▶ Runde starten",
-        enabled: canStartPromptSelection,
-        action: () => startPromptSelection(),
-      },
-      secondary: {
-        label:
-          canTransitionTo("LOBBY") && phase !== "LOBBY" ? "Zur Lobby" : null,
-        enabled: canTransitionTo("LOBBY") && phase !== "LOBBY",
-        action: () => transitionPhase("LOBBY"),
-      },
-      hint:
-        queuedCount === 0
-          ? "Füge einen Prompt hinzu und lege ihn in die Warteschlange."
-          : queuedCount === 1
-            ? "1 Prompt → startet direkt die Schreibphase."
-            : "Mehrere Prompts → Publikum stimmt ab, Gewinner geht in Schreiben.",
-    });
-    return;
-  }
-
-  if (phase === "PROMPT_SELECTION") {
-    setOverviewActions({
-      primary: {
-        label: "→ Schreiben starten",
-        enabled: canTransitionTo("WRITING"),
-        action: () => transitionPhase("WRITING"),
-      },
-      secondary: {
-        label: "Pause",
-        enabled: canTransitionTo("INTERMISSION"),
-        action: () => transitionPhase("INTERMISSION"),
-      },
-      hint: "Wenn genug Votes da sind (oder du abkürzen willst), starte Schreiben.",
-    });
-    return;
-  }
-
-  if (phase === "WRITING") {
-    setOverviewActions({
-      primary: {
-        label: "→ Antworten zeigen",
-        enabled: canTransitionTo("REVEAL"),
-        action: () => closeWriting(),
-      },
-      secondary: {
-        label: "+10 Sekunden",
-        enabled: !!gameState.deadline,
-        action: () => extendTimer(10),
-      },
-      hint: "Warte bis alle eingereicht haben, dann Reveal starten.",
-    });
-    return;
-  }
-
-  if (phase === "REVEAL") {
-    setOverviewActions({
-      primary: {
-        label: "Weiter →",
-        enabled: true,
-        action: () => revealNext(),
-      },
-      secondary: {
-        label: "→ Abstimmen",
-        enabled: canTransitionTo("VOTING"),
-        action: () => transitionPhase("VOTING"),
-      },
-      hint: "Mit „Weiter“ durch die Antworten blättern, dann Abstimmen starten.",
-    });
-    return;
-  }
-
-  if (phase === "VOTING") {
-    setOverviewActions({
-      primary: {
-        label: "→ Auflösung",
-        enabled: canTransitionTo("RESULTS"),
-        action: () => transitionPhase("RESULTS"),
-      },
-      secondary: {
-        label: "+10 Sekunden",
-        enabled: !!gameState.deadline,
-        action: () => extendTimer(10),
-      },
-      hint: "Voting läuft; Timer wechselt automatisch zur Auflösung, falls aktiv.",
-    });
-    return;
-  }
-
-  if (phase === "INTERMISSION") {
-    setOverviewActions({
-      primary: {
-        label: "Zur Lobby",
-        enabled: canTransitionTo("LOBBY"),
-        action: () => transitionPhase("LOBBY"),
-      },
-      secondary: {
-        label: "Spiel beenden",
-        enabled: canTransitionTo("ENDED"),
-        action: () => transitionPhase("ENDED"),
-      },
-      hint: "Pause-Modus.",
-    });
-    return;
-  }
-
-  if (phase === "ENDED") {
-    setOverviewActions({
-      primary: { label: "—", enabled: false, action: null },
-      secondary: { label: null, enabled: false, action: null },
-      hint: "Spiel beendet.",
-    });
-  }
-}
-
-function updateOverviewRevealStatus() {
-  const el = document.getElementById("overviewRevealStatus");
-  if (!el) return;
-
-  if (gameState.phase !== "REVEAL") {
-    el.textContent = "";
-    return;
-  }
-
-  const round = gameState.currentRound;
-  const total =
-    round?.reveal_order?.length ??
-    (Array.isArray(gameState.revealOrder) ? gameState.revealOrder.length : 0);
-  const idx = round?.reveal_index ?? 0;
-
-  if (!total) {
-    el.textContent = "Keine Antworten zum Anzeigen.";
-    return;
-  }
-
-  el.textContent = `Position: ${Math.min(idx + 1, total)}/${total}`;
-}
-
-function filterOverviewPrompts() {
-  updateOverviewPromptPool();
-}
-
-function updateOverviewPromptPool() {
-  const container = document.getElementById("overviewPromptPoolList");
-  if (!container) return;
-
-  const query =
-    document
-      .getElementById("overviewPromptSearchInput")
-      ?.value.trim()
-      .toLowerCase() ?? "";
-  const sourceFilter =
-    document.getElementById("overviewPromptSourceFilter")?.value ?? "all";
-
-  const queuedIds = new Set(gameState.queuedPrompts.map((p) => p.id));
-  const queueFull = gameState.queuedPrompts.length >= 3;
-
-  const prompts = (gameState.prompts || [])
-    .filter((p) => {
-      if (sourceFilter !== "all" && p.source !== sourceFilter) return false;
-      if (!query) return true;
-      const haystack = `${p.text ?? ""} ${p.image_url ?? ""}`.toLowerCase();
-      return haystack.includes(query);
-    })
-    .sort((a, b) => {
-      const at = a.created_at ?? "";
-      const bt = b.created_at ?? "";
-      return bt.localeCompare(at);
-    })
-    .slice(0, 15);
-
-  container.innerHTML = "";
-
-  if (prompts.length === 0) {
-    container.innerHTML =
-      '<p style="opacity: 0.6;">Keine passenden Prompts.</p>';
-    return;
-  }
-
-  prompts.forEach((prompt) => {
-    container.appendChild(renderPromptRow(prompt, queuedIds, queueFull));
-  });
-}
-
-function maybeAutoQueueOverviewPrompt() {
-  if (!pendingOverviewPromptAutoQueue) return;
-
-  const queuedIds = new Set(gameState.queuedPrompts.map((p) => p.id));
-  const { text, image_url } = pendingOverviewPromptAutoQueue;
-
-  const candidates = (gameState.prompts || [])
-    .filter((p) => p.source === "host")
-    .filter((p) => !queuedIds.has(p.id))
-    .filter((p) => (p.text ?? null) === (text ?? null))
-    .filter((p) => (p.image_url ?? null) === (image_url ?? null))
-    .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-
-  if (candidates.length === 0) return;
-
-  queuePrompt(candidates[0].id);
-  pendingOverviewPromptAutoQueue = null;
-}
-
-// UI Updates
-function updatePlayersList() {
-  updatePlayersListInto("playerTokensList");
-  updatePlayersListInto("overviewPlayerTokensList");
-}
-
-function updatePlayersListInto(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  container.innerHTML = "";
-
-  // Use playerStatus if available, fall back to legacy players array
-  const players =
-    gameState.playerStatus.length > 0
-      ? gameState.playerStatus
-      : gameState.players.map((token, idx) => ({
-          token,
-          display_name: null,
-          status: "not_submitted",
-          id: `player_${idx}`,
-        }));
-
-  if (players.length === 0) {
-    container.innerHTML = '<p style="opacity: 0.6;">Keine Spieler erstellt</p>';
-    return;
-  }
-
-  players.forEach((player) => {
-    const div = document.createElement("div");
-    div.className = "player-status-card";
-
-    // Determine status display
-    const token = typeof player === "string" ? player : player.token;
-    const name = player.display_name || "Nicht registriert";
-    const status = player.status || "not_submitted";
-
-    // Status badge
-    let statusBadge = "";
-    let statusClass = "";
-    switch (status) {
-      case "submitted":
-        statusBadge = "✅ Eingereicht";
-        statusClass = "submitted";
-        break;
-      case "checking_typos":
-        statusBadge = "🔄 Prüft...";
-        statusClass = "checking";
-        break;
-      default:
-        statusBadge = "⏳ Wartet";
-        statusClass = "waiting";
-    }
-
-    const playerId = player.id || `unknown_${token}`;
-    div.innerHTML = `
-      <div class="player-info">
-        <div class="player-header">
-          <span class="player-name">${escapeHtml(name)}</span>
-          <span class="status-badge ${statusClass}">${statusBadge}</span>
-        </div>
-        <div class="player-token">
-          <span class="token">${token}</span>
-          <button onclick="copyToClipboard('${token}')" class="copy-btn" title="Token kopieren">📋</button>
-          <button onclick="removePlayer('${playerId}', '${escapeHtml(name).replace(/'/g, "\\'")}')" class="remove-btn" title="Spieler entfernen">🗑️</button>
-        </div>
-      </div>
-    `;
-    container.appendChild(div);
-  });
-
-  // Update overview count
-  const overviewPlayers = document.getElementById("overviewPlayers");
-  if (overviewPlayers) {
-    overviewPlayers.textContent = getPlayerCount();
-  }
-}
-
-/**
- * Update the prompt stats dashboard
- */
-function updatePromptStats() {
-  const stats = gameState.promptStats;
-
-  // Update stat values
-  document.getElementById("promptStatTotal").textContent = stats.total || 0;
-  document.getElementById("promptStatHost").textContent = stats.host_count || 0;
-  document.getElementById("promptStatAudience").textContent =
-    stats.audience_count || 0;
-
-  // Update top submitters section
-  const topSection = document.getElementById("topSubmittersSection");
-  const topList = document.getElementById("topSubmittersList");
-
-  if (stats.top_submitters && stats.top_submitters.length > 0) {
-    topSection.style.display = "block";
-    topList.innerHTML = stats.top_submitters
-      .map((s) => {
-        const shortId = s.voter_id.substring(0, 8);
-        return `
-        <div class="top-submitter-item">
-          <span class="submitter-id" title="${escapeHtml(s.voter_id)}">${shortId}...</span>
-          <span class="submitter-count">${s.count} Prompts</span>
-          <button class="danger small" onclick="shadowbanAudience('${s.voter_id}')" title="Shadowban">🚫</button>
-        </div>
-      `;
-      })
-      .join("");
-  } else {
-    topSection.style.display = "none";
-  }
-}
-
-/**
- * Toggle collapsible prompt section
- */
-function togglePromptSection(sectionKey) {
-  const isExpanded = promptSectionState[sectionKey];
-  promptSectionState[sectionKey] = !isExpanded;
-
-  // Persist state
-  localStorage.setItem(
-    `promptSection_${sectionKey}`,
-    isExpanded ? "collapsed" : "expanded",
-  );
-
-  // Update UI
-  const listId =
-    sectionKey === "hostPrompts" ? "hostPromptsList" : "audiencePromptsList";
-  const toggleId =
-    sectionKey === "hostPrompts"
-      ? "hostPromptsToggle"
-      : "audiencePromptsToggle";
-
-  const list = document.getElementById(listId);
-  const toggle = document.getElementById(toggleId);
-
-  if (list) {
-    list.classList.toggle("collapsed", isExpanded);
-  }
-  if (toggle) {
-    toggle.textContent = isExpanded ? "▶" : "▼";
-  }
-}
-
-/**
- * Filter prompts by search query
- */
-function filterPrompts() {
-  const query = document
-    .getElementById("promptSearchInput")
-    .value.toLowerCase()
-    .trim();
-
-  // Filter all prompt rows
-  document.querySelectorAll(".prompt-row").forEach((row) => {
-    const text = row.dataset.searchText || "";
-    const matches = !query || text.toLowerCase().includes(query);
-    row.style.display = matches ? "" : "none";
-  });
-}
-
-/**
- * Pick a random prompt from visible prompts and add to queue
- */
-function pickRandomPrompt() {
-  const queuedIds = new Set(gameState.queuedPrompts.map((p) => p.id));
-  const availablePrompts = gameState.prompts.filter(
-    (p) => !queuedIds.has(p.id),
-  );
-
-  if (availablePrompts.length === 0) {
-    showAlert("Keine verfügbaren Prompts zum Auswählen", "warning");
-    return;
-  }
-
-  if (gameState.queuedPrompts.length >= 3) {
-    showAlert("Warteschlange ist voll (max. 3)", "warning");
-    return;
-  }
-
-  const randomPrompt =
-    availablePrompts[Math.floor(Math.random() * availablePrompts.length)];
-  queuePrompt(randomPrompt.id);
-}
-
-/**
- * Shadowban all submitters of a deduplicated prompt
- */
-function shadowbanPromptSubmitters(promptId) {
-  const prompt = gameState.prompts.find((p) => p.id === promptId);
-  if (!prompt) return;
-
-  const submitterCount = prompt.submitter_ids?.length || 0;
-  const message =
-    submitterCount > 1
-      ? `Alle ${submitterCount} Einreicher dieses Prompts shadowbannen?\n\nDiese Nutzer können weiterhin Prompts einreichen, aber sie werden ignoriert.`
-      : "Diesen Einreicher shadowbannen?\n\nDer Nutzer kann weiterhin Prompts einreichen, aber sie werden ignoriert.";
-
-  if (confirm(message)) {
-    wsConn.send({
-      t: "host_shadowban_prompt_submitters",
-      prompt_id: promptId,
-    });
-    showAlert(`${submitterCount} Nutzer shadowbanned`, "success");
-  }
-}
-
-/**
- * Render a single compact prompt row
- */
-function renderPromptRow(prompt, queuedIds, queueFull) {
-  const isQueued = queuedIds.has(prompt.id);
-  const hasImage = !!prompt.image_url;
-  const hasText = !!prompt.text;
-  const submitterCount = prompt.submission_count || 1;
-
-  // Build display text
-  let displayText = "";
-  if (hasText) {
-    displayText = prompt.text;
-  } else if (hasImage) {
-    displayText = "[Bild-Prompt]";
-  } else {
-    displayText = "(Leerer Prompt)";
-  }
-
-  // Truncate for display
-  const truncatedText =
-    displayText.length > 60
-      ? `${displayText.substring(0, 60)}...`
-      : displayText;
-
-  // Build tooltip content
-  const escapedTooltipText = escapeHtml(displayText);
-  let tooltipContent = escapedTooltipText;
-  if (hasImage) {
-    tooltipContent = `<img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" style="max-width: 300px; max-height: 200px;"><br>${escapedTooltipText}`;
-  }
-
-  // Submitter info for audience prompts
-  const submitterInfo =
-    prompt.source === "audience" && prompt.submitter_ids?.length > 0
-      ? `<span class="submitter-count" title="${prompt.submitter_ids.length} Einreicher">${submitterCount}x</span>`
-      : "";
-
-  const div = document.createElement("div");
-  div.className = `prompt-row${isQueued ? " queued" : ""}`;
-  div.dataset.searchText = displayText;
-  div.dataset.promptId = prompt.id;
-
-  div.innerHTML = `
-    <div class="prompt-row-content">
-      ${hasImage ? '<span class="prompt-image-indicator" title="Hat Bild">🖼️</span>' : ""}
-      <span class="prompt-text-preview" title="${escapeHtml(displayText)}">${escapeHtml(truncatedText)}</span>
-      ${submitterInfo}
-    </div>
-    <div class="prompt-row-actions">
-      ${
-        isQueued
-          ? '<span class="queued-badge">✓</span>'
-          : queueFull
-            ? ""
-            : `<button class="action-btn queue-btn" onclick="event.stopPropagation(); queuePrompt('${prompt.id}')" title="In Warteschlange">+</button>`
-      }
-      ${
-        prompt.source === "audience" && prompt.submitter_ids?.length > 0
-          ? `<button class="action-btn ban-btn" onclick="event.stopPropagation(); shadowbanPromptSubmitters('${prompt.id}')" title="Einreicher shadowbannen">🚫</button>`
-          : ""
-      }
-      <button class="action-btn delete-btn" onclick="event.stopPropagation(); deletePrompt('${prompt.id}')" title="Löschen">×</button>
-    </div>
-    <div class="prompt-tooltip">${tooltipContent}</div>
-  `;
-
-  return div;
-}
-
-function updatePromptsList() {
-  // Update stats first
-  updatePromptStats();
-
-  const hostList = document.getElementById("hostPromptsList");
-  const audienceList = document.getElementById("audiencePromptsList");
-
-  if (!hostList || !audienceList) return;
-
-  // Get queued prompt IDs
-  const queuedIds = new Set(gameState.queuedPrompts.map((p) => p.id));
-  const queueFull = gameState.queuedPrompts.length >= 3;
-
-  // Separate prompts by source
-  const hostPrompts = gameState.prompts.filter((p) => p.source === "host");
-  const audiencePrompts = gameState.prompts.filter(
-    (p) => p.source === "audience",
-  );
-
-  // Update counts
-  document.getElementById("hostPromptsCount").textContent = hostPrompts.length;
-  document.getElementById("audiencePromptsCount").textContent =
-    audiencePrompts.length;
-
-  // Render host prompts
-  hostList.innerHTML = "";
-  if (hostPrompts.length === 0) {
-    hostList.innerHTML = '<p class="no-prompts-hint">Keine Host-Prompts</p>';
-  } else {
-    hostPrompts.forEach((prompt) => {
-      hostList.appendChild(renderPromptRow(prompt, queuedIds, queueFull));
-    });
-  }
-
-  // Render audience prompts
-  audienceList.innerHTML = "";
-  if (audiencePrompts.length === 0) {
-    audienceList.innerHTML =
-      '<p class="no-prompts-hint">Keine Publikums-Prompts</p>';
-  } else {
-    audiencePrompts.forEach((prompt) => {
-      audienceList.appendChild(renderPromptRow(prompt, queuedIds, queueFull));
-    });
-  }
-
-  // Apply current collapse state
-  const hostToggle = document.getElementById("hostPromptsToggle");
-  const audienceToggle = document.getElementById("audiencePromptsToggle");
-
-  if (!promptSectionState.hostPrompts) {
-    hostList.classList.add("collapsed");
-    if (hostToggle) hostToggle.textContent = "▶";
-  }
-  if (!promptSectionState.audiencePrompts) {
-    audienceList.classList.add("collapsed");
-    if (audienceToggle) audienceToggle.textContent = "▶";
-  }
-
-  // Apply search filter if there's a query
-  const searchInput = document.getElementById("promptSearchInput");
-  if (searchInput?.value.trim()) {
-    filterPrompts();
-  }
-}
-
-function updateQueuedPromptsList() {
-  updateQueuedPromptsListInto("queuedPromptsList", "startPromptSelectionBtn");
-  updateQueuedPromptsListInto(
-    "overviewQueuedPromptsList",
-    "overviewStartPromptSelectionBtn",
-  );
-}
-
-function updateQueuedPromptsListInto(containerId, startBtnId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  container.innerHTML = "";
-
-  // Always update start button visibility first
-  const startBtn = document.getElementById(startBtnId);
-  if (startBtn) {
-    startBtn.style.display =
-      gameState.queuedPrompts.length > 0 ? "block" : "none";
-    const count = gameState.queuedPrompts.length;
-    if (count === 1) {
-      startBtn.textContent = "▶ Runde starten (1 Prompt → direkt zu Schreiben)";
-    } else if (count > 1) {
-      startBtn.textContent = `▶ Prompt-Voting starten (${count} Prompts)`;
-    }
-  }
-
-  if (gameState.queuedPrompts.length === 0) {
-    container.innerHTML =
-      '<p style="opacity: 0.6;">Keine Prompts in der Warteschlange. Wähle Prompts aus dem Pool.</p>';
-    return;
-  }
-
-  gameState.queuedPrompts.forEach((prompt, idx) => {
-    const div = document.createElement("div");
-    div.className = "prompt-card queued";
-
-    const hasImage = !!prompt.image_url;
-    const hasText = !!prompt.text;
-
-    let contentHtml = "";
-    if (hasImage) {
-      contentHtml += `<div class="prompt-image"><img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" style="max-width: 150px; max-height: 100px; border-radius: 4px;"></div>`;
-    }
-    if (hasText) {
-      contentHtml += `<div class="prompt-text">${escapeHtml(prompt.text)}</div>`;
-    }
-
-    div.innerHTML = `
-      <div class="prompt-header">
-        <span class="queue-number">#${idx + 1}</span>
-        ${hasImage ? '<span class="badge multimodal">Bild</span>' : ""}
-      </div>
-      ${contentHtml}
-      <div class="prompt-actions">
-        <button class="secondary small" onclick="unqueuePrompt('${prompt.id}')" title="Zurück in den Pool">↩ Pool</button>
-        <button class="danger small" onclick="deletePrompt('${prompt.id}')" title="Prompt löschen">🗑️</button>
-      </div>
-    `;
-    container.appendChild(div);
-  });
-}
-
-function queuePrompt(promptId) {
-  wsConn.send({
-    t: "host_queue_prompt",
-    prompt_id: promptId,
-  });
-}
-
-function unqueuePrompt(promptId) {
-  wsConn.send({
-    t: "host_unqueue_prompt",
-    prompt_id: promptId,
-  });
-}
-
-// biome-ignore lint/correctness/noUnusedVariables: Called from HTML onclick
-function deletePrompt(promptId) {
-  wsConn.send({
-    t: "host_delete_prompt",
-    prompt_id: promptId,
-  });
-}
-
-function startPromptSelection() {
-  if (gameState.queuedPrompts.length === 0) {
-    showAlert("Keine Prompts in der Warteschlange", "warning");
-    return;
-  }
-  wsConn.send({
-    t: "host_transition_phase",
-    phase: "PROMPT_SELECTION",
-  });
-}
-
-function selectPromptById(promptId) {
-  wsConn.send({
-    t: "host_select_prompt",
-    prompt_id: promptId,
-  });
-}
-
-function shadowbanAudience(voterId) {
-  if (
-    confirm(
-      "Diesen Nutzer shadowbannen?\n\nAlle zukünftigen Prompts von diesem Nutzer werden ignoriert. Der Nutzer erfährt davon nichts.",
-    )
-  ) {
-    wsConn.send({
-      t: "host_shadowban_audience",
-      voter_id: voterId,
-    });
-    showAlert("Nutzer shadowbanned", "success");
-  }
-}
-
-function removePlayer(playerId, playerName) {
-  const displayName = playerName || `${playerId.substring(0, 8)}...`;
-  if (
-    confirm(
-      `Spieler "${displayName}" entfernen?\n\n` +
-        "- Der Spieler wird aus dem Spiel entfernt\n" +
-        "- Seine Antwort wird gelöscht (falls vorhanden)\n" +
-        "- Betroffene Stimmen werden zurückgesetzt\n\n" +
-        "Dies kann nicht rückgängig gemacht werden!",
-    )
-  ) {
-    wsConn.send({
-      t: "host_remove_player",
-      player_id: playerId,
-    });
-    showAlert(`Spieler ${displayName} wird entfernt...`, "info");
-  }
-}
-
-function updateSubmissionsList() {
-  const container = document.getElementById("submissionsList");
-  if (!container) return;
-  container.innerHTML = "";
-
-  // Also update the AI-specific submissions list
-  updateAiSubmissionsList();
-
-  if (gameState.submissions.length === 0) {
-    container.innerHTML = '<p style="opacity: 0.6;">Noch keine Antworten</p>';
-    gameState.revealOrder = [];
-    return;
-  }
-
-  // Build reveal order: use existing order, add new submissions at end
-  const existingIds = new Set(gameState.revealOrder);
-  const currentIds = new Set(gameState.submissions.map((s) => s.id));
-
-  // Remove IDs that no longer exist
-  gameState.revealOrder = gameState.revealOrder.filter((id) =>
-    currentIds.has(id),
-  );
-
-  // Add new submissions at the end
-  gameState.submissions.forEach((sub) => {
-    if (!existingIds.has(sub.id)) {
-      gameState.revealOrder.push(sub.id);
-    }
-  });
-
-  // Create a map for quick submission lookup
-  const submissionMap = new Map(gameState.submissions.map((s) => [s.id, s]));
-
-  // Render submissions in reveal order
-  gameState.revealOrder.forEach((subId, index) => {
-    const sub = submissionMap.get(subId);
-    if (!sub) return;
-
-    const div = document.createElement("div");
-    const authorKind = sub.author_kind || "unknown";
-    const isSelectedAi =
-      authorKind === "ai" && gameState.selectedAiSubmissionId === sub.id;
-    div.className = `submission-card draggable${authorKind === "ai" ? " ai" : ""}${isSelectedAi ? " selected-ai" : ""}`;
-    div.dataset.submissionId = sub.id;
-    div.draggable = true;
-
-    // Show provider info for AI submissions
-    const providerInfo =
-      authorKind === "ai" && sub.author_ref
-        ? `<span class="provider-info">(${escapeHtml(sub.author_ref)})</span>`
-        : "";
-
-    div.innerHTML = `
-      <div class="header">
-        <div class="drag-handle">
-          <span class="order-number">${index + 1}</span>
-          <span class="drag-icon">⋮⋮</span>
-        </div>
-        <div class="header-content">
-          <span style="font-size: 12px; opacity: 0.6;">${sub.id.substring(0, 12)}...</span>
-          <div>
-            <span class="badge ${authorKind}">${authorKind.toUpperCase()}</span>
-            ${providerInfo}
-            ${isSelectedAi ? '<span class="badge selected">AUSGEWÄHLT</span>' : ""}
-          </div>
-        </div>
-      </div>
-      <div class="text">${escapeHtml(sub.display_text)}</div>
-      <div class="actions">
-        ${authorKind === "ai" && !isSelectedAi ? `<button onclick="selectAiSubmission('${sub.id}')">Als KI auswählen</button>` : ""}
-        ${authorKind === "ai" ? `<button class="remove-btn" onclick="removeSubmission('${sub.id}')">Entfernen</button>` : ""}
-        ${authorKind === "player" ? `<button class="danger" onclick="markDuplicate('${sub.id}')">Dupe</button>` : ""}
-        <button class="secondary">Bearbeiten</button>
-      </div>
-    `;
-
-    // Add drag event listeners
-    div.addEventListener("dragstart", handleDragStart);
-    div.addEventListener("dragend", handleDragEnd);
-    div.addEventListener("dragover", handleDragOver);
-    div.addEventListener("dragenter", handleDragEnter);
-    div.addEventListener("dragleave", handleDragLeave);
-    div.addEventListener("drop", handleDrop);
-
-    container.appendChild(div);
-  });
-
-  // Update the manual input field with current order
-  const revealOrderInput = document.getElementById("revealOrderInput");
-  if (revealOrderInput) {
-    revealOrderInput.value = gameState.revealOrder.join(", ");
-  }
-}
-
-// Drag-and-drop handlers
-function handleDragStart(e) {
-  const card = e.target.closest(".submission-card");
-  if (!card) return;
-
-  dragState.draggedId = card.dataset.submissionId;
-  dragState.draggedElement = card;
-  card.classList.add("dragging");
-
-  e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData("text/plain", dragState.draggedId);
-}
-
-function handleDragEnd(e) {
-  const card = e.target.closest(".submission-card");
-  if (card) {
-    card.classList.remove("dragging");
-  }
-
-  // Remove all drag-over indicators
-  document.querySelectorAll(".submission-card.drag-over").forEach((el) => {
-    el.classList.remove("drag-over");
-  });
-
-  dragState.draggedId = null;
-  dragState.draggedElement = null;
-}
-
-function handleDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = "move";
-}
-
-function handleDragEnter(e) {
-  e.preventDefault();
-  const card = e.target.closest(".submission-card");
-  if (card && card !== dragState.draggedElement) {
-    card.classList.add("drag-over");
-  }
-}
-
-function handleDragLeave(e) {
-  const card = e.target.closest(".submission-card");
-  if (card && !card.contains(e.relatedTarget)) {
-    card.classList.remove("drag-over");
-  }
-}
-
-function handleDrop(e) {
-  e.preventDefault();
-  const targetCard = e.target.closest(".submission-card");
-  if (!targetCard || !dragState.draggedId) return;
-
-  const targetId = targetCard.dataset.submissionId;
-  if (targetId === dragState.draggedId) return;
-
-  targetCard.classList.remove("drag-over");
-
-  // Reorder the reveal order array
-  const fromIndex = gameState.revealOrder.indexOf(dragState.draggedId);
-  const toIndex = gameState.revealOrder.indexOf(targetId);
-
-  if (fromIndex === -1 || toIndex === -1) return;
-
-  // Remove from old position and insert at new position
-  gameState.revealOrder.splice(fromIndex, 1);
-  gameState.revealOrder.splice(toIndex, 0, dragState.draggedId);
-
-  // Re-render the list
-  updateSubmissionsList();
-
-  // Send the new order to the server
-  sendRevealOrder();
-}
-
-function sendRevealOrder() {
-  if (gameState.revealOrder.length === 0) return;
-
-  wsConn.send({
-    t: "host_set_reveal_order",
-    order: gameState.revealOrder,
-  });
-
-  showAlert("Reihenfolge aktualisiert", "success");
-}
-
-function updateScores() {
-  // Player scores
-  const playerContainer = document.getElementById("playerScores");
-  playerContainer.innerHTML = "";
-
-  if (gameState.scores.players.length === 0) {
-    playerContainer.innerHTML =
-      '<p style="opacity: 0.6;">Noch keine Punkte</p>';
-  } else {
-    gameState.scores.players.forEach((score, idx) => {
-      const displayName = score.display_name || score.ref_id.substring(0, 12);
-      playerContainer.innerHTML += `
-                <div class="info-item">
-                    <div class="label">${idx + 1}. ${displayName}</div>
-                    <div class="value">${score.total} Pkt</div>
-                </div>
-            `;
-    });
-  }
-
-  // Audience scores
-  const audienceContainer = document.getElementById("audienceScores");
-  audienceContainer.innerHTML = "";
-
-  if (gameState.scores.audience_top.length === 0) {
-    audienceContainer.innerHTML =
-      '<p style="opacity: 0.6;">Noch keine Publikums-Punkte</p>';
-  } else {
-    gameState.scores.audience_top.slice(0, 10).forEach((score, idx) => {
-      audienceContainer.innerHTML += `
-                <div class="info-item">
-                    <div class="label">${idx + 1}. ${score.ref_id.substring(0, 12)}</div>
-                    <div class="value">${score.total} Pkt</div>
-                </div>
-            `;
-    });
-  }
-}
-
-function showAlert(message, type = "info") {
-  const container = document.getElementById("overviewAlert");
-  if (!container) return;
-  container.innerHTML = "";
-
-  const alert = document.createElement("div");
-  alert.className = `alert ${type}`;
-  alert.textContent = message;
-  container.appendChild(alert);
-
-  // Auto-hide after 5 seconds
-  setTimeout(() => {
-    container.innerHTML = "";
-  }, 5000);
-}
-
-function log(message, type = "info") {
-  const logDiv = document.getElementById("messageLog");
-  if (!logDiv) return;
-  const entry = document.createElement("div");
-  entry.className = `log-entry ${type}`;
-
-  const timestamp = formatTime();
-  const ts = document.createElement("span");
-  ts.className = "timestamp";
-  ts.textContent = `[${timestamp}]`;
-
-  entry.appendChild(ts);
-  entry.appendChild(document.createTextNode(` ${message}`));
-
-  logDiv.appendChild(entry);
-  logDiv.scrollTop = logDiv.scrollHeight;
-}
-
-function clearLog() {
-  document.getElementById("messageLog").innerHTML = "";
-}
-
-/**
- * Generate QR codes for joining the game
- */
-function generateJoinQRCodes() {
-  // Generate QR code for audience join
-  const audienceUrl = QRCodeManager.generateAudienceQR("audienceQRCode", {
-    width: 200,
-    height: 200,
-  });
-
-  // Update URL display
-  const urlEl = document.getElementById("audienceJoinUrl");
-  if (urlEl) {
-    urlEl.textContent = audienceUrl;
-  }
-}
-
-/**
- * Copy audience join URL to clipboard
- */
-function copyAudienceUrl() {
-  const url = QRCodeManager.getAudienceJoinUrl();
-  copyToClipboard(url);
-  showAlert("URL in Zwischenablage kopiert!", "success");
-}
-
-// ============================================================================
-// State Export/Import Functions
-// ============================================================================
-
-let cachedStateExport = null;
-
-/**
- * Fetch and display the current state
- */
-async function refreshStateView() {
-  const viewer = document.getElementById("stateJsonView");
-  viewer.textContent = "Lade...";
-
-  try {
-    const response = await fetch("/api/state/export");
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    cachedStateExport = await response.json();
-    viewer.textContent = JSON.stringify(cachedStateExport, null, 2);
-    showAlert("State geladen", "success");
-  } catch (error) {
-    viewer.textContent = `Fehler: ${error.message}`;
-    showAlert(`Fehler beim Laden: ${error.message}`, "error");
-  }
-}
-
-/**
- * Download the state as a JSON file
- */
-async function downloadStateExport() {
-  try {
-    // Always fetch fresh data for download
-    const response = await fetch("/api/state/export");
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    const data = await response.json();
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    a.download = `gptdash-state-${timestamp}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    showAlert("State-Datei heruntergeladen", "success");
-  } catch (error) {
-    showAlert(`Fehler beim Download: ${error.message}`, "error");
-  }
-}
-
-/**
- * Copy current state to clipboard
- */
-async function copyStateToClipboard() {
-  try {
-    const response = await fetch("/api/state/export");
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    const data = await response.json();
-    await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-    showAlert("State in Zwischenablage kopiert", "success");
-  } catch (error) {
-    showAlert(`Fehler: ${error.message}`, "error");
-  }
-}
-
-/**
- * Handle file selection for import
- */
-function handleStateFileSelect(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    document.getElementById("stateImportText").value = e.target.result;
-    showImportStatus("Datei geladen. Klicke 'Validieren' zur Prüfung.", "info");
-  };
-  reader.onerror = () => {
-    showImportStatus("Fehler beim Lesen der Datei", "error");
-  };
-  reader.readAsText(file);
-}
-
-/**
- * Validate the import JSON without importing
- */
-function validateStateImport() {
-  const text = document.getElementById("stateImportText").value.trim();
-  if (!text) {
-    showImportStatus("Bitte JSON eingeben oder Datei hochladen", "error");
-    return null;
-  }
-
-  try {
-    const data = JSON.parse(text);
-
-    // Basic validation
-    if (!data.schema_version) {
-      showImportStatus("Fehler: schema_version fehlt", "error");
-      return null;
-    }
-
-    // Count objects for summary
-    const summary = [];
-    if (data.game) summary.push("1 Game");
-    if (data.rounds) summary.push(`${Object.keys(data.rounds).length} Runden`);
-    if (data.players)
-      summary.push(`${Object.keys(data.players).length} Spieler`);
-    if (data.submissions)
-      summary.push(`${Object.keys(data.submissions).length} Antworten`);
-    if (data.votes) summary.push(`${Object.keys(data.votes).length} Votes`);
-    if (data.scores) summary.push(`${data.scores.length} Scores`);
-
-    showImportStatus(
-      `✓ JSON valide (Schema v${data.schema_version}): ${summary.join(", ")}`,
-      "success",
-    );
-    return data;
-  } catch (error) {
-    showImportStatus(`JSON-Parsing Fehler: ${error.message}`, "error");
-    return null;
-  }
-}
-
-/**
- * Execute the state import
- */
-async function executeStateImport() {
-  const data = validateStateImport();
-  if (!data) return;
-
-  if (
-    !confirm(
-      "ACHTUNG: Der gesamte Spielzustand wird ersetzt!\n\n" +
-        "Alle verbundenen Clients werden über den neuen Zustand informiert.\n\n" +
-        "Fortfahren?",
-    )
-  ) {
-    return;
-  }
-
-  showImportStatus("Importiere...", "info");
-
-  try {
-    const response = await fetch("/api/state/import", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText);
-    }
-
-    showImportStatus("✓ State erfolgreich importiert!", "success");
-    showAlert("State importiert! UI wird aktualisiert...", "success");
-
-    // Clear the import textarea
-    document.getElementById("stateImportText").value = "";
-    document.getElementById("stateImportFile").value = "";
-
-    // Refresh the state view
-    await refreshStateView();
-  } catch (error) {
-    showImportStatus(`Import fehlgeschlagen: ${error.message}`, "error");
-    showAlert(`Import fehlgeschlagen: ${error.message}`, "error");
-  }
-}
-
-/**
- * Show status message in import section
- */
-function showImportStatus(message, type) {
-  const el = document.getElementById("stateImportStatus");
-  if (!el) return;
-  el.innerHTML = "";
-  const alert = document.createElement("div");
-  alert.className = `alert ${type}`;
-  alert.style.margin = "0";
-  alert.textContent = message;
-  el.appendChild(alert);
-}
-
 // Initialize on page load
 init();
 
+// Expose functions to window for onclick handlers in HTML
 if (typeof window !== "undefined") {
   Object.assign(window, {
+    // Panel navigation
+    showPanel,
+
+    // Phase transitions
     transitionPhase,
+
+    // Player management
     hostCreatePlayers,
     hostCreatePlayersFromOverview,
     hostCreatePlayersCustom,
+    removePlayer: (playerId, playerName) =>
+      removePlayer(playerId, playerName, wsConn),
+
+    // Round management
     hostStartRound,
-    addPrompt,
-    addPromptFromOverview,
-    selectPrompt,
-    selectPromptById,
-    queuePrompt,
-    unqueuePrompt,
-    startPromptSelection,
-    setRevealOrder,
-    resetGame,
     closeWriting,
-    clearLog,
-    copyAudienceUrl,
-    togglePanicMode,
-    setManualWinner,
-    markDuplicate,
-    extendTimer,
-    regenerateAi,
-    writeManualAiSubmission,
-    selectAiSubmission,
-    shadowbanAudience,
-    shadowbanPromptSubmitters,
-    removePlayer,
-    // Prompt panel functions
+    revealNext,
+    revealPrev,
+
+    // Prompts
+    addPrompt: () => addPrompt(wsConn),
+    addPromptFromOverview: (queue) => addPromptFromOverview(queue, wsConn),
+    selectPrompt: () => selectPrompt(wsConn),
+    selectPromptById: (id) => selectPromptById(id, wsConn),
+    queuePrompt: (id) => queuePrompt(id, wsConn),
+    unqueuePrompt: (id) => unqueuePrompt(id, wsConn),
+    deletePrompt: (id) => deletePrompt(id, wsConn),
+    startPromptSelection: () => startPromptSelection(wsConn),
     togglePromptSection,
     filterPrompts,
-    pickRandomPrompt,
-    // Overview helpers
+    pickRandomPrompt: () => pickRandomPrompt(wsConn),
+    shadowbanAudience: (id) => shadowbanAudience(id, wsConn),
+    shadowbanPromptSubmitters: (id) => shadowbanPromptSubmitters(id, wsConn),
+
+    // AI management
+    regenerateAi: () => regenerateAi(wsConn),
+    writeManualAiSubmission: () => writeManualAiSubmission(wsConn),
+    selectAiSubmission: (id) => selectAiSubmission(id, wsConn),
+    removeSubmission: (id) => removeSubmission(id, wsConn),
+
+    // Submissions
+    markDuplicate: (id) => markDuplicate(id, wsConn),
+    setRevealOrder: () => setRevealOrder(wsConn),
+
+    // Game control
+    resetGame,
+    clearPromptPool,
+    togglePanicMode,
+    setManualWinner,
+    extendTimer,
+
+    // Overview
     runOverviewPrimaryAction,
     runOverviewSecondaryAction,
     filterOverviewPrompts,
+
     // State export/import
     refreshStateView,
     downloadStateExport,
@@ -2084,5 +538,10 @@ if (typeof window !== "undefined") {
     handleStateFileSelect,
     validateStateImport,
     executeStateImport,
+
+    // Utilities
+    clearLog,
+    copyAudienceUrl,
+    copyToClipboard,
   });
 }

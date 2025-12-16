@@ -618,6 +618,27 @@ class ChallengeSolver {
   }
 }
 
+// ES6 module exports (for host.js and its modules)
+export {
+  WSConnection,
+  updateConnectionStatus,
+  showScreen,
+  showPanel,
+  restorePanelFromUrl,
+  showError,
+  hideError,
+  escapeHtml,
+  generateId,
+  copyToClipboard,
+  formatTime,
+  debounce,
+  CountdownTimer,
+  QRCodeManager,
+  TTSManager,
+  ChallengeSolver,
+};
+
+// Also expose on window for non-module scripts (beamer, player, audience)
 if (typeof window !== "undefined") {
   Object.assign(window, {
     WSConnection,
