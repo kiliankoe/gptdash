@@ -105,9 +105,9 @@ pub async fn handle_message(
             host::handle_start_round(state).await
         }
 
-        ClientMessage::HostSelectPrompt { prompt_id } => {
+        ClientMessage::HostSelectPrompt { prompt_id, model } => {
             check_host!(role, "select prompts");
-            host::handle_select_prompt(state, prompt_id).await
+            host::handle_select_prompt(state, prompt_id, model).await
         }
 
         ClientMessage::HostEditSubmission {
@@ -181,9 +181,9 @@ pub async fn handle_message(
             host::handle_extend_timer(state, seconds).await
         }
 
-        ClientMessage::HostRegenerateAi => {
+        ClientMessage::HostRegenerateAi { model } => {
             check_host!(role, "regenerate AI");
-            host::handle_regenerate_ai(state).await
+            host::handle_regenerate_ai(state, model).await
         }
 
         ClientMessage::HostRemoveSubmission { submission_id } => {

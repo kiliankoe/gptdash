@@ -7,11 +7,103 @@ import { escapeHtml } from "../common.js";
 import { showAlert } from "./ui.js";
 
 /**
+ * Fetch available AI models from the server
+ */
+export async function fetchAvailableModels() {
+  try {
+    const response = await fetch("/api/models");
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    gameState.availableModels = data;
+
+    // Set default model if not already set
+    if (gameState.selectedModel === null && data.default_model) {
+      gameState.selectedModel = data.default_model;
+    }
+
+    updateModelSelectorUI();
+    console.log("Available models loaded:", data);
+  } catch (e) {
+    console.error("Failed to fetch available models:", e);
+    showAlert("Konnte KI-Modelle nicht laden", "warning");
+  }
+}
+
+/**
+ * Update the model selector dropdown UI
+ */
+export function updateModelSelectorUI() {
+  const selector = document.getElementById("modelSelector");
+  if (!selector) return;
+
+  // Clear and add default option
+  selector.innerHTML = '<option value="">Alle Provider (Standard)</option>';
+
+  const { openai_models, ollama_models } = gameState.availableModels;
+
+  // Add OpenAI models
+  if (openai_models && openai_models.length > 0) {
+    const group = document.createElement("optgroup");
+    group.label = "OpenAI";
+    openai_models.forEach((m) => {
+      const opt = document.createElement("option");
+      opt.value = m.id;
+      opt.textContent = m.name + (m.supports_vision ? " (Vision)" : "");
+      if (m.id === gameState.selectedModel) opt.selected = true;
+      group.appendChild(opt);
+    });
+    selector.appendChild(group);
+  }
+
+  // Add Ollama models
+  if (ollama_models && ollama_models.length > 0) {
+    const group = document.createElement("optgroup");
+    group.label = "Ollama (lokal)";
+    ollama_models.forEach((m) => {
+      const opt = document.createElement("option");
+      opt.value = m.id;
+      opt.textContent = m.name + (m.supports_vision ? " (Vision)" : "");
+      if (m.id === gameState.selectedModel) opt.selected = true;
+      group.appendChild(opt);
+    });
+    selector.appendChild(group);
+  }
+}
+
+/**
+ * Get currently selected model ID
+ * @returns {string|null} Model ID or null for all providers
+ */
+export function getSelectedModel() {
+  return gameState.selectedModel || null;
+}
+
+/**
+ * Set selected model
+ * @param {string} modelId - Model ID or empty string for all providers
+ */
+export function setSelectedModel(modelId) {
+  gameState.selectedModel = modelId || null;
+  console.log("Selected model:", gameState.selectedModel || "All providers");
+}
+
+/**
  * Regenerate AI submissions
  */
 export function regenerateAi(wsConn) {
-  wsConn.send({ t: "host_regenerate_ai" });
-  showAlert("KI-Generierung gestartet...", "info");
+  const model = getSelectedModel();
+  wsConn.send({
+    t: "host_regenerate_ai",
+    model: model,
+  });
+  showAlert(
+    model
+      ? `KI-Generierung gestartet (${model})...`
+      : "KI-Generierung gestartet...",
+    "info",
+  );
 }
 
 /**

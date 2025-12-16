@@ -181,7 +181,8 @@ impl AppState {
                     match self.start_round().await {
                         Ok(round) => {
                             // Select the prompt (removes from pool, starts LLM)
-                            if let Err(e) = self.select_prompt(&round.id, &prompt.id).await {
+                            // Use None for model to generate from all providers (auto-transition)
+                            if let Err(e) = self.select_prompt(&round.id, &prompt.id, None).await {
                                 tracing::error!("Failed to select prompt: {}", e);
                             }
                         }
@@ -216,7 +217,10 @@ impl AppState {
                         match self.start_round().await {
                             Ok(round) => {
                                 // Select the prompt (removes from pool, starts LLM)
-                                if let Err(e) = self.select_prompt(&round.id, &prompt.id).await {
+                                // Use None for model to generate from all providers (auto-transition)
+                                if let Err(e) =
+                                    self.select_prompt(&round.id, &prompt.id, None).await
+                                {
                                     tracing::error!("Failed to select winning prompt: {}", e);
                                 }
                             }

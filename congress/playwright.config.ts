@@ -4,10 +4,15 @@ import { config } from "dotenv";
 // Load .env file for webServer process
 config();
 
+// Allow OPENAI_API_KEY to pass through for model-selection tests when set
+// Set E2E_ENABLE_OPENAI=1 to enable OpenAI for e2e tests
+const enableOpenAI = process.env.E2E_ENABLE_OPENAI === "1";
+
 const webServerEnv = {
   ...process.env,
   BIND_ADDR: "127.0.0.1",
-  OPENAI_API_KEY: "",
+  // Only pass through OpenAI key if explicitly enabled for e2e tests
+  OPENAI_API_KEY: enableOpenAI ? process.env.OPENAI_API_KEY || "" : "",
   OLLAMA_BASE_URL: "",
   OLLAMA_MODEL: "",
   // E2E tests drive the host UI without credentials.

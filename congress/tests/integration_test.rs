@@ -113,6 +113,7 @@ async fn test_full_game_flow() {
     let select_prompt_result = handle_message(
         ClientMessage::HostSelectPrompt {
             prompt_id: prompt.id.clone(),
+            model: None,
         },
         &host_role,
         &state,
@@ -701,7 +702,10 @@ async fn test_player_status_tracking() {
         )
         .await
         .unwrap();
-    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
 
     handle_message(
         ClientMessage::HostTransitionPhase {
@@ -786,7 +790,10 @@ async fn test_submission_update() {
         )
         .await
         .unwrap();
-    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
 
     handle_message(
         ClientMessage::HostTransitionPhase {
@@ -899,7 +906,10 @@ async fn test_submission_update_unauthorized() {
         )
         .await
         .unwrap();
-    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
 
     handle_message(
         ClientMessage::HostTransitionPhase {
@@ -996,7 +1006,10 @@ async fn test_host_write_ai_submission() {
         )
         .await
         .unwrap();
-    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
 
     // Host writes manual AI submission
     let result = handle_message(
@@ -1096,7 +1109,12 @@ async fn test_host_regenerate_ai_unauthorized() {
     state.create_game().await;
 
     // Audience tries to regenerate AI (should fail)
-    let result = handle_message(ClientMessage::HostRegenerateAi, &audience_role, &state).await;
+    let result = handle_message(
+        ClientMessage::HostRegenerateAi { model: None },
+        &audience_role,
+        &state,
+    )
+    .await;
 
     match result {
         Some(ServerMessage::Error { code, .. }) => {
@@ -1117,7 +1135,12 @@ async fn test_host_regenerate_ai_no_round() {
     state.create_game().await;
 
     // Try to regenerate AI without starting a round
-    let result = handle_message(ClientMessage::HostRegenerateAi, &host_role, &state).await;
+    let result = handle_message(
+        ClientMessage::HostRegenerateAi { model: None },
+        &host_role,
+        &state,
+    )
+    .await;
 
     match result {
         Some(ServerMessage::Error { code, .. }) => {
@@ -1150,7 +1173,12 @@ async fn test_host_regenerate_ai_no_prompt() {
     handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
 
     // Try to regenerate AI without selecting a prompt
-    let result = handle_message(ClientMessage::HostRegenerateAi, &host_role, &state).await;
+    let result = handle_message(
+        ClientMessage::HostRegenerateAi { model: None },
+        &host_role,
+        &state,
+    )
+    .await;
 
     match result {
         Some(ServerMessage::Error { code, .. }) => {
@@ -1192,7 +1220,10 @@ async fn test_select_ai_submission() {
         )
         .await
         .unwrap();
-    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
 
     // Create two manual AI submissions
     handle_message(
@@ -1381,7 +1412,10 @@ async fn test_remove_player_mid_round() {
         )
         .await
         .unwrap();
-    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
 
     handle_message(
         ClientMessage::HostTransitionPhase {
@@ -1593,7 +1627,10 @@ async fn test_add_player_mid_round() {
         )
         .await
         .unwrap();
-    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
 
     handle_message(
         ClientMessage::HostTransitionPhase {
@@ -1728,7 +1765,7 @@ async fn test_multimodal_prompt_image_only() {
     assert_eq!(prompt.image_url, Some(image_url.to_string()));
 
     // Verify prompt can be selected
-    let select_result = state.select_prompt(&round.id, &prompt.id).await;
+    let select_result = state.select_prompt(&round.id, &prompt.id, None).await;
     assert!(select_result.is_ok());
 
     // Verify selected prompt has image URL
@@ -1861,7 +1898,10 @@ async fn test_multimodal_prompt_via_handler() {
     drop(pool);
 
     let select_result = handle_message(
-        ClientMessage::HostSelectPrompt { prompt_id },
+        ClientMessage::HostSelectPrompt {
+            prompt_id,
+            model: None,
+        },
         &host_role,
         &state,
     )
@@ -1915,6 +1955,7 @@ async fn test_multimodal_prompt_selected_includes_image() {
     let result = handle_message(
         ClientMessage::HostSelectPrompt {
             prompt_id: prompt.id.clone(),
+            model: None,
         },
         &host_role,
         &state,
@@ -2028,7 +2069,10 @@ async fn test_add_prompt_after_starting_round() {
 
     // Now select the prompt for the round
     let select_result = handle_message(
-        ClientMessage::HostSelectPrompt { prompt_id },
+        ClientMessage::HostSelectPrompt {
+            prompt_id,
+            model: None,
+        },
         &host_role,
         &state,
     )
@@ -2164,7 +2208,10 @@ async fn test_submit_answer_invalid_token() {
         )
         .await
         .unwrap();
-    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
 
     handle_message(
         ClientMessage::HostTransitionPhase {
@@ -2275,7 +2322,10 @@ async fn test_valid_player_token_flow() {
         )
         .await
         .unwrap();
-    state.select_prompt(&round.id, &prompt.id).await.unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
 
     handle_message(
         ClientMessage::HostTransitionPhase {

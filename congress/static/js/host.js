@@ -15,10 +15,13 @@ import {
 
 // Import from host modules
 import {
+  fetchAvailableModels,
+  getSelectedModel,
   handleAiGenerationStatus,
   regenerateAi,
   removeSubmission,
   selectAiSubmission,
+  setSelectedModel,
   writeManualAiSubmission,
 } from "./host/ai-manager.js";
 import {
@@ -121,6 +124,9 @@ function init() {
 
   // Restore panel from URL if present (allows reload to stay on same panel)
   restorePanelFromUrl();
+
+  // Fetch available AI models
+  fetchAvailableModels();
 }
 
 function handleMessage(message) {
@@ -596,6 +602,8 @@ if (typeof window !== "undefined") {
     writeManualAiSubmission: () => writeManualAiSubmission(wsConn),
     selectAiSubmission: (id) => selectAiSubmission(id, wsConn),
     removeSubmission: (id) => removeSubmission(id, wsConn),
+    setSelectedModel,
+    getSelectedModel,
 
     // Submissions
     markDuplicate: (id) => markDuplicate(id, wsConn),

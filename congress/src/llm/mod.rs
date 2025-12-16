@@ -4,7 +4,7 @@ mod openai;
 use async_trait::async_trait;
 use std::time::Duration;
 
-pub use ollama::OllamaProvider;
+pub use ollama::{list_local_models, OllamaProvider};
 pub use openai::OpenAiProvider;
 
 /// Result type for LLM operations
@@ -41,6 +41,8 @@ pub struct GenerateRequest {
     pub max_tokens: Option<u32>,
     /// Timeout for the request
     pub timeout: Duration,
+    /// Optional model override (e.g., "gpt-5" instead of configured model)
+    pub model_override: Option<String>,
 }
 
 /// Response from an LLM provider
@@ -139,6 +141,48 @@ impl LlmManager {
             .into_iter()
             .flatten()
             .collect()
+    }
+
+    /// Generate from a specific provider with optional model override
+    /// model_id format: "provider:model" (e.g., "openai:gpt-5", "ollama:llama3.2")
+    pub async fn generate_from_model(
+        &self,
+        model_id: &str,
+        request: GenerateRequest,
+    ) -> LlmResult<(String, GenerateResponse)> {
+        let parts: Vec<&str> = model_id.splitn(2, ':').collect();
+        if parts.len() != 2 {
+            return Err(LlmError::ConfigError(
+                "Invalid model ID format, expected 'provider:model'".to_string(),
+            ));
+        }
+        let (provider_name, model_name) = (parts[0], parts[1]);
+
+        // Find provider by name
+        let provider = self
+            .providers
+            .iter()
+            .find(|p| p.name() == provider_name)
+            .ok_or_else(|| {
+                LlmError::ConfigError(format!("Provider '{}' not configured", provider_name))
+            })?;
+
+        // Check vision support for multimodal requests
+        if request.image_url.is_some() && !provider.supports_vision() {
+            return Err(LlmError::ConfigError(format!(
+                "Provider '{}' does not support vision for multimodal requests",
+                provider_name
+            )));
+        }
+
+        // Create request with model override
+        let request_with_override = GenerateRequest {
+            model_override: Some(model_name.to_string()),
+            ..request
+        };
+
+        let response = provider.generate(request_with_override).await?;
+        Ok((provider_name.to_string(), response))
     }
 }
 
@@ -276,6 +320,7 @@ pub async fn check_typos(provider: &dyn LlmProvider, text: &str) -> String {
         image_url: None,
         max_tokens: Some(500), // Allow for text that might slightly expand
         timeout: Duration::from_secs(5), // Short timeout for typo check
+        model_override: None,  // Use default model for typo check
     };
 
     match check_typos_with_system_prompt(provider, request).await {
@@ -320,6 +365,7 @@ async fn check_typos_with_system_prompt(
         image_url: request.image_url,
         max_tokens: request.max_tokens,
         timeout: request.timeout,
+        model_override: request.model_override,
     };
 
     provider.generate(modified_request).await

@@ -85,9 +85,15 @@ impl LlmProvider for OpenAiProvider {
             }
         };
 
+        // Use model override if provided, otherwise use configured model
+        let model = request
+            .model_override
+            .clone()
+            .unwrap_or_else(|| self.model.clone());
+
         // Create the chat completion request
         let mut req_builder = CreateChatCompletionRequestArgs::default();
-        req_builder.model(&self.model).messages([
+        req_builder.model(&model).messages([
             ChatCompletionRequestSystemMessageArgs::default()
                 .content(system_content)
                 .build()
@@ -128,7 +134,7 @@ impl LlmProvider for OpenAiProvider {
             text: text.trim().to_string(),
             metadata: ResponseMetadata {
                 provider: "openai".to_string(),
-                model: self.model.clone(),
+                model, // Use the actual model used (may be override)
                 tokens_used,
                 latency_ms,
             },
@@ -161,6 +167,7 @@ mod tests {
             image_url: None,
             max_tokens: Some(100),
             timeout: Duration::from_secs(30),
+            model_override: None,
         };
 
         let response = provider.generate(request).await.unwrap();

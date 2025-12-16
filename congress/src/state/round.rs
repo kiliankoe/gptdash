@@ -186,7 +186,13 @@ impl AppState {
 
     /// Select a prompt from the pool for the round and transition to Collecting
     /// This removes the prompt from the pool (it's been "used")
-    pub async fn select_prompt(&self, round_id: &str, prompt_id: &str) -> Result<Prompt, String> {
+    /// `model` specifies which AI model to use (e.g., "openai:gpt-5"). If None, uses all providers.
+    pub async fn select_prompt(
+        &self,
+        round_id: &str,
+        prompt_id: &str,
+        model: Option<String>,
+    ) -> Result<Prompt, String> {
         // Get and remove the prompt from the pool
         let prompt = self
             .remove_prompt_from_pool(prompt_id)
@@ -229,9 +235,10 @@ impl AppState {
             let state = self.clone();
             let round_id = round_id.to_string();
             let prompt_clone = prompt.clone();
+            let model_clone = model.clone();
             tokio::spawn(async move {
                 if let Err(e) = state
-                    .generate_ai_submissions(&round_id, &prompt_clone)
+                    .generate_ai_submissions(&round_id, &prompt_clone, model_clone.as_deref())
                     .await
                 {
                     tracing::error!("Failed to generate AI submissions: {}", e);
@@ -242,11 +249,14 @@ impl AppState {
         Ok(prompt)
     }
 
-    /// Generate AI submissions from all available LLM providers
+    /// Generate AI submissions from LLM providers
+    /// If `model` is Some, generates from that specific model only (format: "provider:model")
+    /// If `model` is None, generates from all available providers (existing behavior)
     pub async fn generate_ai_submissions(
         &self,
         round_id: &str,
         prompt: &Prompt,
+        model: Option<&str>,
     ) -> Result<(), String> {
         let llm = match &self.llm {
             Some(manager) => manager,
@@ -278,10 +288,24 @@ impl AppState {
             image_url: prompt.image_url.clone(),
             max_tokens: Some(self.llm_config.default_max_tokens),
             timeout: self.llm_config.default_timeout,
+            model_override: None, // Model override is handled by generate_from_model
         };
 
-        // Generate from all providers concurrently
-        let responses = llm.generate_from_all(request).await;
+        // Generate either from specific model or all providers
+        let responses: Vec<(String, crate::llm::GenerateResponse)> = if let Some(model_id) = model {
+            // Generate from specific model only
+            tracing::info!("Generating AI submission from model: {}", model_id);
+            match llm.generate_from_model(model_id, request).await {
+                Ok(response) => vec![response],
+                Err(e) => {
+                    tracing::error!("Model {} failed: {}", model_id, e);
+                    return Err(format!("Model {} failed: {}", model_id, e));
+                }
+            }
+        } else {
+            // Generate from all providers concurrently
+            llm.generate_from_all(request).await
+        };
 
         if responses.is_empty() {
             tracing::error!("No LLM providers generated responses");

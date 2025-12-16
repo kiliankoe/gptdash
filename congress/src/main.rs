@@ -109,6 +109,7 @@ async fn main() {
         .route("/host", get(auth::serve_host))
         .route("/api/state/export", get(api::export_state))
         .route("/api/state/import", post(api::import_state))
+        .route("/api/models", get(api::list_available_models))
         .layer(middleware::from_fn_with_state(
             auth_config.clone(),
             auth::host_auth_middleware,

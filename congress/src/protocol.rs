@@ -45,6 +45,10 @@ pub enum ClientMessage {
     HostStartRound,
     HostSelectPrompt {
         prompt_id: PromptId,
+        /// Optional model to use for AI generation. Format: "provider:model" (e.g., "openai:gpt-5")
+        /// If None or empty, uses all configured providers (current behavior)
+        #[serde(default)]
+        model: Option<String>,
     },
     HostEditSubmission {
         submission_id: SubmissionId,
@@ -81,7 +85,12 @@ pub enum ClientMessage {
         seconds: u32,
     },
     /// Regenerate AI submissions (retry after failure or get new options)
-    HostRegenerateAi,
+    HostRegenerateAi {
+        /// Optional model to use for AI generation. Format: "provider:model" (e.g., "openai:gpt-5")
+        /// If None or empty, uses all configured providers
+        #[serde(default)]
+        model: Option<String>,
+    },
     /// Remove an existing submission (host only)
     HostRemoveSubmission {
         submission_id: SubmissionId,

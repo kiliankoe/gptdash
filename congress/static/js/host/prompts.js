@@ -5,6 +5,7 @@
 import { gameState, promptSectionState } from "./state.js";
 import { escapeHtml, debounce } from "../common.js";
 import { showAlert } from "./ui.js";
+import { getSelectedModel } from "./ai-manager.js";
 
 // State for auto-queueing prompts after adding from overview
 export let pendingOverviewPromptAutoQueue = null;
@@ -138,9 +139,11 @@ export function selectPrompt(wsConn) {
  * Select a prompt by ID
  */
 export function selectPromptById(promptId, wsConn) {
+  const model = getSelectedModel();
   wsConn.send({
     t: "host_select_prompt",
     prompt_id: promptId,
+    model: model,
   });
 }
 

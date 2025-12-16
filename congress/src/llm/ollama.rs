@@ -93,6 +93,48 @@ struct OllamaGenerateResponse {
     done: bool,
 }
 
+/// Response from Ollama /api/tags endpoint
+#[derive(Debug, Deserialize)]
+struct OllamaTagsResponse {
+    models: Vec<OllamaModelInfo>,
+}
+
+/// Model info from Ollama /api/tags endpoint
+#[derive(Debug, Deserialize)]
+struct OllamaModelInfo {
+    name: String,
+}
+
+/// List locally installed models from Ollama
+pub async fn list_local_models(base_url: &str) -> LlmResult<Vec<String>> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(2))
+        .build()
+        .map_err(|e| LlmError::ApiError(format!("Failed to create HTTP client: {}", e)))?;
+
+    let url = format!("{}/api/tags", base_url);
+
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| LlmError::ApiError(format!("Failed to fetch Ollama models: {}", e)))?;
+
+    if !response.status().is_success() {
+        return Err(LlmError::ApiError(format!(
+            "Ollama /api/tags returned status: {}",
+            response.status()
+        )));
+    }
+
+    let tags_response: OllamaTagsResponse = response
+        .json()
+        .await
+        .map_err(|e| LlmError::ParseError(format!("Failed to parse Ollama models: {}", e)))?;
+
+    Ok(tags_response.models.into_iter().map(|m| m.name).collect())
+}
+
 #[async_trait]
 impl LlmProvider for OllamaProvider {
     async fn generate(&self, request: GenerateRequest) -> LlmResult<GenerateResponse> {
@@ -137,8 +179,14 @@ impl LlmProvider for OllamaProvider {
             None
         };
 
+        // Use model override if provided, otherwise use configured model
+        let model = request
+            .model_override
+            .clone()
+            .unwrap_or_else(|| self.model.clone());
+
         let ollama_request = OllamaGenerateRequest {
-            model: self.model.clone(),
+            model: model.clone(),
             prompt: full_prompt,
             stream: false,
             options: request.max_tokens.map(|num_predict| OllamaOptions {
@@ -176,7 +224,7 @@ impl LlmProvider for OllamaProvider {
             text: ollama_response.response.trim().to_string(),
             metadata: ResponseMetadata {
                 provider: "ollama".to_string(),
-                model: self.model.clone(),
+                model,             // Use the actual model used (may be override)
                 tokens_used: None, // Ollama doesn't return token counts in this API
                 latency_ms,
             },
@@ -207,6 +255,7 @@ mod tests {
             image_url: None,
             max_tokens: Some(100),
             timeout: Duration::from_secs(30),
+            model_override: None,
         };
 
         let response = provider.generate(request).await.unwrap();

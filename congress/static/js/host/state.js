@@ -26,6 +26,13 @@ export const gameState = {
   aiGenerationStatus: "idle", // idle, generating, completed, failed
   currentRound: null, // Current round info
   currentPrompt: null, // Currently selected prompt for the round
+  // Model selection state
+  availableModels: {
+    openai_models: [],
+    ollama_models: [],
+    default_model: null,
+  },
+  selectedModel: null, // null = all providers, "openai:gpt-5" = specific model
 };
 
 // Prompt section collapse state (persisted in localStorage)

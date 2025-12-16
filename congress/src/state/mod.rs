@@ -1075,7 +1075,10 @@ mod tests {
             )
             .await
             .unwrap();
-        state.select_prompt(&round.id, &prompt.id).await.unwrap();
+        state
+            .select_prompt(&round.id, &prompt.id, None)
+            .await
+            .unwrap();
 
         // Now transition should work
         assert!(state.transition_phase(GamePhase::Writing).await.is_ok());
@@ -1097,7 +1100,10 @@ mod tests {
             )
             .await
             .unwrap();
-        state.select_prompt(&round.id, &prompt.id).await.unwrap();
+        state
+            .select_prompt(&round.id, &prompt.id, None)
+            .await
+            .unwrap();
         state.transition_phase(GamePhase::Writing).await.unwrap();
 
         // Try to go to Reveal without submissions
@@ -1122,7 +1128,10 @@ mod tests {
             )
             .await
             .unwrap();
-        state.select_prompt(&round.id, &prompt.id).await.unwrap();
+        state
+            .select_prompt(&round.id, &prompt.id, None)
+            .await
+            .unwrap();
         state.transition_phase(GamePhase::Writing).await.unwrap();
 
         // Add a submission
@@ -1163,7 +1172,10 @@ mod tests {
             )
             .await
             .unwrap();
-        state.select_prompt(&round.id, &prompt.id).await.unwrap();
+        state
+            .select_prompt(&round.id, &prompt.id, None)
+            .await
+            .unwrap();
 
         // Should now be in Collecting state
         let current = state.get_current_round().await.unwrap();
@@ -1215,7 +1227,10 @@ mod tests {
             )
             .await
             .unwrap();
-        state.select_prompt(&round.id, &prompt.id).await.unwrap();
+        state
+            .select_prompt(&round.id, &prompt.id, None)
+            .await
+            .unwrap();
 
         // Try to transition to Revealing without submissions
         let result = state
@@ -1253,10 +1268,13 @@ mod tests {
             .unwrap();
 
         // First selection should work (transitions round to Collecting)
-        assert!(state.select_prompt(&round.id, &prompt.id).await.is_ok());
+        assert!(state
+            .select_prompt(&round.id, &prompt.id, None)
+            .await
+            .is_ok());
 
         // Try to select second prompt when not in Setup state
-        let result = state.select_prompt(&round.id, &prompt2.id).await;
+        let result = state.select_prompt(&round.id, &prompt2.id, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Setup state"));
     }
@@ -1274,7 +1292,10 @@ mod tests {
             .add_prompt_to_pool(Some("Test".to_string()), None, PromptSource::Host, None)
             .await
             .unwrap();
-        state.select_prompt(&round.id, &prompt.id).await.unwrap();
+        state
+            .select_prompt(&round.id, &prompt.id, None)
+            .await
+            .unwrap();
         state.transition_phase(GamePhase::Writing).await.unwrap();
 
         // Should not be able to start round in Writing phase
@@ -1377,7 +1398,10 @@ mod tests {
             )
             .await
             .unwrap();
-        state.select_prompt(&round.id, &prompt.id).await.unwrap();
+        state
+            .select_prompt(&round.id, &prompt.id, None)
+            .await
+            .unwrap();
 
         // Add submissions
         let player = state.create_player().await;
@@ -1422,7 +1446,10 @@ mod tests {
             .add_prompt_to_pool(Some("Test".to_string()), None, PromptSource::Host, None)
             .await
             .unwrap();
-        state.select_prompt(&round.id, &prompt.id).await.unwrap();
+        state
+            .select_prompt(&round.id, &prompt.id, None)
+            .await
+            .unwrap();
 
         let player = state.create_player().await;
         let player_sub = state

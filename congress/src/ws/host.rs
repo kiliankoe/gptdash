@@ -76,8 +76,13 @@ pub async fn handle_start_round(state: &Arc<AppState>) -> Option<ServerMessage> 
 pub async fn handle_select_prompt(
     state: &Arc<AppState>,
     prompt_id: String,
+    model: Option<String>,
 ) -> Option<ServerMessage> {
-    tracing::info!("Host selecting prompt: {}", prompt_id);
+    tracing::info!(
+        "Host selecting prompt: {} with model: {:?}",
+        prompt_id,
+        model
+    );
 
     // Ensure we have a round to select the prompt for
     let round = match state.get_current_round().await {
@@ -114,7 +119,7 @@ pub async fn handle_select_prompt(
     };
 
     // Select prompt from pool (removes it from pool)
-    match state.select_prompt(&round.id, &prompt_id).await {
+    match state.select_prompt(&round.id, &prompt_id, model).await {
         Ok(prompt) => Some(ServerMessage::PromptSelected { prompt }),
         Err(e) => Some(ServerMessage::Error {
             code: "PROMPT_SELECT_FAILED".to_string(),
@@ -375,8 +380,11 @@ pub async fn handle_extend_timer(state: &Arc<AppState>, seconds: u32) -> Option<
     }
 }
 
-pub async fn handle_regenerate_ai(state: &Arc<AppState>) -> Option<ServerMessage> {
-    tracing::info!("Host requesting AI regeneration");
+pub async fn handle_regenerate_ai(
+    state: &Arc<AppState>,
+    model: Option<String>,
+) -> Option<ServerMessage> {
+    tracing::info!("Host requesting AI regeneration with model: {:?}", model);
 
     let round = match state.get_current_round().await {
         Some(r) => r,
@@ -434,9 +442,10 @@ pub async fn handle_regenerate_ai(state: &Arc<AppState>) -> Option<ServerMessage
     // Spawn generation in background
     let state_clone = state.clone();
     let round_id = round.id.clone();
+    let model_clone = model.clone();
     tokio::spawn(async move {
         match state_clone
-            .generate_ai_submissions(&round_id, &prompt)
+            .generate_ai_submissions(&round_id, &prompt, model_clone.as_deref())
             .await
         {
             Ok(_) => {

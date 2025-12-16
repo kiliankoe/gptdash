@@ -347,6 +347,19 @@
 
                 <div class="card" style="border: 2px solid #4dabf7;">
                     <div class="card-header" style="color: #4dabf7;">KI-Antwort Verwaltung</div>
+
+                    <!-- Model selector -->
+                    <div style="margin-bottom: 15px;">
+                        <label for="modelSelector" style="display: block; margin-bottom: 5px; font-weight: bold;">KI-Modell:</label>
+                        <select id="modelSelector" onchange="setSelectedModel(this.value)" style="width: 100%;">
+                            <option value="">Alle Provider (Standard)</option>
+                            <!-- Options populated dynamically from /api/models -->
+                        </select>
+                        <p style="opacity: 0.6; font-size: 0.85em; margin-top: 5px;">
+                            Standard: Generiert von allen konfigurierten Providern. Wähle ein spezifisches Modell für gezielte Generierung.
+                        </p>
+                    </div>
+
                     <div id="aiGenerationStatus" style="margin-bottom: 15px;">
                         <p style="opacity: 0.6;">KI-Status: Warte auf Prompt-Auswahl</p>
                     </div>
