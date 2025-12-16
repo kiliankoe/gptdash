@@ -381,9 +381,56 @@ test.describe("Game Flow", () => {
     await expect(leaderboard).toBeVisible();
 
     // ============================================
-    // STEP 14: Start a second round and verify UI resets
+    // STEP 14: Host transitions to PODIUM and audience winner screen
     // ============================================
-    console.log("Step 14: Starting second round and verifying state reset...");
+    console.log("Step 14: Transitioning to podium and checking winner screens...");
+
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="PODIUM"]');
+
+    await expect(host.locator("#overviewPhase")).toHaveText("PODIUM", {
+      timeout: 5000,
+    });
+    await waitForBeamerScene(beamer, "scenePodium");
+
+    // Give time for scores message to propagate
+    await host.waitForTimeout(500);
+
+    // At least one audience member should see either:
+    // - winnerFullscreen (if they correctly identified AI and are in top 3)
+    // - waitingScreen (if they didn't identify AI correctly)
+    // Check that both audience members have appropriate screens
+    const audience0Screen = await audience[0]
+      .locator("#winnerFullscreen.active, #waitingScreen.active")
+      .first()
+      .getAttribute("id");
+    const audience1Screen = await audience[1]
+      .locator("#winnerFullscreen.active, #waitingScreen.active")
+      .first()
+      .getAttribute("id");
+
+    console.log(`Audience 0 sees: ${audience0Screen}`);
+    console.log(`Audience 1 sees: ${audience1Screen}`);
+
+    // Both should have valid screens (either winner or waiting)
+    expect(["winnerFullscreen", "waitingScreen"]).toContain(audience0Screen);
+    expect(["winnerFullscreen", "waitingScreen"]).toContain(audience1Screen);
+
+    // If winner screen is shown, verify the green pulsing animation is applied
+    const winnerScreen = audience[0].locator("#winnerFullscreen.active");
+    if ((await winnerScreen.count()) > 0) {
+      // Verify it has the pulse animation
+      const animationName = await winnerScreen.evaluate(
+        (el) => getComputedStyle(el).animationName,
+      );
+      expect(animationName).toBe("winnerPulse");
+      console.log("Winner screen verified with pulsing animation!");
+    }
+
+    // ============================================
+    // STEP 15: Start a second round and verify UI resets
+    // ============================================
+    console.log("Step 15: Starting second round and verifying state reset...");
 
     // Add a second prompt to the pool
     await host.click('.sidebar-item:has-text("Prompts")');
@@ -438,7 +485,7 @@ test.describe("Game Flow", () => {
     );
 
     console.log(
-      "Full game flow (including round 2 start) completed successfully!",
+      "Full game flow (including PODIUM winner screen and round 2 start) completed successfully!",
     );
   });
 });

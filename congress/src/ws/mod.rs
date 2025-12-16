@@ -342,6 +342,18 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                             tracing::info!("Sent submissions for audience voting state recovery");
                         }
                     }
+                    GamePhase::Results | GamePhase::Podium => {
+                        // Send scores for winner display (top 3 audience detection)
+                        let (all_players, top_audience) = state.get_leaderboards().await;
+                        let scores_msg = ServerMessage::Scores {
+                            players: all_players,
+                            audience_top: top_audience.into_iter().take(10).collect(),
+                        };
+                        if let Ok(msg) = serde_json::to_string(&scores_msg) {
+                            let _ = sender.send(Message::Text(msg.into())).await;
+                        }
+                        tracing::info!("Sent scores for audience state recovery (PODIUM/RESULTS)");
+                    }
                     _ => {}
                 }
             }

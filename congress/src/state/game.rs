@@ -397,6 +397,13 @@ impl AppState {
                             });
                         }
                     }
+                } else if effective_phase == GamePhase::Podium {
+                    // Re-broadcast scores for audience winner display
+                    let (all_players, top_audience) = self.get_leaderboards().await;
+                    self.broadcast_to_all(crate::protocol::ServerMessage::Scores {
+                        players: all_players,
+                        audience_top: top_audience.into_iter().take(10).collect(),
+                    });
                 }
 
                 // Broadcast phase change to all clients

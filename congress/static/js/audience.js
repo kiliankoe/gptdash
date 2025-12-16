@@ -34,6 +34,9 @@ let promptCandidates = [];
 let selectedPrompt = null;
 let hasPromptVoted = false;
 
+// Leaderboard state for winner detection
+let audienceLeaderboard = [];
+
 // Initialize
 function init() {
   // Check if voter token is in localStorage
@@ -216,6 +219,13 @@ function handleMessage(message) {
       }
       break;
 
+    case "scores":
+      // Store leaderboard for winner detection in PODIUM phase
+      console.log("Scores received:", message);
+      audienceLeaderboard = message.audience_top || [];
+      checkWinnerStatus();
+      break;
+
     case "error":
       handleError(message.code, message.msg);
       break;
@@ -334,12 +344,16 @@ function updatePhase(phase) {
 
     case "PODIUM":
       if (voterToken) {
-        updateWaitingMessage(
-          "&#x1F3C6;",
-          "Siegerehrung",
-          "Die Gewinner werden verkündet! Schau auf die große Leinwand.",
-        );
-        showScreen("waitingScreen");
+        if (isInTopThree()) {
+          showScreen("winnerFullscreen");
+        } else {
+          updateWaitingMessage(
+            "&#x1F3C6;",
+            "Siegerehrung",
+            "Die Gewinner werden verkündet! Schau auf die große Leinwand.",
+          );
+          showScreen("waitingScreen");
+        }
       }
       break;
 
@@ -569,6 +583,22 @@ function updatePanicModeUI() {
   if (voteButton) {
     voteButton.disabled =
       panicMode || hasVoted || !(selectedAiAnswer && selectedFunnyAnswer);
+  }
+}
+
+// Winner detection for PODIUM phase
+function isInTopThree() {
+  if (!voterToken || !audienceLeaderboard || audienceLeaderboard.length === 0) {
+    return false;
+  }
+  const top3 = audienceLeaderboard.slice(0, 3);
+  return top3.some((score) => score.ref_id === voterToken);
+}
+
+function checkWinnerStatus() {
+  // If we're in PODIUM and now know we're a winner, show the winner screen
+  if (currentPhase === "PODIUM" && isInTopThree()) {
+    showScreen("winnerFullscreen");
   }
 }
 

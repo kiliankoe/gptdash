@@ -867,3 +867,67 @@ button.secondary:hover {
   background: rgba(250, 245, 245, 0.2);
   box-shadow: none;
 }
+
+/* ========================
+   WINNER FULLSCREEN (PODIUM)
+   ======================== */
+.winner-fullscreen {
+  background: #00ff00;
+  animation: winnerPulse 2s ease-in-out infinite;
+}
+
+.winner-fullscreen.active {
+  display: flex !important;
+}
+
+@keyframes winnerPulse {
+  0%,
+  100% {
+    background-color: #00ff00;
+  }
+  50% {
+    background-color: #00cc00;
+  }
+}
+
+.winner-pulse-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  text-align: center;
+}
+
+.winner-trophy {
+  font-size: 120px;
+  animation: trophyBounce 1s ease-in-out infinite;
+}
+
+@keyframes trophyBounce {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.winner-fullscreen h1 {
+  font-family: var(--font-headline);
+  font-size: 72px;
+  font-variation-settings:
+    "wght" 100,
+    "wdth" 100;
+  color: var(--color-dark);
+  margin: 24px 0;
+  text-transform: uppercase;
+}
+
+.winner-fullscreen p {
+  font-size: 24px;
+  color: var(--color-dark);
+  opacity: 0.9;
+}
