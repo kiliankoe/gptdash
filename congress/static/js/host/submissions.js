@@ -89,7 +89,7 @@ export function updateSubmissionsList() {
         ${authorKind === "ai" && !isSelectedAi ? `<button onclick="selectAiSubmission('${sub.id}')">Als KI auswhlen</button>` : ""}
         ${authorKind === "ai" ? `<button class="remove-btn" onclick="removeSubmission('${sub.id}')">Entfernen</button>` : ""}
         ${authorKind === "player" ? `<button class="danger" onclick="markDuplicate('${sub.id}')">Dupe</button>` : ""}
-        <button class="secondary">Bearbeiten</button>
+        <button class="secondary" onclick="editSubmission('${sub.id}')">Bearbeiten</button>
       </div>
     `;
 
@@ -199,6 +199,36 @@ export function sendRevealOrder() {
   });
 
   showAlert("Reihenfolge aktualisiert", "success");
+}
+
+/**
+ * Edit a submission's display text
+ */
+export function editSubmission(submissionId, conn) {
+  const wsConnection = conn || wsConn;
+  const submission = gameState.submissions.find((s) => s.id === submissionId);
+  if (!submission) {
+    showAlert("Antwort nicht gefunden", "error");
+    return;
+  }
+
+  const newText = prompt("Antwort bearbeiten:", submission.display_text);
+
+  if (newText === null) {
+    return; // User cancelled
+  }
+
+  if (newText.trim() === "") {
+    showAlert("Antwort darf nicht leer sein", "error");
+    return;
+  }
+
+  wsConnection.send({
+    t: "host_edit_submission",
+    submission_id: submissionId,
+    new_text: newText,
+  });
+  showAlert("Antwort aktualisiert", "success");
 }
 
 /**

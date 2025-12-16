@@ -59,6 +59,7 @@ import {
 import {
   updateSubmissionsList,
   markDuplicate,
+  editSubmission,
   setRevealOrder,
   setWsConn as setSubmissionsWsConn,
 } from "./host/submissions.js";
@@ -517,6 +518,7 @@ if (typeof window !== "undefined") {
 
     // Submissions
     markDuplicate: (id) => markDuplicate(id, wsConn),
+    editSubmission: (id) => editSubmission(id, wsConn),
     setRevealOrder: () => setRevealOrder(wsConn),
 
     // Game control
