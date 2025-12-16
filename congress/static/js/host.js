@@ -23,7 +23,7 @@ import {
   log,
   clearLog,
   generateJoinQRCodes,
-  copyAudienceUrl,
+  copyPlayerUrl,
   updateScores,
 } from "./host/ui.js";
 import {
@@ -543,7 +543,7 @@ if (typeof window !== "undefined") {
 
     // Utilities
     clearLog,
-    copyAudienceUrl,
+    copyPlayerUrl,
     copyToClipboard,
   });
 }

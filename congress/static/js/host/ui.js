@@ -168,24 +168,25 @@ export function clearLog() {
  * Generate QR codes for joining the game
  */
 export function generateJoinQRCodes() {
-  // Generate QR code for audience join
-  const audienceUrl = QRCodeManager.generateAudienceQR("audienceQRCode", {
+  // Generate QR code for player join
+  const playerUrl = QRCodeManager.getPlayerJoinUrl();
+  QRCodeManager.generate("playerQRCode", playerUrl, {
     width: 200,
     height: 200,
   });
 
   // Update URL display
-  const urlEl = document.getElementById("audienceJoinUrl");
+  const urlEl = document.getElementById("playerJoinUrl");
   if (urlEl) {
-    urlEl.textContent = audienceUrl;
+    urlEl.textContent = playerUrl;
   }
 }
 
 /**
- * Copy audience join URL to clipboard
+ * Copy player join URL to clipboard
  */
-export function copyAudienceUrl() {
-  const url = QRCodeManager.getAudienceJoinUrl();
+export function copyPlayerUrl() {
+  const url = QRCodeManager.getPlayerJoinUrl();
   copyToClipboard(url);
   showAlert("URL in Zwischenablage kopiert!", "success");
 }
