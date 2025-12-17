@@ -1010,6 +1010,9 @@ function handleTriviaClear() {
   hideTriviaOverlays();
 }
 
+// Dynamic labels for trivia choices (2-4)
+const TRIVIA_LABELS = ["A", "B", "C", "D"];
+
 function showTriviaOverlay() {
   const overlay = document.getElementById("triviaOverlay");
   const resultOverlay = document.getElementById("triviaResultOverlay");
@@ -1024,13 +1027,12 @@ function showTriviaOverlay() {
   // Update question
   questionEl.textContent = gameState.activeTrivia.question;
 
-  // Update choices
-  const labels = ["A", "B", "C"];
+  // Update choices (dynamic count)
   choicesEl.innerHTML = gameState.activeTrivia.choices
     .map(
       (choice, idx) => `
       <div class="trivia-choice">
-        <span class="trivia-choice-label">${labels[idx]}</span>
+        <span class="trivia-choice-label">${TRIVIA_LABELS[idx]}</span>
         <span class="trivia-choice-text">${escapeHtml(choice)}</span>
       </div>
     `,
@@ -1061,8 +1063,7 @@ function showTriviaResult() {
   // Calculate max votes for bar width
   const maxVotes = Math.max(...result.vote_counts, 1);
 
-  // Update choices with results
-  const labels = ["A", "B", "C"];
+  // Update choices with results (dynamic count)
   choicesEl.innerHTML = result.choices
     .map((choice, idx) => {
       const isCorrect = idx === result.correct_index;
@@ -1071,7 +1072,7 @@ function showTriviaResult() {
 
       return `
         <div class="trivia-result-choice ${isCorrect ? "correct" : ""}">
-          <span class="trivia-result-label">${labels[idx]}</span>
+          <span class="trivia-result-label">${TRIVIA_LABELS[idx]}</span>
           <span class="trivia-result-text">${escapeHtml(choice)}${isCorrect ? " ✓" : ""}</span>
           <div class="trivia-result-bar-container">
             <div class="trivia-result-bar" style="width: ${percent}%"></div>

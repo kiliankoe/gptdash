@@ -664,9 +664,20 @@ pub async fn broadcast_trivia_to_host(state: &Arc<AppState>) {
 pub async fn handle_add_trivia_question(
     state: &Arc<AppState>,
     question: String,
-    choices: [crate::protocol::TriviaChoiceInput; 3],
+    choices: Vec<crate::protocol::TriviaChoiceInput>,
 ) -> Option<ServerMessage> {
     tracing::info!("Host adding trivia question: {:?}", question);
+
+    // Validate 2-4 choices
+    if choices.len() < 2 || choices.len() > 4 {
+        return Some(ServerMessage::Error {
+            code: "INVALID_TRIVIA_QUESTION".to_string(),
+            msg: format!(
+                "Trivia questions must have 2-4 choices, got {}",
+                choices.len()
+            ),
+        });
+    }
 
     // Validate exactly one choice is marked as correct
     let correct_count = choices.iter().filter(|c| c.is_correct).count();
@@ -680,21 +691,22 @@ pub async fn handle_add_trivia_question(
         });
     }
 
+    // Validate all choices have non-empty text
+    if choices.iter().any(|c| c.text.trim().is_empty()) {
+        return Some(ServerMessage::Error {
+            code: "INVALID_TRIVIA_QUESTION".to_string(),
+            msg: "All choices must have non-empty text".to_string(),
+        });
+    }
+
     // Convert protocol choices to state choices
-    let state_choices = [
-        crate::state::trivia::TriviaChoiceInput {
-            text: choices[0].text.clone(),
-            is_correct: choices[0].is_correct,
-        },
-        crate::state::trivia::TriviaChoiceInput {
-            text: choices[1].text.clone(),
-            is_correct: choices[1].is_correct,
-        },
-        crate::state::trivia::TriviaChoiceInput {
-            text: choices[2].text.clone(),
-            is_correct: choices[2].is_correct,
-        },
-    ];
+    let state_choices: Vec<crate::state::trivia::TriviaChoiceInput> = choices
+        .into_iter()
+        .map(|c| crate::state::trivia::TriviaChoiceInput {
+            text: c.text,
+            is_correct: c.is_correct,
+        })
+        .collect();
 
     let _trivia = state.add_trivia_question(question, state_choices).await;
 
@@ -731,14 +743,11 @@ pub async fn handle_present_trivia(
     match state.present_trivia(&question_id).await {
         Ok(question) => {
             // Broadcast trivia question to all clients (beamer + audience)
+            let choices: Vec<String> = question.choices.iter().map(|c| c.text.clone()).collect();
             let msg = ServerMessage::TriviaQuestion {
                 question_id: question.id.clone(),
                 question: question.question.clone(),
-                choices: [
-                    question.choices[0].text.clone(),
-                    question.choices[1].text.clone(),
-                    question.choices[2].text.clone(),
-                ],
+                choices,
             };
             state.broadcast_to_all(msg);
 

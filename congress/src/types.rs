@@ -207,12 +207,12 @@ pub struct TriviaChoice {
     pub is_correct: bool,
 }
 
-/// A trivia question with exactly 3 choices (A/B/C)
+/// A trivia question with 2-4 choices
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TriviaQuestion {
     pub id: TriviaQuestionId,
     pub question: String,
-    pub choices: [TriviaChoice; 3],
+    pub choices: Vec<TriviaChoice>,
     pub created_at: String,
 }
 

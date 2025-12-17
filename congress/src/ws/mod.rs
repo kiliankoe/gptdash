@@ -349,14 +349,12 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                     GamePhase::Writing => {
                         // Send active trivia question if any
                         if let Some(trivia) = state.get_active_trivia().await {
+                            let choices: Vec<String> =
+                                trivia.choices.iter().map(|c| c.text.clone()).collect();
                             let trivia_msg = ServerMessage::TriviaQuestion {
                                 question_id: trivia.id.clone(),
                                 question: trivia.question.clone(),
-                                choices: [
-                                    trivia.choices[0].text.clone(),
-                                    trivia.choices[1].text.clone(),
-                                    trivia.choices[2].text.clone(),
-                                ],
+                                choices,
                             };
                             if let Ok(msg) = serde_json::to_string(&trivia_msg) {
                                 let _ = sender.send(Message::Text(msg.into())).await;
@@ -465,14 +463,12 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
 
                 // Send active trivia question if any
                 if let Some(trivia) = state.get_active_trivia().await {
+                    let choices: Vec<String> =
+                        trivia.choices.iter().map(|c| c.text.clone()).collect();
                     let trivia_msg = ServerMessage::TriviaQuestion {
                         question_id: trivia.id.clone(),
                         question: trivia.question.clone(),
-                        choices: [
-                            trivia.choices[0].text.clone(),
-                            trivia.choices[1].text.clone(),
-                            trivia.choices[2].text.clone(),
-                        ],
+                        choices,
                     };
                     if let Ok(msg) = serde_json::to_string(&trivia_msg) {
                         let _ = sender.send(Message::Text(msg.into())).await;

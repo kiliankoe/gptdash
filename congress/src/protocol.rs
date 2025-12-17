@@ -140,10 +140,10 @@ pub enum ClientMessage {
         prompt_id: PromptId,
     },
     // ========== Trivia System ==========
-    /// Add a new trivia question (host only)
+    /// Add a new trivia question (host only, 2-4 choices)
     HostAddTriviaQuestion {
         question: String,
-        choices: [TriviaChoiceInput; 3],
+        choices: Vec<TriviaChoiceInput>,
     },
     /// Remove a trivia question from the pool (host only)
     HostRemoveTriviaQuestion {
@@ -345,7 +345,7 @@ pub enum ServerMessage {
     TriviaQuestion {
         question_id: TriviaQuestionId,
         question: String,
-        choices: [String; 3],
+        choices: Vec<String>,
     },
     /// Acknowledge a trivia vote
     TriviaVoteAck {
@@ -355,9 +355,9 @@ pub enum ServerMessage {
     TriviaResult {
         question_id: TriviaQuestionId,
         question: String,
-        choices: [String; 3],
+        choices: Vec<String>,
         correct_index: usize,
-        vote_counts: [u32; 3],
+        vote_counts: Vec<u32>,
         total_votes: u32,
     },
     /// Clear trivia display (return to normal WRITING screen)

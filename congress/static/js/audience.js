@@ -39,6 +39,7 @@ let triviaQuestion = null; // Current trivia question (id, question, choices)
 let selectedTriviaChoice = null;
 let hasTriviaVoted = false;
 let triviaResult = null; // Trivia result after resolve
+const TRIVIA_LABELS = ["A", "B", "C", "D"]; // Dynamic labels for 2-4 choices
 
 // Leaderboard state for winner detection
 let audienceLeaderboard = [];
@@ -928,8 +929,7 @@ function renderTriviaOptions() {
   // Update question text
   questionEl.textContent = triviaQuestion.question;
 
-  // Render choices
-  const labels = ["A", "B", "C"];
+  // Render choices (dynamic count 2-4)
   container.innerHTML = "";
 
   triviaQuestion.choices.forEach((choice, idx) => {
@@ -938,7 +938,7 @@ function renderTriviaOptions() {
     option.dataset.choiceIndex = idx;
     option.innerHTML = `
       <span class="checkmark">✓</span>
-      <span class="trivia-label">${labels[idx]}</span>
+      <span class="trivia-label">${TRIVIA_LABELS[idx]}</span>
       <span class="trivia-text">${escapeHtml(choice)}</span>
     `;
 
@@ -1007,7 +1007,6 @@ function updateTriviaVoteSummary() {
   const summaryEl = document.getElementById("triviaVoteSummary");
   if (!summaryEl || !triviaQuestion) return;
 
-  const labels = ["A", "B", "C"];
   if (
     selectedTriviaChoice !== null &&
     triviaQuestion.choices[selectedTriviaChoice]
@@ -1015,7 +1014,7 @@ function updateTriviaVoteSummary() {
     const choiceText = triviaQuestion.choices[selectedTriviaChoice];
     const shortText =
       choiceText.length > 40 ? choiceText.substring(0, 40) + "..." : choiceText;
-    summaryEl.textContent = `${labels[selectedTriviaChoice]}: "${shortText}"`;
+    summaryEl.textContent = `${TRIVIA_LABELS[selectedTriviaChoice]}: "${shortText}"`;
   } else {
     summaryEl.textContent = "";
   }
@@ -1031,8 +1030,7 @@ function showTriviaResultScreen() {
   // Update question text
   questionEl.textContent = triviaResult.question;
 
-  // Render result choices
-  const labels = ["A", "B", "C"];
+  // Render result choices (dynamic count)
   container.innerHTML = "";
 
   triviaResult.choices.forEach((choice, idx) => {
@@ -1042,7 +1040,7 @@ function showTriviaResultScreen() {
     const option = document.createElement("div");
     option.className = `trivia-result-option ${isCorrect ? "correct" : ""}`;
     option.innerHTML = `
-      <span class="trivia-label">${labels[idx]}</span>
+      <span class="trivia-label">${TRIVIA_LABELS[idx]}</span>
       <span class="trivia-text">${escapeHtml(choice)}${isCorrect ? " ✓" : ""}</span>
       <span class="trivia-count">${voteCount}</span>
     `;

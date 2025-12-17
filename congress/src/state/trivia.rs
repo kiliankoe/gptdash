@@ -19,9 +19,9 @@ pub struct TriviaChoiceInput {
 pub struct TriviaResultData {
     pub question_id: TriviaQuestionId,
     pub question: String,
-    pub choices: [String; 3],
+    pub choices: Vec<String>,
     pub correct_index: usize,
-    pub vote_counts: [u32; 3],
+    pub vote_counts: Vec<u32>,
     pub total_votes: u32,
 }
 
@@ -30,28 +30,21 @@ impl AppState {
     // Trivia Question CRUD
     // =========================================================================
 
-    /// Add a new trivia question to the pool
+    /// Add a new trivia question to the pool (2-4 choices)
     pub async fn add_trivia_question(
         &self,
         question: String,
-        choices: [TriviaChoiceInput; 3],
+        choices: Vec<TriviaChoiceInput>,
     ) -> TriviaQuestion {
         let now = chrono::Utc::now().to_rfc3339();
 
-        let trivia_choices = [
-            TriviaChoice {
-                text: choices[0].text.clone(),
-                is_correct: choices[0].is_correct,
-            },
-            TriviaChoice {
-                text: choices[1].text.clone(),
-                is_correct: choices[1].is_correct,
-            },
-            TriviaChoice {
-                text: choices[2].text.clone(),
-                is_correct: choices[2].is_correct,
-            },
-        ];
+        let trivia_choices: Vec<TriviaChoice> = choices
+            .into_iter()
+            .map(|c| TriviaChoice {
+                text: c.text,
+                is_correct: c.is_correct,
+            })
+            .collect();
 
         let trivia_question = TriviaQuestion {
             id: ulid::Ulid::new().to_string(),
@@ -174,15 +167,13 @@ impl AppState {
             .unwrap_or(0);
 
         // Get vote counts
-        let vote_counts = self.get_trivia_vote_counts(&active_id).await;
+        let vote_counts = self
+            .get_trivia_vote_counts(&active_id, question.choices.len())
+            .await;
         let total_votes: u32 = vote_counts.iter().sum();
 
         // Extract choice texts
-        let choices = [
-            question.choices[0].text.clone(),
-            question.choices[1].text.clone(),
-            question.choices[2].text.clone(),
-        ];
+        let choices: Vec<String> = question.choices.iter().map(|c| c.text.clone()).collect();
 
         // Clear active trivia (but keep votes for potential re-display)
         *self.active_trivia.write().await = None;
@@ -231,11 +222,6 @@ impl AppState {
         voter_id: &VoterId,
         choice_index: usize,
     ) -> Result<(), String> {
-        // Validate choice index (must be 0, 1, or 2)
-        if choice_index > 2 {
-            return Err("Invalid choice index (must be 0, 1, or 2)".to_string());
-        }
-
         // Get active trivia question ID
         let question_id = self
             .active_trivia
@@ -243,6 +229,20 @@ impl AppState {
             .await
             .clone()
             .ok_or_else(|| "No active trivia question".to_string())?;
+
+        // Get the question to validate choice_index against actual number of choices
+        let question = self
+            .get_trivia_question(&question_id)
+            .await
+            .ok_or_else(|| "Trivia question not found".to_string())?;
+
+        // Validate choice index against actual number of choices
+        if choice_index >= question.choices.len() {
+            return Err(format!(
+                "Invalid choice index (must be 0-{})",
+                question.choices.len() - 1
+            ));
+        }
 
         // Create the vote
         let vote = TriviaVote {
@@ -271,17 +271,21 @@ impl AppState {
         Ok(())
     }
 
-    /// Get vote counts for a trivia question [count_for_0, count_for_1, count_for_2]
-    pub async fn get_trivia_vote_counts(&self, question_id: &TriviaQuestionId) -> [u32; 3] {
+    /// Get vote counts for a trivia question as a Vec (one count per choice)
+    pub async fn get_trivia_vote_counts(
+        &self,
+        question_id: &TriviaQuestionId,
+        num_choices: usize,
+    ) -> Vec<u32> {
         let votes = self.trivia_votes.read().await;
         let question_votes = match votes.get(question_id) {
             Some(v) => v,
-            None => return [0, 0, 0],
+            None => return vec![0; num_choices],
         };
 
-        let mut counts = [0u32; 3];
+        let mut counts = vec![0u32; num_choices];
         for vote in question_votes {
-            if vote.choice_index < 3 {
+            if vote.choice_index < num_choices {
                 counts[vote.choice_index] += 1;
             }
         }
@@ -296,7 +300,15 @@ impl AppState {
             None => return 0,
         };
 
-        let counts = self.get_trivia_vote_counts(&active_id).await;
+        // Get the question to know how many choices it has
+        let question = match self.get_trivia_question(&active_id).await {
+            Some(q) => q,
+            None => return 0,
+        };
+
+        let counts = self
+            .get_trivia_vote_counts(&active_id, question.choices.len())
+            .await;
         counts.iter().sum()
     }
 
@@ -318,8 +330,8 @@ mod tests {
     use super::*;
     use crate::types::GamePhase;
 
-    fn make_choices(correct_index: usize) -> [TriviaChoiceInput; 3] {
-        [
+    fn make_choices(correct_index: usize) -> Vec<TriviaChoiceInput> {
+        vec![
             TriviaChoiceInput {
                 text: "Choice A".to_string(),
                 is_correct: correct_index == 0,
@@ -331,6 +343,40 @@ mod tests {
             TriviaChoiceInput {
                 text: "Choice C".to_string(),
                 is_correct: correct_index == 2,
+            },
+        ]
+    }
+
+    fn make_choices_2(correct_index: usize) -> Vec<TriviaChoiceInput> {
+        vec![
+            TriviaChoiceInput {
+                text: "Choice A".to_string(),
+                is_correct: correct_index == 0,
+            },
+            TriviaChoiceInput {
+                text: "Choice B".to_string(),
+                is_correct: correct_index == 1,
+            },
+        ]
+    }
+
+    fn make_choices_4(correct_index: usize) -> Vec<TriviaChoiceInput> {
+        vec![
+            TriviaChoiceInput {
+                text: "Choice A".to_string(),
+                is_correct: correct_index == 0,
+            },
+            TriviaChoiceInput {
+                text: "Choice B".to_string(),
+                is_correct: correct_index == 1,
+            },
+            TriviaChoiceInput {
+                text: "Choice C".to_string(),
+                is_correct: correct_index == 2,
+            },
+            TriviaChoiceInput {
+                text: "Choice D".to_string(),
+                is_correct: correct_index == 3,
             },
         ]
     }
@@ -498,9 +544,9 @@ mod tests {
             .await
             .unwrap();
 
-        // Check counts
-        let counts = state.get_trivia_vote_counts(&question.id).await;
-        assert_eq!(counts, [1, 2, 0]);
+        // Check counts (3 choices)
+        let counts = state.get_trivia_vote_counts(&question.id, 3).await;
+        assert_eq!(counts, vec![1, 2, 0]);
     }
 
     #[tokio::test]
@@ -535,14 +581,20 @@ mod tests {
             .submit_trivia_vote(&"voter1".to_string(), 0)
             .await
             .unwrap();
-        assert_eq!(state.get_trivia_vote_counts(&question.id).await, [1, 0, 0]);
+        assert_eq!(
+            state.get_trivia_vote_counts(&question.id, 3).await,
+            vec![1, 0, 0]
+        );
 
         // Change vote to choice 2
         state
             .submit_trivia_vote(&"voter1".to_string(), 2)
             .await
             .unwrap();
-        assert_eq!(state.get_trivia_vote_counts(&question.id).await, [0, 0, 1]);
+        assert_eq!(
+            state.get_trivia_vote_counts(&question.id, 3).await,
+            vec![0, 0, 1]
+        );
     }
 
     #[tokio::test]
@@ -593,7 +645,7 @@ mod tests {
         assert_eq!(result.question_id, question.id);
         assert_eq!(result.question, "Test?");
         assert_eq!(result.correct_index, 1);
-        assert_eq!(result.vote_counts, [1, 2, 0]);
+        assert_eq!(result.vote_counts, vec![1, 2, 0]);
         assert_eq!(result.total_votes, 3);
 
         // Active trivia should be cleared
@@ -721,5 +773,120 @@ mod tests {
         let vote = state.get_trivia_vote(&"voter1".to_string()).await.unwrap();
         assert_eq!(vote.choice_index, 2);
         assert_eq!(vote.voter_id, "voter1");
+    }
+
+    #[tokio::test]
+    async fn test_two_choice_question() {
+        let state = AppState::new();
+        state.create_game().await;
+
+        let question = state
+            .add_trivia_question("True or False?".to_string(), make_choices_2(1))
+            .await;
+
+        // Verify 2 choices stored
+        assert_eq!(question.choices.len(), 2);
+        assert_eq!(question.choices[0].text, "Choice A");
+        assert_eq!(question.choices[1].text, "Choice B");
+        assert!(question.choices[1].is_correct);
+
+        // Set up WRITING phase and present trivia
+        let round = state.start_round().await.unwrap();
+        let prompt = state
+            .add_prompt_to_pool(
+                Some("Test".to_string()),
+                None,
+                crate::types::PromptSource::Host,
+                None,
+            )
+            .await
+            .unwrap();
+        state
+            .select_prompt(&round.id, &prompt.id, None)
+            .await
+            .unwrap();
+        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state.present_trivia(&question.id).await.unwrap();
+
+        // Vote
+        state
+            .submit_trivia_vote(&"voter1".to_string(), 0)
+            .await
+            .unwrap();
+        state
+            .submit_trivia_vote(&"voter2".to_string(), 1)
+            .await
+            .unwrap();
+
+        // Check counts (2 choices)
+        let counts = state.get_trivia_vote_counts(&question.id, 2).await;
+        assert_eq!(counts, vec![1, 1]);
+
+        // Trying to vote for choice 2 should fail
+        let result = state.submit_trivia_vote(&"voter3".to_string(), 2).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid choice index"));
+    }
+
+    #[tokio::test]
+    async fn test_four_choice_question() {
+        let state = AppState::new();
+        state.create_game().await;
+
+        let question = state
+            .add_trivia_question("Pick a letter?".to_string(), make_choices_4(3))
+            .await;
+
+        // Verify 4 choices stored
+        assert_eq!(question.choices.len(), 4);
+        assert_eq!(question.choices[3].text, "Choice D");
+        assert!(question.choices[3].is_correct);
+
+        // Set up WRITING phase and present trivia
+        let round = state.start_round().await.unwrap();
+        let prompt = state
+            .add_prompt_to_pool(
+                Some("Test".to_string()),
+                None,
+                crate::types::PromptSource::Host,
+                None,
+            )
+            .await
+            .unwrap();
+        state
+            .select_prompt(&round.id, &prompt.id, None)
+            .await
+            .unwrap();
+        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state.present_trivia(&question.id).await.unwrap();
+
+        // Vote for all 4 choices
+        state
+            .submit_trivia_vote(&"voter1".to_string(), 0)
+            .await
+            .unwrap();
+        state
+            .submit_trivia_vote(&"voter2".to_string(), 1)
+            .await
+            .unwrap();
+        state
+            .submit_trivia_vote(&"voter3".to_string(), 2)
+            .await
+            .unwrap();
+        state
+            .submit_trivia_vote(&"voter4".to_string(), 3)
+            .await
+            .unwrap();
+
+        // Check counts (4 choices)
+        let counts = state.get_trivia_vote_counts(&question.id, 4).await;
+        assert_eq!(counts, vec![1, 1, 1, 1]);
+
+        // Resolve and verify
+        let result = state.resolve_trivia().await.unwrap();
+        assert_eq!(result.choices.len(), 4);
+        assert_eq!(result.vote_counts.len(), 4);
+        assert_eq!(result.correct_index, 3);
+        assert_eq!(result.total_votes, 4);
     }
 }

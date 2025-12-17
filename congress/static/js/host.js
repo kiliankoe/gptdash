@@ -116,6 +116,9 @@ function init() {
   // Generate QR codes for joining
   generateJoinQRCodes();
 
+  // Initialize trivia choice inputs (start with 2)
+  renderTriviaChoices();
+
   // Setup image preview for multimodal prompts
   setupImagePreview();
 
@@ -592,7 +595,63 @@ function updatePanicModeUI() {
   }
 }
 
-// Trivia Functions
+// Trivia Functions - Dynamic choice count (2-4)
+const TRIVIA_CHOICE_LABELS = ["A", "B", "C", "D"];
+let triviaChoiceCount = 2; // Start with 2 choices
+
+function renderTriviaChoices() {
+  const container = document.getElementById("triviaChoicesContainer");
+  if (!container) return;
+
+  let html = "";
+  for (let i = 0; i < triviaChoiceCount; i++) {
+    const existingValue =
+      document.getElementById(`triviaChoice${i}`)?.value || "";
+    html += `
+      <div style="display: grid; grid-template-columns: auto auto 1fr auto; gap: 10px; align-items: center; margin-bottom: 8px;" data-choice-index="${i}">
+        <input type="radio" name="triviaCorrect" value="${i}" id="triviaCorrect${i}" ${i === 0 ? "checked" : ""} style="width: 18px; height: 18px;">
+        <label for="triviaCorrect${i}" style="font-weight: bold;">${TRIVIA_CHOICE_LABELS[i]}:</label>
+        <input type="text" id="triviaChoice${i}" placeholder="Antwort ${TRIVIA_CHOICE_LABELS[i]}" value="${escapeHtml(existingValue)}" style="margin-bottom: 0;">
+        ${triviaChoiceCount > 2 ? `<button type="button" onclick="removeTriviaChoice(${i})" style="padding: 5px 10px; background: #e03131;">X</button>` : '<span style="width: 40px;"></span>'}
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+
+  // Show/hide add button
+  const addBtn = document.getElementById("addTriviaChoiceBtn");
+  if (addBtn) {
+    addBtn.style.display = triviaChoiceCount >= 4 ? "none" : "inline-block";
+  }
+}
+
+function addTriviaChoice() {
+  if (triviaChoiceCount >= 4) return;
+  triviaChoiceCount++;
+  renderTriviaChoices();
+}
+
+function removeTriviaChoice(index) {
+  if (triviaChoiceCount <= 2) return;
+
+  // Save current values before re-rendering
+  const values = [];
+  for (let i = 0; i < triviaChoiceCount; i++) {
+    if (i !== index) {
+      values.push(document.getElementById(`triviaChoice${i}`)?.value || "");
+    }
+  }
+
+  triviaChoiceCount--;
+  renderTriviaChoices();
+
+  // Restore values
+  for (let i = 0; i < values.length; i++) {
+    const input = document.getElementById(`triviaChoice${i}`);
+    if (input) input.value = values[i];
+  }
+}
+
 function addTriviaQuestion() {
   const questionText = document
     .getElementById("triviaQuestionText")
@@ -603,15 +662,12 @@ function addTriviaQuestion() {
   }
 
   const choices = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < triviaChoiceCount; i++) {
     const choiceText = document
       .getElementById(`triviaChoice${i}`)
       ?.value?.trim();
     if (!choiceText) {
-      showAlert(
-        `Bitte fülle Antwort ${String.fromCharCode(65 + i)} aus`,
-        "error",
-      );
+      showAlert(`Bitte fülle Antwort ${TRIVIA_CHOICE_LABELS[i]} aus`, "error");
       return;
     }
     const isCorrect =
@@ -626,11 +682,10 @@ function addTriviaQuestion() {
     choices: choices,
   });
 
-  // Clear form
+  // Clear form and reset to 2 choices
   document.getElementById("triviaQuestionText").value = "";
-  for (let i = 0; i < 3; i++) {
-    document.getElementById(`triviaChoice${i}`).value = "";
-  }
+  triviaChoiceCount = 2;
+  renderTriviaChoices();
   document.getElementById("triviaCorrect0").checked = true;
 
   showAlert("Trivia-Frage hinzugefügt", "success");
@@ -710,13 +765,12 @@ function updateTriviaUI() {
         activeTriviaText.textContent = gameState.activeTrivia.question;
       }
       if (activeTriviaChoices) {
-        const labels = ["A", "B", "C"];
         let html = "";
         gameState.activeTrivia.choices.forEach((choice, idx) => {
           const correctClass = choice.is_correct
             ? 'style="color: #51cf66; font-weight: bold;"'
             : "";
-          html += `<div ${correctClass}>${labels[idx]}: ${escapeHtml(choice.text)}${choice.is_correct ? " ✓" : ""}</div>`;
+          html += `<div ${correctClass}>${TRIVIA_CHOICE_LABELS[idx]}: ${escapeHtml(choice.text)}${choice.is_correct ? " ✓" : ""}</div>`;
         });
         activeTriviaChoices.innerHTML = html;
       }
@@ -741,7 +795,6 @@ function updateTriviaUI() {
       triviaQuestionsList.innerHTML =
         '<p style="opacity: 0.6;">Noch keine Trivia-Fragen vorhanden. Füge oben eine hinzu.</p>';
     } else {
-      const labels = ["A", "B", "C"];
       let html = "";
       gameState.triviaQuestions.forEach((q) => {
         const isActive = gameState.activeTrivia?.id === q.id;
@@ -753,7 +806,7 @@ function updateTriviaUI() {
           <div class="trivia-question-card" style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 15px; margin-bottom: 10px; ${isActive ? "border: 2px solid #ffd43b;" : ""}">
             <div style="font-weight: bold; margin-bottom: 10px;">${escapeHtml(q.question)}</div>
             <div style="margin-bottom: 10px; font-size: 0.9em;">
-              ${q.choices.map((c, i) => `<div ${c.is_correct ? 'style="color: #51cf66;"' : ""}>${labels[i]}: ${escapeHtml(c.text)}${c.is_correct ? " ✓" : ""}</div>`).join("")}
+              ${q.choices.map((c, i) => `<div ${c.is_correct ? 'style="color: #51cf66;"' : ""}>${TRIVIA_CHOICE_LABELS[i]}: ${escapeHtml(c.text)}${c.is_correct ? " ✓" : ""}</div>`).join("")}
             </div>
             <div class="button-group">
               <button onclick="presentTrivia('${escapeHtml(q.id)}')" class="primary" ${canPresent ? "" : "disabled"} title="${canPresent ? "Frage praesentieren" : "Nur waehrend WRITING und ohne aktive Trivia"}">Praesentieren</button>
@@ -839,6 +892,8 @@ if (typeof window !== "undefined") {
 
     // Trivia
     addTriviaQuestion,
+    addTriviaChoice,
+    removeTriviaChoice,
     presentTrivia,
     resolveTrivia,
     clearTrivia,
