@@ -639,3 +639,159 @@ pub async fn handle_delete_prompt(
         })
     }
 }
+
+// ========== Trivia System ==========
+
+/// Broadcast current trivia questions to host
+pub async fn broadcast_trivia_to_host(state: &Arc<AppState>) {
+    let questions = state.get_trivia_questions().await;
+    let active_trivia_id = state.get_active_trivia_id().await;
+    let active_trivia_votes = state.get_active_trivia_vote_count().await;
+
+    tracing::info!(
+        "Broadcasting trivia to host: active_id={:?}, votes={}",
+        active_trivia_id,
+        active_trivia_votes
+    );
+
+    state.broadcast_to_host(ServerMessage::HostTriviaQuestions {
+        questions,
+        active_trivia_id,
+        active_trivia_votes,
+    });
+}
+
+pub async fn handle_add_trivia_question(
+    state: &Arc<AppState>,
+    question: String,
+    choices: [crate::protocol::TriviaChoiceInput; 3],
+) -> Option<ServerMessage> {
+    tracing::info!("Host adding trivia question: {:?}", question);
+
+    // Validate exactly one choice is marked as correct
+    let correct_count = choices.iter().filter(|c| c.is_correct).count();
+    if correct_count != 1 {
+        return Some(ServerMessage::Error {
+            code: "INVALID_TRIVIA_QUESTION".to_string(),
+            msg: format!(
+                "Exactly one choice must be marked as correct, found {}",
+                correct_count
+            ),
+        });
+    }
+
+    // Convert protocol choices to state choices
+    let state_choices = [
+        crate::state::trivia::TriviaChoiceInput {
+            text: choices[0].text.clone(),
+            is_correct: choices[0].is_correct,
+        },
+        crate::state::trivia::TriviaChoiceInput {
+            text: choices[1].text.clone(),
+            is_correct: choices[1].is_correct,
+        },
+        crate::state::trivia::TriviaChoiceInput {
+            text: choices[2].text.clone(),
+            is_correct: choices[2].is_correct,
+        },
+    ];
+
+    let _trivia = state.add_trivia_question(question, state_choices).await;
+
+    // Broadcast updated trivia list to host
+    broadcast_trivia_to_host(state).await;
+
+    None
+}
+
+pub async fn handle_remove_trivia_question(
+    state: &Arc<AppState>,
+    question_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host removing trivia question: {}", question_id);
+
+    if state.remove_trivia_question(&question_id).await {
+        // Broadcast updated trivia list to host
+        broadcast_trivia_to_host(state).await;
+        None
+    } else {
+        Some(ServerMessage::Error {
+            code: "REMOVE_TRIVIA_FAILED".to_string(),
+            msg: "Trivia question not found".to_string(),
+        })
+    }
+}
+
+pub async fn handle_present_trivia(
+    state: &Arc<AppState>,
+    question_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host presenting trivia question: {}", question_id);
+
+    match state.present_trivia(&question_id).await {
+        Ok(question) => {
+            // Broadcast trivia question to all clients (beamer + audience)
+            let msg = ServerMessage::TriviaQuestion {
+                question_id: question.id.clone(),
+                question: question.question.clone(),
+                choices: [
+                    question.choices[0].text.clone(),
+                    question.choices[1].text.clone(),
+                    question.choices[2].text.clone(),
+                ],
+            };
+            state.broadcast_to_all(msg);
+
+            // Update host with active trivia
+            broadcast_trivia_to_host(state).await;
+
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "PRESENT_TRIVIA_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_resolve_trivia(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host resolving trivia question");
+
+    match state.resolve_trivia().await {
+        Some(result) => {
+            // Broadcast results to all clients (beamer + audience)
+            let msg = ServerMessage::TriviaResult {
+                question_id: result.question_id,
+                question: result.question,
+                choices: result.choices,
+                correct_index: result.correct_index,
+                vote_counts: result.vote_counts,
+                total_votes: result.total_votes,
+            };
+            state.broadcast_to_all(msg);
+
+            // Update host (active trivia is now cleared)
+            broadcast_trivia_to_host(state).await;
+
+            None
+        }
+        None => Some(ServerMessage::Error {
+            code: "RESOLVE_TRIVIA_FAILED".to_string(),
+            msg: "No active trivia question to resolve".to_string(),
+        }),
+    }
+}
+
+pub async fn handle_clear_trivia(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host clearing trivia without resolving");
+
+    state.clear_trivia().await;
+
+    // Broadcast clear to all clients (beamer + audience)
+    state.broadcast_to_all(ServerMessage::TriviaClear);
+
+    // Update host
+    broadcast_trivia_to_host(state).await;
+
+    None
+}

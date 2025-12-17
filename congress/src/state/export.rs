@@ -12,7 +12,8 @@ use std::collections::{HashMap, HashSet};
 /// Version 2: prompt_pool moved from Round.prompt_candidates to global pool
 /// Version 3: Prompt struct changed - submitter_id -> submitter_ids (Vec), added submission_count, created_at
 /// Version 4: Added audience_members with auto-generated display names
-pub const EXPORT_SCHEMA_VERSION: u32 = 4;
+/// Version 5: Added trivia_questions for audience entertainment during WRITING phase
+pub const EXPORT_SCHEMA_VERSION: u32 = 5;
 
 /// A serializable snapshot of the entire game state.
 ///
@@ -51,6 +52,9 @@ pub struct GameStateExport {
     /// Audience members with auto-generated display names (persists across games)
     #[serde(default)]
     pub audience_members: HashMap<VoterId, AudienceMember>,
+    /// Trivia questions pool (persists across rounds/games)
+    #[serde(default)]
+    pub trivia_questions: Vec<TriviaQuestion>,
 }
 
 impl GameStateExport {
@@ -68,6 +72,7 @@ impl GameStateExport {
         shadowbanned_audience: HashSet<VoterId>,
         prompt_pool: Vec<Prompt>,
         audience_members: HashMap<VoterId, AudienceMember>,
+        trivia_questions: Vec<TriviaQuestion>,
     ) -> Self {
         Self {
             schema_version: EXPORT_SCHEMA_VERSION,
@@ -83,6 +88,7 @@ impl GameStateExport {
             shadowbanned_audience,
             prompt_pool,
             audience_members,
+            trivia_questions,
         }
     }
 
@@ -161,6 +167,7 @@ mod tests {
             HashSet::new(),
             Vec::new(),
             HashMap::new(),
+            Vec::new(), // trivia_questions
         );
 
         let json = serde_json::to_string_pretty(&export).unwrap();
@@ -195,6 +202,7 @@ mod tests {
             shadowbanned_audience: HashSet::new(),
             prompt_pool: Vec::new(),
             audience_members: HashMap::new(),
+            trivia_questions: Vec::new(),
         };
 
         let result = export.validate();
@@ -218,6 +226,7 @@ mod tests {
             shadowbanned_audience: HashSet::new(),
             prompt_pool: Vec::new(),
             audience_members: HashMap::new(),
+            trivia_questions: Vec::new(),
         };
 
         let result = export.validate();

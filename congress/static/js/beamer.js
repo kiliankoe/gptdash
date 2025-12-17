@@ -24,6 +24,9 @@ const gameState = {
   voteCounts: { ai: {}, funny: {} },
   promptCandidates: [], // Prompts for voting during PROMPT_SELECTION
   promptVoteCounts: {}, // Vote counts per prompt during PROMPT_SELECTION
+  // Trivia state
+  activeTrivia: null, // Current trivia question being shown
+  triviaResult: null, // Trivia result after resolve
 };
 
 // Connections and utilities
@@ -139,6 +142,16 @@ function handleMessage(msg) {
     case "beamer_prompt_vote_counts":
       handlePromptVoteCounts(msg);
       break;
+    // Trivia messages
+    case "trivia_question":
+      handleTriviaQuestion(msg);
+      break;
+    case "trivia_result":
+      handleTriviaResult(msg);
+      break;
+    case "trivia_clear":
+      handleTriviaClear();
+      break;
     case "error":
       console.error("[Beamer] Error:", msg.code, msg.msg);
       break;
@@ -202,6 +215,13 @@ function handlePhaseChange(msg) {
   if (previousPhase === "REVEAL" && msg.phase !== "REVEAL") {
     gameState.currentRevealSubmission = null;
     lastSpokenSubmissionId = null;
+  }
+
+  // Clear trivia when leaving WRITING phase
+  if (previousPhase === "WRITING" && msg.phase !== "WRITING") {
+    gameState.activeTrivia = null;
+    gameState.triviaResult = null;
+    hideTriviaOverlays();
   }
 
   showScene(phaseToScene(msg.phase));
@@ -953,3 +973,128 @@ setInterval(() => {
     activeTimerEl.classList.remove("warning");
   }
 }, 100);
+
+// ========================
+// Trivia Handlers
+// ========================
+
+function handleTriviaQuestion(msg) {
+  console.log("[Beamer] Trivia question received:", msg);
+  gameState.activeTrivia = {
+    question_id: msg.question_id,
+    question: msg.question,
+    choices: msg.choices,
+  };
+  gameState.triviaResult = null; // Clear any previous result
+  showTriviaOverlay();
+}
+
+function handleTriviaResult(msg) {
+  console.log("[Beamer] Trivia result received:", msg);
+  gameState.triviaResult = {
+    question_id: msg.question_id,
+    question: msg.question,
+    choices: msg.choices,
+    correct_index: msg.correct_index,
+    vote_counts: msg.vote_counts,
+    total_votes: msg.total_votes,
+  };
+  gameState.activeTrivia = null; // Clear active question
+  showTriviaResult();
+}
+
+function handleTriviaClear() {
+  console.log("[Beamer] Trivia cleared");
+  gameState.activeTrivia = null;
+  gameState.triviaResult = null;
+  hideTriviaOverlays();
+}
+
+function showTriviaOverlay() {
+  const overlay = document.getElementById("triviaOverlay");
+  const resultOverlay = document.getElementById("triviaResultOverlay");
+  const questionEl = document.getElementById("triviaQuestion");
+  const choicesEl = document.getElementById("triviaChoices");
+
+  if (!overlay || !questionEl || !choicesEl) return;
+
+  // Hide result overlay if showing
+  if (resultOverlay) resultOverlay.style.display = "none";
+
+  // Update question
+  questionEl.textContent = gameState.activeTrivia.question;
+
+  // Update choices
+  const labels = ["A", "B", "C"];
+  choicesEl.innerHTML = gameState.activeTrivia.choices
+    .map(
+      (choice, idx) => `
+      <div class="trivia-choice">
+        <span class="trivia-choice-label">${labels[idx]}</span>
+        <span class="trivia-choice-text">${escapeHtml(choice)}</span>
+      </div>
+    `,
+    )
+    .join("");
+
+  // Show overlay
+  overlay.style.display = "flex";
+}
+
+function showTriviaResult() {
+  const overlay = document.getElementById("triviaOverlay");
+  const resultOverlay = document.getElementById("triviaResultOverlay");
+  const questionEl = document.getElementById("triviaResultQuestion");
+  const choicesEl = document.getElementById("triviaResultChoices");
+  const totalVotesEl = document.getElementById("triviaTotalVotes");
+
+  if (!resultOverlay || !questionEl || !choicesEl) return;
+
+  // Hide question overlay
+  if (overlay) overlay.style.display = "none";
+
+  const result = gameState.triviaResult;
+
+  // Update question
+  questionEl.textContent = result.question;
+
+  // Calculate max votes for bar width
+  const maxVotes = Math.max(...result.vote_counts, 1);
+
+  // Update choices with results
+  const labels = ["A", "B", "C"];
+  choicesEl.innerHTML = result.choices
+    .map((choice, idx) => {
+      const isCorrect = idx === result.correct_index;
+      const voteCount = result.vote_counts[idx] || 0;
+      const percent = (voteCount / maxVotes) * 100;
+
+      return `
+        <div class="trivia-result-choice ${isCorrect ? "correct" : ""}">
+          <span class="trivia-result-label">${labels[idx]}</span>
+          <span class="trivia-result-text">${escapeHtml(choice)}${isCorrect ? " ✓" : ""}</span>
+          <div class="trivia-result-bar-container">
+            <div class="trivia-result-bar" style="width: ${percent}%"></div>
+          </div>
+          <span class="trivia-result-count">${voteCount}</span>
+        </div>
+      `;
+    })
+    .join("");
+
+  // Update total votes
+  if (totalVotesEl) {
+    totalVotesEl.textContent = `Gesamt: ${result.total_votes} Stimmen`;
+  }
+
+  // Show result overlay
+  resultOverlay.style.display = "flex";
+}
+
+function hideTriviaOverlays() {
+  const overlay = document.getElementById("triviaOverlay");
+  const resultOverlay = document.getElementById("triviaResultOverlay");
+
+  if (overlay) overlay.style.display = "none";
+  if (resultOverlay) resultOverlay.style.display = "none";
+}

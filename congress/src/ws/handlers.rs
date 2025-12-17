@@ -230,6 +230,37 @@ pub async fn handle_message(
             voter_token,
             prompt_id,
         } => audience::handle_prompt_vote(state, voter_token, prompt_id).await,
+
+        // ========== Trivia System ==========
+        ClientMessage::HostAddTriviaQuestion { question, choices } => {
+            check_host!(role, "add trivia questions");
+            host::handle_add_trivia_question(state, question, choices).await
+        }
+
+        ClientMessage::HostRemoveTriviaQuestion { question_id } => {
+            check_host!(role, "remove trivia questions");
+            host::handle_remove_trivia_question(state, question_id).await
+        }
+
+        ClientMessage::HostPresentTrivia { question_id } => {
+            check_host!(role, "present trivia");
+            host::handle_present_trivia(state, question_id).await
+        }
+
+        ClientMessage::HostResolveTrivia => {
+            check_host!(role, "resolve trivia");
+            host::handle_resolve_trivia(state).await
+        }
+
+        ClientMessage::HostClearTrivia => {
+            check_host!(role, "clear trivia");
+            host::handle_clear_trivia(state).await
+        }
+
+        ClientMessage::SubmitTriviaVote {
+            voter_token,
+            choice_index,
+        } => audience::handle_submit_trivia_vote(state, voter_token, choice_index).await,
     }
 }
 

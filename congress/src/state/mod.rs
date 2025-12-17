@@ -4,6 +4,7 @@ mod player;
 mod round;
 mod score;
 mod submission;
+pub mod trivia;
 pub mod vote;
 
 use crate::llm::{LlmConfig, LlmManager};
@@ -42,6 +43,12 @@ pub struct AppState {
     pub vote_challenge_nonce: Arc<RwLock<Option<String>>>,
     /// Timestamp when VOTING phase started (for server-side timing validation)
     pub voting_phase_started_at: Arc<RwLock<Option<chrono::DateTime<chrono::Utc>>>>,
+    /// Trivia questions pool (persists across rounds/games)
+    pub trivia_questions: Arc<RwLock<Vec<TriviaQuestion>>>,
+    /// Currently active trivia question ID (during WRITING phase)
+    pub active_trivia: Arc<RwLock<Option<TriviaQuestionId>>>,
+    /// Trivia votes per question (question_id -> vec of votes)
+    pub trivia_votes: Arc<RwLock<HashMap<TriviaQuestionId, Vec<TriviaVote>>>>,
     /// LLM manager for generating AI answers
     pub llm: Option<Arc<LlmManager>>,
     /// LLM configuration (timeout, max tokens, etc.)
@@ -87,6 +94,9 @@ impl AppState {
             audience_members: Arc::new(RwLock::new(HashMap::new())),
             vote_challenge_nonce: Arc::new(RwLock::new(None)),
             voting_phase_started_at: Arc::new(RwLock::new(None)),
+            trivia_questions: Arc::new(RwLock::new(Vec::new())),
+            active_trivia: Arc::new(RwLock::new(None)),
+            trivia_votes: Arc::new(RwLock::new(HashMap::new())),
             llm: llm.map(Arc::new),
             llm_config,
             broadcast: broadcast_tx,
@@ -819,6 +829,7 @@ impl AppState {
         let shadowbanned_audience = self.shadowbanned_audience.read().await.clone();
         let prompt_pool = self.prompt_pool.read().await.clone();
         let audience_members = self.audience_members.read().await.clone();
+        let trivia_questions = self.trivia_questions.read().await.clone();
 
         GameStateExport::new(
             game,
@@ -832,6 +843,7 @@ impl AppState {
             shadowbanned_audience,
             prompt_pool,
             audience_members,
+            trivia_questions,
         )
     }
 
@@ -855,6 +867,7 @@ impl AppState {
         *self.shadowbanned_audience.write().await = export.shadowbanned_audience;
         *self.prompt_pool.write().await = export.prompt_pool;
         *self.audience_members.write().await = export.audience_members;
+        *self.trivia_questions.write().await = export.trivia_questions;
 
         // Broadcast state refresh to all clients
         if let Some(ref game) = export.game {

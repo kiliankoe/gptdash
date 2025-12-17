@@ -75,6 +75,35 @@
                 <div class="writing-timer" id="writingTimer">01:00</div>
                 <div class="submission-counter" id="submissionCounter">0 Antworten eingereicht</div>
             </div>
+
+            <!-- Trivia Overlay (shown during active trivia) -->
+            <div class="trivia-overlay" id="triviaOverlay" style="display: none;">
+                <div class="trivia-question-card">
+                    <div class="trivia-label label">Trivia</div>
+                    <div class="trivia-question headline headline-lg" id="triviaQuestion">
+                        Trivia-Frage wird geladen...
+                    </div>
+                    <div class="trivia-choices" id="triviaChoices">
+                        <!-- Choices will be generated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trivia Result Overlay (shown after resolve) -->
+            <div class="trivia-result-overlay" id="triviaResultOverlay" style="display: none;">
+                <div class="trivia-result-card">
+                    <div class="trivia-label label">Trivia Ergebnis</div>
+                    <div class="trivia-question headline headline-md" id="triviaResultQuestion">
+                        Trivia-Frage...
+                    </div>
+                    <div class="trivia-result-choices" id="triviaResultChoices">
+                        <!-- Result bars will be generated dynamically -->
+                    </div>
+                    <div class="trivia-total-votes" id="triviaTotalVotes">
+                        Gesamt: 0 Stimmen
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- ========================

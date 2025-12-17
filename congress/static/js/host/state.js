@@ -33,6 +33,11 @@ export const gameState = {
     default_model: null,
   },
   selectedModel: null, // null = all providers, "openai:gpt-5" = specific model
+  // Trivia state
+  triviaQuestions: [], // All trivia questions in pool
+  activeTrivia: null, // Currently presented trivia question (full object)
+  activeTriviaVoteCount: 0, // Vote count for active trivia
+  triviaResultShowing: false, // True when trivia result is being displayed
 };
 
 // Prompt section collapse state (persisted in localStorage)

@@ -34,6 +34,12 @@ let promptCandidates = [];
 let selectedPrompt = null;
 let hasPromptVoted = false;
 
+// Trivia state
+let triviaQuestion = null; // Current trivia question (id, question, choices)
+let selectedTriviaChoice = null;
+let hasTriviaVoted = false;
+let triviaResult = null; // Trivia result after resolve
+
 // Leaderboard state for winner detection
 let audienceLeaderboard = [];
 
@@ -226,6 +232,40 @@ function handleMessage(message) {
       checkWinnerStatus();
       break;
 
+    // Trivia messages
+    case "trivia_question":
+      handleTriviaQuestion(message);
+      break;
+
+    case "trivia_vote_ack":
+      console.log("Trivia vote acknowledged:", message);
+      hasTriviaVoted = true;
+      showScreen("triviaConfirmedScreen");
+      updateTriviaVoteSummary();
+      break;
+
+    case "trivia_vote_state":
+      // State recovery for trivia voting on reconnect
+      console.log("Trivia vote state recovery:", message);
+      if (message.has_voted && message.choice_index !== null) {
+        hasTriviaVoted = true;
+        selectedTriviaChoice = message.choice_index;
+        // If trivia is active and we're in WRITING phase, show confirmed screen
+        if (triviaQuestion && currentPhase === "WRITING") {
+          showScreen("triviaConfirmedScreen");
+          updateTriviaVoteSummary();
+        }
+      }
+      break;
+
+    case "trivia_result":
+      handleTriviaResult(message);
+      break;
+
+    case "trivia_clear":
+      handleTriviaClear();
+      break;
+
     case "error":
       handleError(message.code, message.msg);
       break;
@@ -240,6 +280,11 @@ function resetRoundUiState() {
   promptCandidates = [];
   hasPromptVoted = false;
   selectedPrompt = null;
+  // Clear trivia state
+  triviaQuestion = null;
+  triviaResult = null;
+  hasTriviaVoted = false;
+  selectedTriviaChoice = null;
   // Clear challenge for new round
   if (challengeSolver) {
     challengeSolver.clear();
@@ -265,9 +310,20 @@ function joinAudience() {
 
   updateConnectionStatus(true, "connected");
   hideError("welcomeError");
+
   // Show the appropriate screen based on current phase (important for late joiners)
   if (currentPhase === "VOTING" && !hasVoted) {
     showVotingScreen();
+  } else if (currentPhase === "WRITING" && triviaQuestion && !hasTriviaVoted) {
+    // If there's an active trivia question during WRITING, show trivia voting
+    showTriviaScreen();
+  } else if (currentPhase === "WRITING" && triviaQuestion && hasTriviaVoted) {
+    // If they've already voted on trivia, show confirmed screen
+    showScreen("triviaConfirmedScreen");
+    updateTriviaVoteSummary();
+  } else if (triviaResult) {
+    // If trivia results are showing, display them
+    showTriviaResultScreen();
   } else {
     showScreen("waitingScreen");
   }
@@ -802,6 +858,205 @@ function updatePromptVoteSummary() {
   }
 }
 
+// ========================
+// Trivia Functions
+// ========================
+
+function handleTriviaQuestion(message) {
+  console.log("Trivia question received:", message);
+  triviaQuestion = {
+    question_id: message.question_id,
+    question: message.question,
+    choices: message.choices,
+  };
+  triviaResult = null;
+  hasTriviaVoted = false;
+  selectedTriviaChoice = null;
+
+  // If we're in WRITING phase, show trivia screen
+  if (currentPhase === "WRITING") {
+    showTriviaScreen();
+  }
+}
+
+function handleTriviaResult(message) {
+  console.log("Trivia result received:", message);
+  triviaResult = {
+    question_id: message.question_id,
+    question: message.question,
+    choices: message.choices,
+    correct_index: message.correct_index,
+    vote_counts: message.vote_counts,
+    total_votes: message.total_votes,
+  };
+  triviaQuestion = null; // Clear active question
+
+  // Show result screen
+  showTriviaResultScreen();
+}
+
+function handleTriviaClear() {
+  console.log("Trivia cleared");
+  triviaQuestion = null;
+  triviaResult = null;
+  hasTriviaVoted = false;
+  selectedTriviaChoice = null;
+
+  // Return to waiting screen if in WRITING phase
+  if (currentPhase === "WRITING") {
+    updateWaitingMessage(
+      "&#x270D;&#xFE0F;",
+      "Spieler schreiben...",
+      "Die Spieler denken sich gerade ihre Antworten aus. Gleich kannst du abstimmen!",
+    );
+    showScreen("waitingScreen");
+  }
+}
+
+function showTriviaScreen() {
+  renderTriviaOptions();
+  hideError("triviaError");
+  showScreen("triviaScreen");
+}
+
+function renderTriviaOptions() {
+  const questionEl = document.getElementById("triviaQuestionText");
+  const container = document.getElementById("triviaOptions");
+
+  if (!questionEl || !container || !triviaQuestion) return;
+
+  // Update question text
+  questionEl.textContent = triviaQuestion.question;
+
+  // Render choices
+  const labels = ["A", "B", "C"];
+  container.innerHTML = "";
+
+  triviaQuestion.choices.forEach((choice, idx) => {
+    const option = document.createElement("div");
+    option.className = "trivia-option";
+    option.dataset.choiceIndex = idx;
+    option.innerHTML = `
+      <span class="checkmark">✓</span>
+      <span class="trivia-label">${labels[idx]}</span>
+      <span class="trivia-text">${escapeHtml(choice)}</span>
+    `;
+
+    if (selectedTriviaChoice === idx) {
+      option.classList.add("selected");
+    }
+
+    option.addEventListener("click", () => selectTriviaChoice(idx));
+    container.appendChild(option);
+  });
+}
+
+function selectTriviaChoice(choiceIndex) {
+  console.log("Selected trivia choice:", choiceIndex);
+  selectedTriviaChoice = choiceIndex;
+
+  // Update UI
+  document.querySelectorAll("#triviaOptions .trivia-option").forEach((opt) => {
+    opt.classList.toggle(
+      "selected",
+      parseInt(opt.dataset.choiceIndex, 10) === choiceIndex,
+    );
+  });
+
+  // Auto-submit vote (no need for submit button like main voting)
+  submitTriviaVote();
+}
+
+function submitTriviaVote() {
+  if (selectedTriviaChoice === null) {
+    console.log("submitTriviaVote: No choice selected, returning");
+    return;
+  }
+
+  if (!requireConnection("triviaError")) {
+    console.log("submitTriviaVote: Not connected, returning");
+    return;
+  }
+
+  console.log("submitTriviaVote: Sending vote", {
+    voter_token: voterToken,
+    choice_index: selectedTriviaChoice,
+  });
+
+  // Send trivia vote
+  const sent = wsConn.send({
+    t: "submit_trivia_vote",
+    voter_token: voterToken,
+    choice_index: selectedTriviaChoice,
+  });
+
+  if (!sent) {
+    showError("triviaError", "Verbindung verloren. Versuch's nochmal.");
+    return;
+  }
+
+  hideError("triviaError");
+}
+
+function changeTriviaVote() {
+  hasTriviaVoted = false;
+  showTriviaScreen();
+}
+
+function updateTriviaVoteSummary() {
+  const summaryEl = document.getElementById("triviaVoteSummary");
+  if (!summaryEl || !triviaQuestion) return;
+
+  const labels = ["A", "B", "C"];
+  if (
+    selectedTriviaChoice !== null &&
+    triviaQuestion.choices[selectedTriviaChoice]
+  ) {
+    const choiceText = triviaQuestion.choices[selectedTriviaChoice];
+    const shortText =
+      choiceText.length > 40 ? choiceText.substring(0, 40) + "..." : choiceText;
+    summaryEl.textContent = `${labels[selectedTriviaChoice]}: "${shortText}"`;
+  } else {
+    summaryEl.textContent = "";
+  }
+}
+
+function showTriviaResultScreen() {
+  const questionEl = document.getElementById("triviaResultQuestionText");
+  const container = document.getElementById("triviaResultOptions");
+  const totalEl = document.getElementById("triviaResultTotal");
+
+  if (!questionEl || !container || !triviaResult) return;
+
+  // Update question text
+  questionEl.textContent = triviaResult.question;
+
+  // Render result choices
+  const labels = ["A", "B", "C"];
+  container.innerHTML = "";
+
+  triviaResult.choices.forEach((choice, idx) => {
+    const isCorrect = idx === triviaResult.correct_index;
+    const voteCount = triviaResult.vote_counts[idx] || 0;
+
+    const option = document.createElement("div");
+    option.className = `trivia-result-option ${isCorrect ? "correct" : ""}`;
+    option.innerHTML = `
+      <span class="trivia-label">${labels[idx]}</span>
+      <span class="trivia-text">${escapeHtml(choice)}${isCorrect ? " ✓" : ""}</span>
+      <span class="trivia-count">${voteCount}</span>
+    `;
+    container.appendChild(option);
+  });
+
+  // Update total
+  if (totalEl) {
+    totalEl.textContent = `Gesamt: ${triviaResult.total_votes} Stimmen`;
+  }
+
+  showScreen("triviaResultScreen");
+}
+
 if (typeof window !== "undefined") {
   Object.assign(window, {
     joinAudience,
@@ -811,6 +1066,7 @@ if (typeof window !== "undefined") {
     submitPrompt,
     submitPromptVote,
     changePromptVote,
+    changeTriviaVote,
   });
 }
 

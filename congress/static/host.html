@@ -38,6 +38,7 @@
             <div class="sidebar-item" onclick="showPanel('game')">Spiel-Steuerung</div>
             <div class="sidebar-item" onclick="showPanel('players')">Spieler</div>
             <div class="sidebar-item" onclick="showPanel('prompts')">Prompts</div>
+            <div class="sidebar-item" onclick="showPanel('trivia')">Trivia</div>
             <div class="sidebar-item" onclick="showPanel('submissions')">Antworten</div>
             <div class="sidebar-item" onclick="showPanel('scores')">Punkte</div>
             <div class="sidebar-item" onclick="showPanel('state')">State-Export</div>
@@ -337,6 +338,78 @@
                         <div id="audiencePromptsList" class="prompt-section-content">
                             <p class="no-prompts-hint">Keine Publikums-Prompts</p>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trivia Panel -->
+            <div class="panel" id="trivia">
+                <h2>Trivia-Verwaltung</h2>
+
+                <!-- Active Trivia Controls -->
+                <div class="card" id="activeTriviaCard" style="border: 2px solid #ffd43b; display: none;">
+                    <div class="card-header" style="color: #ffd43b;">Aktive Trivia-Frage</div>
+                    <div id="activeTriviaQuestion" style="margin-bottom: 15px;">
+                        <p style="font-size: 1.1em; font-weight: bold;" id="activeTriviaText"></p>
+                        <div id="activeTriviaChoices" style="margin-top: 10px;"></div>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <span>Stimmen: <strong id="activeTriviaVoteCount">0</strong></span>
+                    </div>
+                    <div class="button-group">
+                        <button onclick="resolveTrivia()" class="primary">Aufloesen (Ergebnis zeigen)</button>
+                        <button onclick="clearTrivia()" class="secondary">Ausblenden (ohne Ergebnis)</button>
+                    </div>
+                </div>
+
+                <!-- Trivia Result Controls (after resolving) -->
+                <div class="card" id="triviaResultCard" style="border: 2px solid #40c057; display: none;">
+                    <div class="card-header" style="color: #40c057;">Trivia-Ergebnis wird angezeigt</div>
+                    <p style="margin-bottom: 15px;">Das Ergebnis der Trivia-Frage wird gerade auf dem Beamer und bei den Zuschauern angezeigt.</p>
+                    <button onclick="clearTriviaResult()" class="secondary">Ergebnis ausblenden</button>
+                </div>
+
+                <!-- Add Question Form -->
+                <div class="card">
+                    <div class="card-header">Trivia-Frage hinzufuegen</div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Frage:</label>
+                        <textarea id="triviaQuestionText" placeholder="Gib hier die Trivia-Frage ein..." style="min-height: 60px;"></textarea>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 10px; font-weight: bold;">Antworten (markiere die richtige):</label>
+
+                        <div style="display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <input type="radio" name="triviaCorrect" value="0" id="triviaCorrect0" checked style="width: 18px; height: 18px;">
+                            <label for="triviaCorrect0" style="font-weight: bold;">A:</label>
+                            <input type="text" id="triviaChoice0" placeholder="Antwort A" style="margin-bottom: 0;">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <input type="radio" name="triviaCorrect" value="1" id="triviaCorrect1" style="width: 18px; height: 18px;">
+                            <label for="triviaCorrect1" style="font-weight: bold;">B:</label>
+                            <input type="text" id="triviaChoice1" placeholder="Antwort B" style="margin-bottom: 0;">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <input type="radio" name="triviaCorrect" value="2" id="triviaCorrect2" style="width: 18px; height: 18px;">
+                            <label for="triviaCorrect2" style="font-weight: bold;">C:</label>
+                            <input type="text" id="triviaChoice2" placeholder="Antwort C" style="margin-bottom: 0;">
+                        </div>
+                    </div>
+
+                    <button onclick="addTriviaQuestion()">Frage hinzufuegen</button>
+                </div>
+
+                <!-- Question List -->
+                <div class="card">
+                    <div class="card-header">Trivia-Fragen (<span id="triviaQuestionCount">0</span>)</div>
+                    <p style="opacity: 0.7; font-size: 0.9em; margin-bottom: 15px;">
+                        Trivia-Fragen koennen waehrend der WRITING-Phase praesentiert werden, um das Publikum zu unterhalten.
+                    </p>
+                    <div id="triviaQuestionsList">
+                        <p style="opacity: 0.6;">Noch keine Trivia-Fragen vorhanden. Fuege oben eine hinzu.</p>
                     </div>
                 </div>
             </div>

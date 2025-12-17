@@ -107,14 +107,30 @@ export async function createGameClients(
     }
   });
 
+  const audience1Page = await audience1Context.newPage();
+  const audience2Page = await audience2Context.newPage();
+
+  // Capture console logs from audience pages for debugging
+  audience1Page.on("console", (msg) => {
+    if (
+      msg.text().includes("joinAudience") ||
+      msg.text().includes("trivia") ||
+      msg.text().includes("Trivia") ||
+      msg.text().includes("Phase") ||
+      msg.text().includes("submitTriviaVote") ||
+      msg.text().includes("showScreen") ||
+      msg.text().includes("handleTriviaQuestion") ||
+      msg.text().includes("showTriviaScreen")
+    ) {
+      console.log(`[AUDIENCE1 CONSOLE] ${msg.type()}: ${msg.text()}`);
+    }
+  });
+
   const clients: GameClients = {
     host: hostPage,
     beamer: await beamerContext.newPage(),
     players: [await player1Context.newPage(), await player2Context.newPage()],
-    audience: [
-      await audience1Context.newPage(),
-      await audience2Context.newPage(),
-    ],
+    audience: [audience1Page, audience2Page],
   };
 
   return { clients, contexts };

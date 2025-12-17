@@ -309,6 +309,41 @@ function handleMessage(message) {
       showAlert(`Fehler: ${message.msg}`, "error");
       break;
 
+    // Trivia messages
+    case "host_trivia_questions":
+      console.log("Received host_trivia_questions:", message);
+      gameState.triviaQuestions = message.questions || [];
+      // Look up the active question by ID from the questions list
+      if (message.active_trivia_id) {
+        gameState.activeTrivia =
+          gameState.triviaQuestions.find(
+            (q) => q.id === message.active_trivia_id,
+          ) || null;
+      } else {
+        gameState.activeTrivia = null;
+      }
+      gameState.activeTriviaVoteCount = message.active_trivia_votes || 0;
+      console.log(
+        "Updated activeTriviaVoteCount:",
+        gameState.activeTriviaVoteCount,
+      );
+      updateTriviaUI();
+      break;
+
+    case "trivia_result":
+      // Trivia was resolved - results are now showing on beamer/audience
+      gameState.triviaResultShowing = true;
+      gameState.activeTrivia = null; // Active trivia is cleared after resolve
+      updateTriviaUI();
+      break;
+
+    case "trivia_clear":
+      // Trivia was cleared (either by host or phase change)
+      gameState.triviaResultShowing = false;
+      gameState.activeTrivia = null;
+      updateTriviaUI();
+      break;
+
     default:
       console.log("Unhandled message type:", message.t, message);
       break;
@@ -557,6 +592,190 @@ function updatePanicModeUI() {
   }
 }
 
+// Trivia Functions
+function addTriviaQuestion() {
+  const questionText = document
+    .getElementById("triviaQuestionText")
+    ?.value?.trim();
+  if (!questionText) {
+    showAlert("Bitte gib eine Frage ein", "error");
+    return;
+  }
+
+  const choices = [];
+  for (let i = 0; i < 3; i++) {
+    const choiceText = document
+      .getElementById(`triviaChoice${i}`)
+      ?.value?.trim();
+    if (!choiceText) {
+      showAlert(
+        `Bitte fülle Antwort ${String.fromCharCode(65 + i)} aus`,
+        "error",
+      );
+      return;
+    }
+    const isCorrect =
+      document.querySelector(`input[name="triviaCorrect"]:checked`)?.value ===
+      String(i);
+    choices.push({ text: choiceText, is_correct: isCorrect });
+  }
+
+  wsConn.send({
+    t: "host_add_trivia_question",
+    question: questionText,
+    choices: choices,
+  });
+
+  // Clear form
+  document.getElementById("triviaQuestionText").value = "";
+  for (let i = 0; i < 3; i++) {
+    document.getElementById(`triviaChoice${i}`).value = "";
+  }
+  document.getElementById("triviaCorrect0").checked = true;
+
+  showAlert("Trivia-Frage hinzugefügt", "success");
+}
+
+function presentTrivia(questionId) {
+  if (gameState.phase !== "WRITING") {
+    showAlert(
+      "Trivia kann nur während der WRITING-Phase präsentiert werden",
+      "error",
+    );
+    return;
+  }
+  if (gameState.activeTrivia) {
+    showAlert(
+      "Es ist bereits eine Trivia-Frage aktiv. Löse sie zuerst auf oder blende sie aus.",
+      "error",
+    );
+    return;
+  }
+  wsConn.send({
+    t: "host_present_trivia",
+    question_id: questionId,
+  });
+  showAlert("Trivia-Frage wird präsentiert", "success");
+}
+
+function resolveTrivia() {
+  if (!gameState.activeTrivia) {
+    showAlert("Keine aktive Trivia-Frage", "error");
+    return;
+  }
+  wsConn.send({ t: "host_resolve_trivia" });
+  showAlert("Trivia aufgelöst - Ergebnis wird angezeigt", "success");
+}
+
+function clearTrivia() {
+  if (!gameState.activeTrivia) {
+    showAlert("Keine aktive Trivia-Frage", "error");
+    return;
+  }
+  wsConn.send({ t: "host_clear_trivia" });
+  showAlert("Trivia ausgeblendet", "success");
+}
+
+function removeTriviaQuestion(questionId) {
+  if (!confirm("Willst du diese Trivia-Frage wirklich löschen?")) {
+    return;
+  }
+  wsConn.send({
+    t: "host_remove_trivia_question",
+    question_id: questionId,
+  });
+}
+
+function updateTriviaUI() {
+  const activeTriviaCard = document.getElementById("activeTriviaCard");
+  const triviaResultCard = document.getElementById("triviaResultCard");
+  const triviaQuestionCount = document.getElementById("triviaQuestionCount");
+  const triviaQuestionsList = document.getElementById("triviaQuestionsList");
+  const activeTriviaText = document.getElementById("activeTriviaText");
+  const activeTriviaChoices = document.getElementById("activeTriviaChoices");
+  const activeTriviaVoteCount = document.getElementById(
+    "activeTriviaVoteCount",
+  );
+
+  // Update question count
+  if (triviaQuestionCount) {
+    triviaQuestionCount.textContent = gameState.triviaQuestions.length;
+  }
+
+  // Update active trivia card (when question is being presented, before resolve)
+  if (activeTriviaCard) {
+    if (gameState.activeTrivia) {
+      activeTriviaCard.style.display = "block";
+      if (activeTriviaText) {
+        activeTriviaText.textContent = gameState.activeTrivia.question;
+      }
+      if (activeTriviaChoices) {
+        const labels = ["A", "B", "C"];
+        let html = "";
+        gameState.activeTrivia.choices.forEach((choice, idx) => {
+          const correctClass = choice.is_correct
+            ? 'style="color: #51cf66; font-weight: bold;"'
+            : "";
+          html += `<div ${correctClass}>${labels[idx]}: ${escapeHtml(choice.text)}${choice.is_correct ? " ✓" : ""}</div>`;
+        });
+        activeTriviaChoices.innerHTML = html;
+      }
+      if (activeTriviaVoteCount) {
+        activeTriviaVoteCount.textContent = gameState.activeTriviaVoteCount;
+      }
+    } else {
+      activeTriviaCard.style.display = "none";
+    }
+  }
+
+  // Update trivia result card (when results are showing, after resolve)
+  if (triviaResultCard) {
+    triviaResultCard.style.display = gameState.triviaResultShowing
+      ? "block"
+      : "none";
+  }
+
+  // Update questions list
+  if (triviaQuestionsList) {
+    if (gameState.triviaQuestions.length === 0) {
+      triviaQuestionsList.innerHTML =
+        '<p style="opacity: 0.6;">Noch keine Trivia-Fragen vorhanden. Füge oben eine hinzu.</p>';
+    } else {
+      const labels = ["A", "B", "C"];
+      let html = "";
+      gameState.triviaQuestions.forEach((q) => {
+        const isActive = gameState.activeTrivia?.id === q.id;
+        const canPresent =
+          gameState.phase === "WRITING" &&
+          !gameState.activeTrivia &&
+          !gameState.triviaResultShowing;
+        html += `
+          <div class="trivia-question-card" style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 15px; margin-bottom: 10px; ${isActive ? "border: 2px solid #ffd43b;" : ""}">
+            <div style="font-weight: bold; margin-bottom: 10px;">${escapeHtml(q.question)}</div>
+            <div style="margin-bottom: 10px; font-size: 0.9em;">
+              ${q.choices.map((c, i) => `<div ${c.is_correct ? 'style="color: #51cf66;"' : ""}>${labels[i]}: ${escapeHtml(c.text)}${c.is_correct ? " ✓" : ""}</div>`).join("")}
+            </div>
+            <div class="button-group">
+              <button onclick="presentTrivia('${escapeHtml(q.id)}')" class="primary" ${canPresent ? "" : "disabled"} title="${canPresent ? "Frage praesentieren" : "Nur waehrend WRITING und ohne aktive Trivia"}">Praesentieren</button>
+              <button onclick="removeTriviaQuestion('${escapeHtml(q.id)}')" class="danger" ${isActive ? "disabled" : ""}>Loeschen</button>
+            </div>
+          </div>
+        `;
+      });
+      triviaQuestionsList.innerHTML = html;
+    }
+  }
+}
+
+/**
+ * Clear trivia result from beamer/audience
+ */
+function clearTriviaResult() {
+  wsConn.send({
+    t: "host_clear_trivia",
+  });
+}
+
 // Initialize on page load
 init();
 
@@ -617,6 +836,14 @@ if (typeof window !== "undefined") {
     togglePanicMode,
     setManualWinner,
     extendTimer,
+
+    // Trivia
+    addTriviaQuestion,
+    presentTrivia,
+    resolveTrivia,
+    clearTrivia,
+    clearTriviaResult,
+    removeTriviaQuestion,
 
     // Overview
     runOverviewPrimaryAction,

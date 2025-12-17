@@ -79,6 +79,62 @@
                 </div>
             </div>
 
+            <!-- Trivia Voting Screen -->
+            <div class="screen" id="triviaScreen">
+                <div class="card">
+                    <h2>&#x1F3AF; Trivia</h2>
+                    <div class="trivia-question-text" id="triviaQuestionText">
+                        Trivia-Frage wird geladen...
+                    </div>
+
+                    <div class="trivia-options" id="triviaOptions">
+                        <!-- Trivia options will be inserted here -->
+                    </div>
+
+                    <div id="triviaError" class="error-message" style="display: none;"></div>
+
+                    <div class="help-text">
+                        Waehle die richtige Antwort!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trivia Vote Confirmed Screen -->
+            <div class="screen" id="triviaConfirmedScreen">
+                <div class="card">
+                    <div class="success-content">
+                        <div class="success-icon">&#x2705;</div>
+                        <h3>Trivia-Stimme abgegeben!</h3>
+                        <p>Deine Antwort wurde gespeichert.</p>
+                        <p id="triviaVoteSummary" class="text-center" style="margin-top: 10px; font-style: italic;"></p>
+
+                        <button onclick="changeTriviaVote()" class="secondary">Antwort aendern</button>
+
+                        <div class="help-text">
+                            Warte auf die Aufloesung...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trivia Result Screen -->
+            <div class="screen" id="triviaResultScreen">
+                <div class="card">
+                    <h2>&#x1F3AF; Trivia Ergebnis</h2>
+                    <div class="trivia-question-text" id="triviaResultQuestionText">
+                        Trivia-Frage...
+                    </div>
+
+                    <div class="trivia-result-options" id="triviaResultOptions">
+                        <!-- Result options will be inserted here -->
+                    </div>
+
+                    <div class="trivia-total-votes" id="triviaResultTotal">
+                        Gesamt: 0 Stimmen
+                    </div>
+                </div>
+            </div>
+
             <!-- Prompt Voting Screen -->
             <div class="screen" id="promptVotingScreen">
                 <div class="card">

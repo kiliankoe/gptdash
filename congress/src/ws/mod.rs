@@ -76,7 +76,8 @@ fn validate_message_for_role(
         Role::Audience => match msg {
             ClientMessage::Join { .. } | ClientMessage::AckNeeded { .. } => Ok(()),
             ClientMessage::Vote { voter_token, .. }
-            | ClientMessage::PromptVote { voter_token, .. } => {
+            | ClientMessage::PromptVote { voter_token, .. }
+            | ClientMessage::SubmitTriviaVote { voter_token, .. } => {
                 if connection_token == Some(voter_token.as_str()) {
                     Ok(())
                 } else {
@@ -345,6 +346,39 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                             tracing::info!("Sent submissions for audience voting state recovery");
                         }
                     }
+                    GamePhase::Writing => {
+                        // Send active trivia question if any
+                        if let Some(trivia) = state.get_active_trivia().await {
+                            let trivia_msg = ServerMessage::TriviaQuestion {
+                                question_id: trivia.id.clone(),
+                                question: trivia.question.clone(),
+                                choices: [
+                                    trivia.choices[0].text.clone(),
+                                    trivia.choices[1].text.clone(),
+                                    trivia.choices[2].text.clone(),
+                                ],
+                            };
+                            if let Ok(msg) = serde_json::to_string(&trivia_msg) {
+                                let _ = sender.send(Message::Text(msg.into())).await;
+                            }
+                            tracing::info!("Sent trivia question for audience state recovery");
+
+                            // Send their vote state if they've already voted
+                            if let Some(vote) = state.get_trivia_vote(token).await {
+                                let vote_state = ServerMessage::TriviaVoteState {
+                                    question_id: trivia.id.clone(),
+                                    has_voted: true,
+                                    choice_index: Some(vote.choice_index),
+                                };
+                                if let Ok(msg) = serde_json::to_string(&vote_state) {
+                                    let _ = sender.send(Message::Text(msg.into())).await;
+                                }
+                                tracing::info!(
+                                    "Sent trivia vote state for audience state recovery"
+                                );
+                            }
+                        }
+                    }
                     GamePhase::Results | GamePhase::Podium => {
                         // Send scores for winner display (top 3 audience detection)
                         let (all_players, top_audience) = state.get_leaderboards().await;
@@ -427,6 +461,23 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                         }
                         tracing::info!("Sent prompt for beamer writing phase recovery");
                     }
+                }
+
+                // Send active trivia question if any
+                if let Some(trivia) = state.get_active_trivia().await {
+                    let trivia_msg = ServerMessage::TriviaQuestion {
+                        question_id: trivia.id.clone(),
+                        question: trivia.question.clone(),
+                        choices: [
+                            trivia.choices[0].text.clone(),
+                            trivia.choices[1].text.clone(),
+                            trivia.choices[2].text.clone(),
+                        ],
+                    };
+                    if let Ok(msg) = serde_json::to_string(&trivia_msg) {
+                        let _ = sender.send(Message::Text(msg.into())).await;
+                    }
+                    tracing::info!("Sent trivia question for beamer state recovery");
                 }
             }
             GamePhase::Reveal => {
@@ -518,6 +569,19 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
             players: player_status,
         };
         if let Ok(msg) = serde_json::to_string(&status_msg) {
+            let _ = sender.send(Message::Text(msg.into())).await;
+        }
+
+        // Send trivia questions and active trivia state
+        let trivia_questions = state.get_trivia_questions().await;
+        let active_trivia_id = state.get_active_trivia_id().await;
+        let active_trivia_votes = state.get_active_trivia_vote_count().await;
+        let trivia_msg = ServerMessage::HostTriviaQuestions {
+            questions: trivia_questions,
+            active_trivia_id,
+            active_trivia_votes,
+        };
+        if let Ok(msg) = serde_json::to_string(&trivia_msg) {
             let _ = sender.send(Message::Text(msg.into())).await;
         }
 

@@ -195,3 +195,31 @@ pub struct ConnectionCounts {
     pub beamers: u32,
     pub hosts: u32,
 }
+
+// ========== Trivia System ==========
+
+pub type TriviaQuestionId = String;
+
+/// A single choice in a trivia question
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriviaChoice {
+    pub text: String,
+    pub is_correct: bool,
+}
+
+/// A trivia question with exactly 3 choices (A/B/C)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriviaQuestion {
+    pub id: TriviaQuestionId,
+    pub question: String,
+    pub choices: [TriviaChoice; 3],
+    pub created_at: String,
+}
+
+/// An audience member's vote on a trivia question
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriviaVote {
+    pub voter_id: VoterId,
+    pub question_id: TriviaQuestionId,
+    pub choice_index: usize,
+}

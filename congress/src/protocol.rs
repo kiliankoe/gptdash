@@ -139,6 +139,36 @@ pub enum ClientMessage {
         voter_token: String,
         prompt_id: PromptId,
     },
+    // ========== Trivia System ==========
+    /// Add a new trivia question (host only)
+    HostAddTriviaQuestion {
+        question: String,
+        choices: [TriviaChoiceInput; 3],
+    },
+    /// Remove a trivia question from the pool (host only)
+    HostRemoveTriviaQuestion {
+        question_id: TriviaQuestionId,
+    },
+    /// Present a trivia question to audience (host only, WRITING phase)
+    HostPresentTrivia {
+        question_id: TriviaQuestionId,
+    },
+    /// Resolve current trivia question and show results (host only)
+    HostResolveTrivia,
+    /// Clear current trivia without showing results (host only)
+    HostClearTrivia,
+    /// Submit a trivia vote (audience only)
+    SubmitTriviaVote {
+        voter_token: String,
+        choice_index: usize,
+    },
+}
+
+/// Input for creating a trivia question choice (from client)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriviaChoiceInput {
+    pub text: String,
+    pub is_correct: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -301,6 +331,42 @@ pub enum ServerMessage {
         audience: u32,
         beamers: u32,
         hosts: u32,
+    },
+    // ========== Trivia System ==========
+    /// Trivia questions list sent to host
+    HostTriviaQuestions {
+        questions: Vec<TriviaQuestion>,
+        /// Currently active trivia question ID (if any)
+        active_trivia_id: Option<TriviaQuestionId>,
+        /// Total votes for active trivia
+        active_trivia_votes: u32,
+    },
+    /// Trivia question presented to beamer and audience (no is_correct flag)
+    TriviaQuestion {
+        question_id: TriviaQuestionId,
+        question: String,
+        choices: [String; 3],
+    },
+    /// Acknowledge a trivia vote
+    TriviaVoteAck {
+        question_id: TriviaQuestionId,
+    },
+    /// Trivia results broadcast to beamer and audience
+    TriviaResult {
+        question_id: TriviaQuestionId,
+        question: String,
+        choices: [String; 3],
+        correct_index: usize,
+        vote_counts: [u32; 3],
+        total_votes: u32,
+    },
+    /// Clear trivia display (return to normal WRITING screen)
+    TriviaClear,
+    /// Sent to audience on reconnect with their trivia vote state
+    TriviaVoteState {
+        question_id: TriviaQuestionId,
+        has_voted: bool,
+        choice_index: Option<usize>,
     },
     Error {
         code: String,

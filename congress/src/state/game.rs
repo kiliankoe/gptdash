@@ -283,6 +283,13 @@ impl AppState {
                     }
                 }
 
+                // Clear active trivia when leaving WRITING phase
+                if game_clone.phase == GamePhase::Writing && effective_phase != GamePhase::Writing {
+                    self.clear_trivia().await;
+                    // Broadcast trivia clear to all clients
+                    self.broadcast_to_all(crate::protocol::ServerMessage::TriviaClear);
+                }
+
                 // Handle phase-specific actions
                 if effective_phase == GamePhase::PromptSelection {
                     // Multiple prompts: broadcast candidates for voting
@@ -460,6 +467,8 @@ impl AppState {
         // Clear queued prompts and prompt votes (move back to pool)
         self.clear_queued_prompts().await;
         self.prompt_votes.write().await.clear();
+        // Clear trivia questions (treated like prompt_pool - persists across rounds but cleared on full reset)
+        self.clear_trivia_questions().await;
 
         // Reset game to initial state
         let mut game = self.game.write().await;

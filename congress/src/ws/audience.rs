@@ -215,3 +215,54 @@ pub async fn handle_prompt_vote(
         }),
     }
 }
+
+// ========== Trivia System ==========
+
+pub async fn handle_submit_trivia_vote(
+    state: &Arc<AppState>,
+    voter_token: String,
+    choice_index: usize,
+) -> Option<ServerMessage> {
+    tracing::info!("Trivia vote from {}: choice {}", voter_token, choice_index);
+
+    // Check we're in WRITING phase (trivia only active during WRITING)
+    let game = state.get_game().await;
+    if let Some(game) = game {
+        if game.phase != crate::types::GamePhase::Writing {
+            return Some(ServerMessage::Error {
+                code: "WRONG_PHASE".to_string(),
+                msg: "Trivia voting only available during writing phase".to_string(),
+            });
+        }
+    } else {
+        return Some(ServerMessage::Error {
+            code: "NO_GAME".to_string(),
+            msg: "No active game".to_string(),
+        });
+    }
+
+    // Get active trivia question ID for the response
+    let question_id = match state.get_active_trivia_id().await {
+        Some(id) => id,
+        None => {
+            return Some(ServerMessage::Error {
+                code: "NO_ACTIVE_TRIVIA".to_string(),
+                msg: "No trivia question is currently active".to_string(),
+            });
+        }
+    };
+
+    // Submit the vote
+    match state.submit_trivia_vote(&voter_token, choice_index).await {
+        Ok(_) => {
+            // Notify host of updated vote count
+            crate::ws::host::broadcast_trivia_to_host(state).await;
+
+            Some(ServerMessage::TriviaVoteAck { question_id })
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "TRIVIA_VOTE_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
