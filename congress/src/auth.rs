@@ -266,6 +266,38 @@ pub async fn serve_player() -> impl IntoResponse {
     }
 }
 
+/// Handler to serve audience page (index.html)
+pub async fn serve_audience() -> impl IntoResponse {
+    match tokio::fs::read_to_string("static/index.html").await {
+        Ok(content) => Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+            .body(Body::from(content))
+            .unwrap(),
+        Err(_) => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from("Page not found"))
+            .unwrap(),
+    }
+}
+
+/// Middleware to block audience HTTP requests when panic mode is active
+pub async fn panic_mode_middleware(
+    State(state): State<Arc<crate::state::AppState>>,
+    request: Request<Body>,
+    next: Next,
+) -> Response<Body> {
+    // This middleware is applied only to audience routes, so just check panic mode
+    if state.is_panic_mode().await {
+        return Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .body(Body::from("Service temporarily unavailable"))
+            .unwrap();
+    }
+
+    next.run(request).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

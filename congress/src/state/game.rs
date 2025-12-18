@@ -407,6 +407,21 @@ impl AppState {
                                 audience_top: top_audience.into_iter().take(10).collect(),
                             });
                         }
+
+                        // Broadcast manual winners if set (for panic mode)
+                        let rounds = self.rounds.read().await;
+                        if let Some(round) = rounds.get(&rid) {
+                            if round.manual_ai_winner.is_some()
+                                || round.manual_funny_winner.is_some()
+                            {
+                                self.broadcast_to_all(
+                                    crate::protocol::ServerMessage::ManualWinners {
+                                        ai_winner_id: round.manual_ai_winner.clone(),
+                                        funny_winner_id: round.manual_funny_winner.clone(),
+                                    },
+                                );
+                            }
+                        }
                     }
                 } else if effective_phase == GamePhase::Podium {
                     // Re-broadcast scores for audience winner display
@@ -505,6 +520,11 @@ impl AppState {
 
         // Broadcast panic mode change to all clients
         self.broadcast_to_all(crate::protocol::ServerMessage::PanicModeUpdate { enabled });
+
+        // If enabling panic mode, disconnect all audience connections
+        if enabled {
+            self.disconnect_all_audience();
+        }
 
         tracing::info!("Panic mode set to: {}", enabled);
     }

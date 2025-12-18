@@ -170,6 +170,15 @@ pub async fn ws_handler(
         _ => Role::Audience,
     };
 
+    // Block audience WebSocket connections during panic mode
+    if role == Role::Audience && state.is_panic_mode().await {
+        return (
+            StatusCode::FORBIDDEN,
+            "Audience connections temporarily disabled.",
+        )
+            .into_response();
+    }
+
     if token_required_for_role(&role) && params.token.is_none() {
         return (
             StatusCode::FORBIDDEN,
@@ -521,6 +530,17 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                     if let Ok(msg) = serde_json::to_string(&vote_counts_msg) {
                         let _ = sender.send(Message::Text(msg.into())).await;
                     }
+
+                    // Send manual winners if set (for panic mode)
+                    if round.manual_ai_winner.is_some() || round.manual_funny_winner.is_some() {
+                        let manual_winners_msg = ServerMessage::ManualWinners {
+                            ai_winner_id: round.manual_ai_winner.clone(),
+                            funny_winner_id: round.manual_funny_winner.clone(),
+                        };
+                        if let Ok(msg) = serde_json::to_string(&manual_winners_msg) {
+                            let _ = sender.send(Message::Text(msg.into())).await;
+                        }
+                    }
                 }
 
                 // Send scores
@@ -601,10 +621,36 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
         None
     };
 
+    // Subscribe to audience disconnect signal if Audience
+    let mut audience_disconnect_rx = if role == Role::Audience {
+        Some(state.audience_disconnect.subscribe())
+    } else {
+        None
+    };
+
     // Handle incoming messages and broadcasts
     let mut msg_rate_limiter = TokenBucket::new(20.0, 40.0);
     loop {
         tokio::select! {
+            // Handle audience disconnect signal (panic mode)
+            disconnect_signal = async {
+                match &mut audience_disconnect_rx {
+                    Some(rx) => rx.recv().await.ok(),
+                    None => std::future::pending::<Option<()>>().await
+                }
+            } => {
+                if disconnect_signal.is_some() {
+                    tracing::info!("Audience connection disconnected due to panic mode");
+                    let _ = sender.send(Message::Close(Some(
+                        axum::extract::ws::CloseFrame {
+                            code: 1000,
+                            reason: "Panic mode enabled".into(),
+                        }
+                    ))).await;
+                    break;
+                }
+            }
+
             // Handle general broadcasts (all clients)
             broadcast_msg = broadcast_rx.recv() => {
                 if let Ok(msg) = broadcast_msg {

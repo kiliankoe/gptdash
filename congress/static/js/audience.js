@@ -23,7 +23,6 @@ let submissions = [];
 let selectedAiAnswer = null;
 let selectedFunnyAnswer = null;
 let hasVoted = false;
-let panicMode = false;
 let audienceTimer = null;
 let promptSubmissionExpanded = false;
 let challengeSolver = null; // Vote challenge solver (anti-automation)
@@ -88,7 +87,6 @@ function handleMessage(message) {
     case "welcome":
       console.log("Welcome message:", message);
       if (message.game) {
-        panicMode = message.game.panic_mode || false;
         currentRoundNo = message.game.round_no;
         updatePhase(message.game.phase);
         // Start timer if in VOTING phase with deadline
@@ -181,11 +179,6 @@ function handleMessage(message) {
       showScreen("confirmedScreen");
       updateVoteSummary();
       updateVoteButtonState();
-      break;
-
-    case "panic_mode_update":
-      panicMode = message.enabled;
-      updatePanicModeUI();
       break;
 
     case "prompt_candidates":
@@ -459,7 +452,6 @@ function showVotingScreen() {
   showScreen("votingScreen");
   updateVoteSummary();
   updateVoteButtonState();
-  updatePanicModeUI();
 }
 
 function renderAnswerOptions() {
@@ -529,8 +521,7 @@ function selectAnswer(category, answerId) {
 
 function updateVoteButtonState() {
   const voteButton = document.getElementById("voteButton");
-  voteButton.disabled =
-    panicMode || hasVoted || !(selectedAiAnswer && selectedFunnyAnswer);
+  voteButton.disabled = hasVoted || !(selectedAiAnswer && selectedFunnyAnswer);
 }
 
 async function submitVote() {
@@ -609,37 +600,10 @@ function updateVoteSummary() {
 function handleError(code, message) {
   console.error("Server error:", code, message);
 
-  // Handle panic mode error specially
-  if (code === "PANIC_MODE") {
-    panicMode = true;
-    updatePanicModeUI();
-    return;
-  }
-
   if (document.getElementById("welcomeScreen").classList.contains("active")) {
     showError("welcomeError", message);
   } else {
     showError("voteError", message);
-  }
-}
-
-function updatePanicModeUI() {
-  const panicOverlay = document.getElementById("panicModeOverlay");
-  const votingContent = document.getElementById("votingContent");
-  const voteButton = document.getElementById("voteButton");
-
-  if (panicOverlay) {
-    panicOverlay.style.display = panicMode ? "flex" : "none";
-  }
-
-  if (votingContent) {
-    votingContent.style.opacity = panicMode ? "0.3" : "1";
-    votingContent.style.pointerEvents = panicMode ? "none" : "auto";
-  }
-
-  if (voteButton) {
-    voteButton.disabled =
-      panicMode || hasVoted || !(selectedAiAnswer && selectedFunnyAnswer);
   }
 }
 
@@ -1013,7 +977,7 @@ function updateTriviaVoteSummary() {
   ) {
     const choiceText = triviaQuestion.choices[selectedTriviaChoice];
     const shortText =
-      choiceText.length > 40 ? choiceText.substring(0, 40) + "..." : choiceText;
+      choiceText.length > 40 ? `${choiceText.substring(0, 40)}...` : choiceText;
     summaryEl.textContent = `${TRIVIA_LABELS[selectedTriviaChoice]}: "${shortText}"`;
   } else {
     summaryEl.textContent = "";

@@ -368,6 +368,11 @@ pub enum ServerMessage {
         has_voted: bool,
         choice_index: Option<usize>,
     },
+    /// Manual winners set by host during panic mode (broadcast when entering RESULTS)
+    ManualWinners {
+        ai_winner_id: Option<SubmissionId>,
+        funny_winner_id: Option<SubmissionId>,
+    },
     Error {
         code: String,
         msg: String,

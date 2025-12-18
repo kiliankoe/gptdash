@@ -2519,3 +2519,320 @@ async fn test_auto_load_invalid_json() {
 
     println!("✅ Auto-load invalid JSON test passed!");
 }
+
+// ============================================================================
+// Panic Mode Tests
+// ============================================================================
+
+/// Test that panic mode sends disconnect signal to audience connections
+#[tokio::test]
+async fn test_panic_mode_sends_disconnect_signal() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Subscribe to the disconnect signal before enabling panic mode
+    let mut disconnect_rx = state.audience_disconnect.subscribe();
+
+    // Enable panic mode
+    handle_message(
+        ClientMessage::HostTogglePanicMode { enabled: true },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Verify panic mode is active
+    assert!(state.is_panic_mode().await, "Panic mode should be enabled");
+
+    // Verify disconnect signal was sent
+    let result = disconnect_rx.try_recv();
+    assert!(
+        result.is_ok(),
+        "Should have received disconnect signal, got: {:?}",
+        result
+    );
+
+    println!("✅ Panic mode sends disconnect signal test passed!");
+}
+
+/// Test that disabling panic mode does NOT send disconnect signal
+#[tokio::test]
+async fn test_panic_mode_disable_no_disconnect() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Enable panic mode first
+    state.set_panic_mode(true).await;
+
+    // Subscribe to the disconnect signal
+    let mut disconnect_rx = state.audience_disconnect.subscribe();
+
+    // Disable panic mode
+    handle_message(
+        ClientMessage::HostTogglePanicMode { enabled: false },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Verify panic mode is disabled
+    assert!(
+        !state.is_panic_mode().await,
+        "Panic mode should be disabled"
+    );
+
+    // Verify no disconnect signal was sent (disabling shouldn't disconnect)
+    let result = disconnect_rx.try_recv();
+    assert!(
+        result.is_err(),
+        "Should NOT receive disconnect signal when disabling panic mode"
+    );
+
+    println!("✅ Panic mode disable no disconnect test passed!");
+}
+
+/// Test that manual winners are broadcast when entering Results phase
+#[tokio::test]
+async fn test_manual_winners_broadcast() {
+    // Skip anti-automation checks
+    std::env::set_var("SKIP_VOTE_ANTI_AUTOMATION", "1");
+
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+    let player_role = Role::Player;
+
+    state.create_game().await;
+
+    // Create a player
+    let create_result = handle_message(
+        ClientMessage::HostCreatePlayers { count: 1 },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    let player_tokens = match create_result {
+        Some(ServerMessage::PlayersCreated { players }) => players,
+        _ => panic!("Expected PlayersCreated"),
+    };
+
+    // Register player
+    handle_message(
+        ClientMessage::RegisterPlayer {
+            player_token: player_tokens[0].token.clone(),
+            display_name: "Alice".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    // Setup round
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt_to_pool(
+            Some("Test prompt".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Player submits
+    handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some(player_tokens[0].token.clone()),
+            text: "Alice's answer".to_string(),
+        },
+        &player_role,
+        &state,
+    )
+    .await;
+
+    // Add AI submission
+    let ai_sub = state
+        .submit_answer(&round.id, None, "AI answer".to_string())
+        .await
+        .unwrap();
+
+    // Set the official AI submission
+    handle_message(
+        ClientMessage::HostSetAiSubmission {
+            submission_id: ai_sub.id.clone(),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Get player submission
+    let submissions = state.get_submissions(&round.id).await;
+    let player_sub = submissions
+        .iter()
+        .find(|s| s.author_kind == gptdash::types::AuthorKind::Player)
+        .expect("Should find player submission");
+
+    // Set reveal order and go to Reveal -> Voting
+    let reveal_order: Vec<_> = submissions.iter().map(|s| s.id.clone()).collect();
+    handle_message(
+        ClientMessage::HostSetRevealOrder {
+            order: reveal_order,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Reveal,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Voting,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Enable panic mode (simulating audience voting failure)
+    state.set_panic_mode(true).await;
+
+    // Set manual winners
+    handle_message(
+        ClientMessage::HostSetManualWinner {
+            winner_type: gptdash::protocol::ManualWinnerType::Ai,
+            submission_id: ai_sub.id.clone(),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(
+        ClientMessage::HostSetManualWinner {
+            winner_type: gptdash::protocol::ManualWinnerType::Funny,
+            submission_id: player_sub.id.clone(),
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Verify manual winners are set in the round
+    let updated_round = state.get_current_round().await.unwrap();
+    assert_eq!(
+        updated_round.manual_ai_winner,
+        Some(ai_sub.id.clone()),
+        "Manual AI winner should be set"
+    );
+    assert_eq!(
+        updated_round.manual_funny_winner,
+        Some(player_sub.id.clone()),
+        "Manual funny winner should be set"
+    );
+
+    // Subscribe to broadcast to verify ManualWinners message is sent
+    let mut broadcast_rx = state.broadcast.subscribe();
+
+    // Transition to Results (this should broadcast ManualWinners)
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Results,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Check for ManualWinners message in broadcast
+    let mut found_manual_winners = false;
+    while let Ok(msg) = broadcast_rx.try_recv() {
+        if let ServerMessage::ManualWinners {
+            ai_winner_id,
+            funny_winner_id,
+        } = msg
+        {
+            assert_eq!(ai_winner_id, Some(ai_sub.id.clone()));
+            assert_eq!(funny_winner_id, Some(player_sub.id.clone()));
+            found_manual_winners = true;
+            break;
+        }
+    }
+
+    assert!(
+        found_manual_winners,
+        "ManualWinners message should be broadcast when entering Results"
+    );
+
+    println!("✅ Manual winners broadcast test passed!");
+}
+
+/// Test that panic mode is preserved through state export/import
+#[tokio::test]
+async fn test_panic_mode_state_persistence() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let save_path = temp_dir.path().join("panic_state.json");
+
+    // Create state with panic mode enabled
+    let state1 = Arc::new(AppState::new());
+    state1.create_game().await;
+    state1.set_panic_mode(true).await;
+
+    // Verify panic mode is on
+    assert!(state1.is_panic_mode().await);
+
+    // Save state
+    gptdash::broadcast::save_state_to_file(&state1, &save_path)
+        .await
+        .expect("Should save state");
+
+    // Load into new state
+    let state2 = Arc::new(AppState::new());
+    gptdash::broadcast::load_state_from_file(&state2, &save_path)
+        .await
+        .expect("Should load state");
+
+    // Verify panic mode was restored
+    assert!(
+        state2.is_panic_mode().await,
+        "Panic mode should be preserved after state restore"
+    );
+
+    println!("✅ Panic mode state persistence test passed!");
+}

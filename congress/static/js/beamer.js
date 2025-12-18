@@ -27,6 +27,9 @@ const gameState = {
   // Trivia state
   activeTrivia: null, // Current trivia question being shown
   triviaResult: null, // Trivia result after resolve
+  // Manual winners (panic mode)
+  manualAiWinner: null,
+  manualFunnyWinner: null,
 };
 
 // Connections and utilities
@@ -152,6 +155,10 @@ function handleMessage(msg) {
     case "trivia_clear":
       handleTriviaClear();
       break;
+    // Manual winners (panic mode)
+    case "manual_winners":
+      handleManualWinners(msg);
+      break;
     case "error":
       console.error("[Beamer] Error:", msg.code, msg.msg);
       break;
@@ -248,6 +255,8 @@ function resetRoundUiState() {
   gameState.voteCounts = { ai: {}, funny: {} };
   gameState.promptCandidates = [];
   gameState.promptVoteCounts = {};
+  gameState.manualAiWinner = null;
+  gameState.manualFunnyWinner = null;
   lastSpokenSubmissionId = null;
   updateSubmissionCounter();
   updateRevealIndicator();
@@ -782,41 +791,47 @@ function updateResultReveals() {
   const aiCounts = gameState.voteCounts.ai;
   const funnyCounts = gameState.voteCounts.funny;
 
-  // Find most voted AI
-  let maxAiVotes = 0;
-  let aiWinnerId = null;
-  for (const [id, count] of Object.entries(aiCounts)) {
-    if (count > maxAiVotes) {
-      maxAiVotes = count;
-      aiWinnerId = id;
+  // AI Winner: Use manual winner > ai_submission_id > most voted
+  let aiDisplayId = gameState.manualAiWinner;
+  let aiIsManual = !!aiDisplayId;
+  if (!aiDisplayId) {
+    aiDisplayId = gameState.currentRound?.ai_submission_id;
+  }
+  if (!aiDisplayId) {
+    let maxAiVotes = 0;
+    for (const [id, count] of Object.entries(aiCounts)) {
+      if (count > maxAiVotes) {
+        maxAiVotes = count;
+        aiDisplayId = id;
+      }
     }
   }
 
-  // Find most voted Funny
-  let maxFunnyVotes = 0;
-  let funnyWinnerId = null;
-  for (const [id, count] of Object.entries(funnyCounts)) {
-    if (count > maxFunnyVotes) {
-      maxFunnyVotes = count;
-      funnyWinnerId = id;
+  // Funny Winner: Use manual winner > most voted
+  let funnyDisplayId = gameState.manualFunnyWinner;
+  let funnyIsManual = !!funnyDisplayId;
+  if (!funnyDisplayId) {
+    let maxFunnyVotes = 0;
+    for (const [id, count] of Object.entries(funnyCounts)) {
+      if (count > maxFunnyVotes) {
+        maxFunnyVotes = count;
+        funnyDisplayId = id;
+      }
     }
   }
 
-  // Update AI reveal (use actual AI submission if marked by host)
+  // Update AI reveal
   const aiRevealAnswer = document.getElementById("aiRevealAnswer");
   const aiRevealMeta = document.getElementById("aiRevealMeta");
-
-  // Check if we have a designated AI submission from the round
-  const actualAiId = gameState.currentRound?.ai_submission_id;
-  const aiDisplayId = actualAiId || aiWinnerId;
-
   if (aiDisplayId && aiRevealAnswer) {
     const aiSub = gameState.submissions.find((s) => s.id === aiDisplayId);
     if (aiSub) {
       aiRevealAnswer.textContent = aiSub.display_text;
       if (aiRevealMeta) {
         const votes = aiCounts[aiDisplayId] || 0;
-        aiRevealMeta.textContent = `${votes} Stimmen`;
+        aiRevealMeta.textContent = aiIsManual
+          ? "(Host-Auswahl)"
+          : `${votes} Stimmen`;
       }
     }
   }
@@ -824,13 +839,15 @@ function updateResultReveals() {
   // Update Funny reveal
   const funnyRevealAnswer = document.getElementById("funnyRevealAnswer");
   const funnyRevealMeta = document.getElementById("funnyRevealMeta");
-
-  if (funnyWinnerId && funnyRevealAnswer) {
-    const funnySub = gameState.submissions.find((s) => s.id === funnyWinnerId);
+  if (funnyDisplayId && funnyRevealAnswer) {
+    const funnySub = gameState.submissions.find((s) => s.id === funnyDisplayId);
     if (funnySub) {
       funnyRevealAnswer.textContent = funnySub.display_text;
       if (funnyRevealMeta) {
-        funnyRevealMeta.textContent = `${maxFunnyVotes} Stimmen`;
+        const votes = funnyCounts[funnyDisplayId] || 0;
+        funnyRevealMeta.textContent = funnyIsManual
+          ? "(Host-Auswahl)"
+          : `${votes} Stimmen`;
       }
     }
   }
@@ -973,6 +990,19 @@ setInterval(() => {
     activeTimerEl.classList.remove("warning");
   }
 }, 100);
+
+// ========================
+// Manual Winners Handler (Panic Mode)
+// ========================
+
+function handleManualWinners(msg) {
+  console.log("[Beamer] Manual winners received:", msg);
+  gameState.manualAiWinner = msg.ai_winner_id;
+  gameState.manualFunnyWinner = msg.funny_winner_id;
+  if (gameState.phase === "RESULTS") {
+    updateResultReveals();
+  }
+}
 
 // ========================
 // Trivia Handlers

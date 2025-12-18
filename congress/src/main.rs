@@ -1,4 +1,5 @@
 use axum::{
+    http::StatusCode,
     middleware,
     routing::{get, post},
     Router,
@@ -134,10 +135,21 @@ async fn main() {
             abuse::ws_abuse_middleware,
         ));
 
+    // Audience routes with panic mode blocking
+    // Only `/` serves the audience page; `/index.html` always returns 404
+    let audience_routes = Router::new()
+        .route("/", get(auth::serve_audience))
+        .route("/index.html", get(|| async { StatusCode::NOT_FOUND }))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::panic_mode_middleware,
+        ));
+
     let app = Router::new()
         .merge(ws_routes)
         .merge(host_routes)
         .merge(page_routes)
+        .merge(audience_routes)
         .fallback_service(ServeDir::new("static"))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())

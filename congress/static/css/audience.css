@@ -872,54 +872,6 @@ button.secondary:hover {
 }
 
 /* ========================
-   PANIC MODE OVERLAY
-   ======================== */
-.panic-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  animation: fadeIn 0.3s ease-out;
-}
-
-.panic-content {
-  text-align: center;
-  padding: 32px;
-}
-
-.panic-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  animation: pulse 2s infinite;
-}
-
-.panic-content h3 {
-  font-family: var(--font-headline);
-  font-size: 24px;
-  font-variation-settings:
-    "wght" 100,
-    "wdth" 100;
-  color: var(--color-additional-01);
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
-
-.panic-content p {
-  font-size: 16px;
-  margin-bottom: 8px;
-}
-
-#votingScreen {
-  position: relative;
-}
-
-/* ========================
    SCREEN: PROMPT VOTING
    ======================== */
 .prompt-options {

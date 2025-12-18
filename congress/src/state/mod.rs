@@ -67,6 +67,8 @@ pub struct AppState {
     pub connected_beamers: Arc<AtomicU32>,
     /// Connected host count
     pub connected_hosts: Arc<AtomicU32>,
+    /// Signal to disconnect all audience connections (for panic mode)
+    pub audience_disconnect: broadcast::Sender<()>,
 }
 
 impl AppState {
@@ -78,6 +80,7 @@ impl AppState {
         let (broadcast_tx, _rx) = broadcast::channel(100);
         let (host_tx, _rx) = broadcast::channel(100);
         let (beamer_tx, _rx) = broadcast::channel(100);
+        let (audience_disconnect_tx, _rx) = broadcast::channel(16);
         Self {
             game: Arc::new(RwLock::new(None)),
             rounds: Arc::new(RwLock::new(HashMap::new())),
@@ -106,6 +109,7 @@ impl AppState {
             connected_audience: Arc::new(AtomicU32::new(0)),
             connected_beamers: Arc::new(AtomicU32::new(0)),
             connected_hosts: Arc::new(AtomicU32::new(0)),
+            audience_disconnect: audience_disconnect_tx,
         }
     }
 
@@ -122,6 +126,12 @@ impl AppState {
     /// Broadcast a message to beamer clients only
     pub fn broadcast_to_beamer(&self, msg: ServerMessage) {
         let _ = self.beamer_broadcast.send(msg);
+    }
+
+    /// Signal all audience connections to disconnect (used when panic mode is enabled)
+    pub fn disconnect_all_audience(&self) {
+        let _ = self.audience_disconnect.send(());
+        tracing::info!("Sent disconnect signal to all audience connections");
     }
 
     // =========================================================================
