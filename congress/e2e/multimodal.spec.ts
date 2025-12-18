@@ -47,7 +47,7 @@ test.describe("Multimodal Prompts", () => {
     expect(tokens).toHaveLength(1);
 
     // Register player
-    await players[0].goto("/player.html");
+    await players[0].goto("/player");
     await players[0].fill("#tokenInput", tokens[0]);
     await players[0].click("#joinButton");
     await players[0].waitForSelector("#registerScreen.active");
@@ -56,7 +56,7 @@ test.describe("Multimodal Prompts", () => {
     await players[0].waitForSelector("#waitingScreen.active");
 
     // Connect beamer
-    await beamer.goto("/beamer.html");
+    await beamer.goto("/beamer");
     await waitForConnection(beamer);
 
     // ============================================
@@ -157,7 +157,7 @@ test.describe("Multimodal Prompts", () => {
     expect(tokens).toHaveLength(1);
 
     // Register player
-    await players[0].goto("/player.html");
+    await players[0].goto("/player");
     await players[0].fill("#tokenInput", tokens[0]);
     await players[0].click("#joinButton");
     await players[0].waitForSelector("#registerScreen.active");
@@ -166,7 +166,7 @@ test.describe("Multimodal Prompts", () => {
     await players[0].waitForSelector("#waitingScreen.active");
 
     // Connect beamer
-    await beamer.goto("/beamer.html");
+    await beamer.goto("/beamer");
     await waitForConnection(beamer);
 
     // ============================================

@@ -45,7 +45,7 @@ test.describe("Player", () => {
     const tokens = await getPlayerTokens(host);
 
     // Player joins with token
-    await players[0].goto("/player.html");
+    await players[0].goto("/player");
     await players[0].fill("#tokenInput", tokens[0]);
     await players[0].click("#joinButton");
 
@@ -80,8 +80,8 @@ test.describe("Player", () => {
 
     await Promise.all([
       host.goto("/host"),
-      players[0].goto("/player.html"),
-      players[1].goto("/player.html"),
+      players[0].goto("/player"),
+      players[1].goto("/player"),
     ]);
 
     await waitForConnection(host);
@@ -254,9 +254,9 @@ test.describe("Player", () => {
     // Navigate to pages
     await Promise.all([
       host.goto("/host"),
-      beamer.goto("/beamer.html"),
-      players[0].goto("/player.html"),
-      players[1].goto("/player.html"),
+      beamer.goto("/beamer"),
+      players[0].goto("/player"),
+      players[1].goto("/player"),
       audience[0].goto("/"),
     ]);
 
@@ -484,7 +484,7 @@ test.describe("Player", () => {
     // ============================================
     console.log("Add player mid-round test: Setting up game...");
 
-    await Promise.all([host.goto("/host"), players[0].goto("/player.html")]);
+    await Promise.all([host.goto("/host"), players[0].goto("/player")]);
 
     await waitForConnection(host);
 
@@ -560,7 +560,7 @@ test.describe("Player", () => {
     console.log("Add player mid-round test: New player joining...");
 
     // Load player page in second player context
-    await players[1].goto("/player.html");
+    await players[1].goto("/player");
     await players[1].fill("#tokenInput", newToken as string);
     await players[1].click("#joinButton");
     await players[1].waitForSelector("#registerScreen.active");
@@ -654,7 +654,7 @@ test.describe("Player", () => {
     const playerToken = tokens[0];
 
     // Player joins and registers
-    await players[0].goto("/player.html");
+    await players[0].goto("/player");
     await players[0].fill("#tokenInput", playerToken);
     await players[0].click("#joinButton");
     await players[0].waitForSelector("#registerScreen.active");
@@ -701,7 +701,7 @@ test.describe("Player", () => {
     const reconnectedPlayer = await reconnectedContext.newPage();
 
     // Navigate with token in URL (simulating reconnection with stored token)
-    await reconnectedPlayer.goto(`/player.html?token=${playerToken}`);
+    await reconnectedPlayer.goto(`/player?token=${playerToken}`);
 
     // ============================================
     // VERIFY: Player sees WRITING screen after reconnect
@@ -767,7 +767,7 @@ test.describe("Player", () => {
     const playerToken = tokens[0];
 
     // Player joins and registers
-    await players[0].goto("/player.html");
+    await players[0].goto("/player");
     await players[0].fill("#tokenInput", playerToken);
     await players[0].click("#joinButton");
     await players[0].waitForSelector("#registerScreen.active");
@@ -843,7 +843,7 @@ test.describe("Player", () => {
     contexts.push(reconnectedContext);
     const reconnectedPlayer = await reconnectedContext.newPage();
 
-    await reconnectedPlayer.goto(`/player.html?token=${playerToken}`);
+    await reconnectedPlayer.goto(`/player?token=${playerToken}`);
 
     // ============================================
     // VERIFY: Player sees locked screen after reconnect

@@ -82,7 +82,7 @@ async function startServer(backupPath: string): Promise<ServerHandle> {
 
   while (Date.now() - startTime < maxWaitMs) {
     try {
-      const response = await fetch(`${TEST_BASE_URL}/beamer.html`);
+      const response = await fetch(`${TEST_BASE_URL}/beamer`);
       if (response.ok) {
         // Give a moment for WebSocket to be ready
         await sleep(500);
@@ -238,7 +238,7 @@ test.describe("State Restoration", () => {
     try {
       // Connect host and beamer
       await host.goto(`${TEST_BASE_URL}/host`);
-      await beamer.goto(`${TEST_BASE_URL}/beamer.html`);
+      await beamer.goto(`${TEST_BASE_URL}/beamer`);
       await waitForConnection(host);
       await waitForConnection(beamer);
 
@@ -257,7 +257,7 @@ test.describe("State Restoration", () => {
       console.log(`Created player tokens: ${tokens.join(", ")}`);
 
       // Player 1 joins and registers
-      await players[0].goto(`${TEST_BASE_URL}/player.html`);
+      await players[0].goto(`${TEST_BASE_URL}/player`);
       await players[0].fill("#tokenInput", tokens[0]);
       await players[0].click("#joinButton");
       await players[0].waitForSelector("#registerScreen.active");
@@ -266,7 +266,7 @@ test.describe("State Restoration", () => {
       await players[0].waitForSelector("#waitingScreen.active");
 
       // Player 2 joins and registers
-      await players[1].goto(`${TEST_BASE_URL}/player.html`);
+      await players[1].goto(`${TEST_BASE_URL}/player`);
       await players[1].fill("#tokenInput", tokens[1]);
       await players[1].click("#joinButton");
       await players[1].waitForSelector("#registerScreen.active");
@@ -335,7 +335,7 @@ test.describe("State Restoration", () => {
       players = result2.players;
 
       await host.goto(`${TEST_BASE_URL}/host`);
-      await beamer.goto(`${TEST_BASE_URL}/beamer.html`);
+      await beamer.goto(`${TEST_BASE_URL}/beamer`);
       await waitForConnection(host);
       await waitForConnection(beamer);
 
@@ -373,7 +373,7 @@ test.describe("State Restoration", () => {
       expect(promptsText).toContain("State restoration test prompt");
 
       // Players can reconnect with their existing tokens
-      await players[0].goto(`${TEST_BASE_URL}/player.html`);
+      await players[0].goto(`${TEST_BASE_URL}/player`);
       await players[0].fill("#tokenInput", tokens[0]);
       await players[0].click("#joinButton");
       // Player should be recognized and go directly to waiting screen (already registered)
@@ -402,7 +402,7 @@ test.describe("State Restoration", () => {
 
     try {
       await host.goto(`${TEST_BASE_URL}/host`);
-      await beamer.goto(`${TEST_BASE_URL}/beamer.html`);
+      await beamer.goto(`${TEST_BASE_URL}/beamer`);
       await waitForConnection(host);
 
       // Create players
@@ -415,7 +415,7 @@ test.describe("State Restoration", () => {
 
       // Players join and register
       for (let i = 0; i < 2; i++) {
-        await players[i].goto(`${TEST_BASE_URL}/player.html`);
+        await players[i].goto(`${TEST_BASE_URL}/player`);
         await players[i].fill("#tokenInput", tokens[i]);
         await players[i].click("#joinButton");
         await players[i].waitForSelector("#registerScreen.active");
@@ -503,7 +503,7 @@ test.describe("State Restoration", () => {
       players = result2.players;
 
       await host.goto(`${TEST_BASE_URL}/host`);
-      await beamer.goto(`${TEST_BASE_URL}/beamer.html`);
+      await beamer.goto(`${TEST_BASE_URL}/beamer`);
       await waitForConnection(host);
 
       // Verify phase is WRITING
@@ -556,7 +556,7 @@ test.describe("State Restoration", () => {
 
     try {
       await host.goto(`${TEST_BASE_URL}/host`);
-      await beamer.goto(`${TEST_BASE_URL}/beamer.html`);
+      await beamer.goto(`${TEST_BASE_URL}/beamer`);
       await waitForConnection(host);
 
       // Create player
@@ -568,7 +568,7 @@ test.describe("State Restoration", () => {
       const tokens = await getPlayerTokens(host);
 
       // Player joins
-      await players[0].goto(`${TEST_BASE_URL}/player.html`);
+      await players[0].goto(`${TEST_BASE_URL}/player`);
       await players[0].fill("#tokenInput", tokens[0]);
       await players[0].click("#joinButton");
       await players[0].waitForSelector("#registerScreen.active");
@@ -686,7 +686,7 @@ test.describe("State Restoration", () => {
       beamer = result2.beamer;
 
       await host.goto(`${TEST_BASE_URL}/host`);
-      await beamer.goto(`${TEST_BASE_URL}/beamer.html`);
+      await beamer.goto(`${TEST_BASE_URL}/beamer`);
       await waitForConnection(host);
       await waitForConnection(beamer);
 
@@ -737,7 +737,7 @@ test.describe("State Restoration", () => {
 
     try {
       await host.goto(`${TEST_BASE_URL}/host`);
-      await beamer.goto(`${TEST_BASE_URL}/beamer.html`);
+      await beamer.goto(`${TEST_BASE_URL}/beamer`);
       await waitForConnection(host);
 
       // Create player
@@ -749,7 +749,7 @@ test.describe("State Restoration", () => {
       const tokens = await getPlayerTokens(host);
 
       // Player joins
-      await players[0].goto(`${TEST_BASE_URL}/player.html`);
+      await players[0].goto(`${TEST_BASE_URL}/player`);
       await players[0].fill("#tokenInput", tokens[0]);
       await players[0].click("#joinButton");
       await players[0].waitForSelector("#registerScreen.active");
@@ -870,7 +870,7 @@ test.describe("State Restoration", () => {
       beamer = result2.beamer;
 
       await host.goto(`${TEST_BASE_URL}/host`);
-      await beamer.goto(`${TEST_BASE_URL}/beamer.html`);
+      await beamer.goto(`${TEST_BASE_URL}/beamer`);
       await waitForConnection(host);
       await waitForConnection(beamer);
 
@@ -909,7 +909,7 @@ test.describe("State Restoration", () => {
 
     try {
       await host.goto(`${TEST_BASE_URL}/host`);
-      await beamer.goto(`${TEST_BASE_URL}/beamer.html`);
+      await beamer.goto(`${TEST_BASE_URL}/beamer`);
       await waitForConnection(host);
 
       // Create player
@@ -921,7 +921,7 @@ test.describe("State Restoration", () => {
       const tokens = await getPlayerTokens(host);
 
       // Player joins
-      await players[0].goto(`${TEST_BASE_URL}/player.html`);
+      await players[0].goto(`${TEST_BASE_URL}/player`);
       await players[0].fill("#tokenInput", tokens[0]);
       await players[0].click("#joinButton");
       await players[0].waitForSelector("#registerScreen.active");

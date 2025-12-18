@@ -463,7 +463,7 @@ const QRCodeManager = {
   getPlayerJoinUrl(token = null) {
     const protocol = window.location.protocol;
     const host = window.location.host || window.location.hostname;
-    const baseUrl = `${protocol}//${host}/player.html`;
+    const baseUrl = `${protocol}//${host}/player`;
     return token ? `${baseUrl}?token=${token}` : baseUrl;
   },
 

@@ -101,7 +101,7 @@ test.describe("Trivia", () => {
     const { host, beamer, players } = clients;
 
     await host.goto("/host");
-    await beamer.goto("/beamer.html");
+    await beamer.goto("/beamer");
     await waitForConnection(host);
 
     // Setup game to WRITING phase
@@ -217,7 +217,7 @@ test.describe("Trivia", () => {
     const { host, beamer, audience, players } = clients;
 
     await host.goto("/host");
-    await beamer.goto("/beamer.html");
+    await beamer.goto("/beamer");
     await waitForConnection(host);
 
     // Setup game to WRITING phase
@@ -288,7 +288,7 @@ test.describe("Trivia", () => {
     const { host, beamer, players } = clients;
 
     await host.goto("/host");
-    await beamer.goto("/beamer.html");
+    await beamer.goto("/beamer");
     await waitForConnection(host);
 
     // Setup game to WRITING phase with player submission
@@ -340,7 +340,7 @@ test.describe("Trivia", () => {
     const { host, beamer, players } = clients;
 
     await host.goto("/host");
-    await beamer.goto("/beamer.html");
+    await beamer.goto("/beamer");
     await waitForConnection(host);
 
     // Setup game to WRITING phase

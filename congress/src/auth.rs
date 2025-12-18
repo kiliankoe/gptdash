@@ -6,7 +6,6 @@ use axum::{
     http::{header, Request, Response, StatusCode},
     middleware::Next,
     response::IntoResponse,
-    response::Redirect,
 };
 use std::sync::Arc;
 
@@ -215,10 +214,6 @@ pub async fn host_ws_auth_middleware(
         )
         .body(Body::from("Unauthorized"))
         .unwrap()
-}
-
-pub async fn redirect_host_html() -> Redirect {
-    Redirect::temporary("/host")
 }
 
 /// Handler to serve host.html (used with auth middleware)

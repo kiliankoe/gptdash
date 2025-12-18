@@ -159,7 +159,7 @@ export async function setupGameToWriting(
 
   // Players join and register
   for (let i = 0; i < Math.min(playerNames.length, players.length); i++) {
-    await players[i].goto("/player.html");
+    await players[i].goto("/player");
     await players[i].fill("#tokenInput", tokens[i]);
     await players[i].click("#joinButton");
     await players[i].waitForSelector("#registerScreen.active");

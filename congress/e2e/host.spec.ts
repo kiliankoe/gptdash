@@ -33,7 +33,7 @@ test.describe("Host", () => {
     const { host, beamer } = clients;
 
     await host.goto("/host");
-    await beamer.goto("/beamer.html");
+    await beamer.goto("/beamer");
 
     await waitForConnection(host);
 
@@ -73,7 +73,7 @@ test.describe("Host", () => {
     // ============================================
     console.log("Host state restoration test: Setting up game state...");
 
-    await Promise.all([host.goto("/host"), players[0].goto("/player.html")]);
+    await Promise.all([host.goto("/host"), players[0].goto("/player")]);
 
     await waitForConnection(host);
 
@@ -302,12 +302,12 @@ test.describe("Host", () => {
     const tokens = await getPlayerTokens(host);
 
     // Players connect (join with tokens)
-    await players[0].goto(`/player.html`);
+    await players[0].goto(`/player`);
     await players[0].fill("#tokenInput", tokens[0]);
     await players[0].click("#joinButton");
     await waitForConnection(players[0]);
 
-    await players[1].goto(`/player.html`);
+    await players[1].goto(`/player`);
     await players[1].fill("#tokenInput", tokens[1]);
     await players[1].click("#joinButton");
     await waitForConnection(players[1]);

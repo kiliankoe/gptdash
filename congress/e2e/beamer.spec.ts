@@ -32,7 +32,7 @@ test.describe("Beamer", () => {
     const { host, beamer } = clients;
 
     await host.goto("/host");
-    await beamer.goto("/beamer.html");
+    await beamer.goto("/beamer");
 
     await waitForConnection(host);
     await waitForConnection(beamer);

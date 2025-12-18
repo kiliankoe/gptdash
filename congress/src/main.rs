@@ -117,11 +117,13 @@ async fn main() {
         ));
 
     // Public page routes (beamer and player)
+    // Block direct .html access - only clean routes should work
     let page_routes = Router::new()
         .route("/beamer", get(auth::serve_beamer))
         .route("/player", get(auth::serve_player))
-        // Prevent bypassing the protected `/host` route via static file serving.
-        .route("/host.html", get(auth::redirect_host_html));
+        .route("/host.html", get(|| async { StatusCode::NOT_FOUND }))
+        .route("/player.html", get(|| async { StatusCode::NOT_FOUND }))
+        .route("/beamer.html", get(|| async { StatusCode::NOT_FOUND }));
 
     // WebSocket route with anti-abuse protection
     let ws_routes = Router::new()
