@@ -7,6 +7,7 @@ import {
   resetGameState,
   createGameClients,
   closeContexts,
+  debugLog,
 } from "./test-utils";
 
 /**
@@ -71,7 +72,7 @@ test.describe("Host", () => {
     // ============================================
     // SETUP: Create game state with prompts and submissions
     // ============================================
-    console.log("Host state restoration test: Setting up game state...");
+    debugLog("Host state restoration test: Setting up game state...");
 
     await Promise.all([host.goto("/host"), players[0].goto("/player")]);
 
@@ -185,7 +186,7 @@ test.describe("Host", () => {
     // ============================================
     // TEST: Reload host page
     // ============================================
-    console.log("Host state restoration test: Reloading host page...");
+    debugLog("Host state restoration test: Reloading host page...");
 
     await host.reload();
     await waitForConnection(host);
@@ -193,7 +194,7 @@ test.describe("Host", () => {
     // ============================================
     // VERIFY: Prompts list is restored after reload
     // ============================================
-    console.log("Host state restoration test: Verifying prompts restored...");
+    debugLog("Host state restoration test: Verifying prompts restored...");
 
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
@@ -219,9 +220,7 @@ test.describe("Host", () => {
     // ============================================
     // VERIFY: Submissions list is restored after reload
     // ============================================
-    console.log(
-      "Host state restoration test: Verifying submissions restored...",
-    );
+    debugLog("Host state restoration test: Verifying submissions restored...");
 
     await host.click('.sidebar-item:has-text("Antworten")');
     await host.waitForSelector("#submissions.active");
@@ -243,7 +242,7 @@ test.describe("Host", () => {
     // ============================================
     // VERIFY: Player status is restored after reload
     // ============================================
-    console.log(
+    debugLog(
       "Host state restoration test: Verifying player status restored...",
     );
 
@@ -265,14 +264,12 @@ test.describe("Host", () => {
     // ============================================
     // VERIFY: Game phase is restored after reload
     // ============================================
-    console.log(
-      "Host state restoration test: Verifying game phase restored...",
-    );
+    debugLog("Host state restoration test: Verifying game phase restored...");
 
     // Phase should still be WRITING
     await expect(host.locator("#overviewPhase")).toHaveText("WRITING");
 
-    console.log("Host state restoration test completed successfully!");
+    debugLog("Host state restoration test completed successfully!");
   });
 
   test("shows live connection counts", async () => {

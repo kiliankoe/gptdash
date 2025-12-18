@@ -4,6 +4,16 @@ import type { Page, BrowserContext, Browser } from "@playwright/test";
  * Shared test utilities and types for GPTDash e2e tests
  */
 
+// Check if quiet mode is enabled (suppress debug logs)
+const quietMode = process.env.E2E_QUIET === "1";
+
+// Conditional logging that respects E2E_QUIET
+export function debugLog(...args: unknown[]): void {
+  if (!quietMode) {
+    console.log(...args);
+  }
+}
+
 export interface GameClients {
   host: Page;
   beamer: Page;
@@ -95,13 +105,14 @@ export async function createGameClients(
   // Capture console logs from host page for debugging
   hostPage.on("console", (msg) => {
     if (
-      msg.text().includes("host_submissions") ||
-      msg.text().includes("Unhandled") ||
-      msg.text().includes("updateSubmissionsList") ||
-      msg.text().includes("submissionsList") ||
-      msg.text().includes("game_state") ||
-      msg.text().includes("Rendering") ||
-      msg.text().includes("Creating card")
+      !quietMode &&
+      (msg.text().includes("host_submissions") ||
+        msg.text().includes("Unhandled") ||
+        msg.text().includes("updateSubmissionsList") ||
+        msg.text().includes("submissionsList") ||
+        msg.text().includes("game_state") ||
+        msg.text().includes("Rendering") ||
+        msg.text().includes("Creating card"))
     ) {
       console.log(`[HOST CONSOLE] ${msg.type()}: ${msg.text()}`);
     }
@@ -113,14 +124,15 @@ export async function createGameClients(
   // Capture console logs from audience pages for debugging
   audience1Page.on("console", (msg) => {
     if (
-      msg.text().includes("joinAudience") ||
-      msg.text().includes("trivia") ||
-      msg.text().includes("Trivia") ||
-      msg.text().includes("Phase") ||
-      msg.text().includes("submitTriviaVote") ||
-      msg.text().includes("showScreen") ||
-      msg.text().includes("handleTriviaQuestion") ||
-      msg.text().includes("showTriviaScreen")
+      !quietMode &&
+      (msg.text().includes("joinAudience") ||
+        msg.text().includes("trivia") ||
+        msg.text().includes("Trivia") ||
+        msg.text().includes("Phase") ||
+        msg.text().includes("submitTriviaVote") ||
+        msg.text().includes("showScreen") ||
+        msg.text().includes("handleTriviaQuestion") ||
+        msg.text().includes("showTriviaScreen"))
     ) {
       console.log(`[AUDIENCE1 CONSOLE] ${msg.type()}: ${msg.text()}`);
     }

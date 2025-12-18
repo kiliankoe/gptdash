@@ -7,6 +7,7 @@ import {
   resetGameState,
   createGameClients,
   closeContexts,
+  debugLog,
 } from "./test-utils";
 
 /**
@@ -62,7 +63,7 @@ test.describe("Multimodal Prompts", () => {
     // ============================================
     // TEST: Add multimodal prompt with image URL
     // ============================================
-    console.log("Multimodal prompt test: Adding prompt with image...");
+    debugLog("Multimodal prompt test: Adding prompt with image...");
 
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
@@ -95,7 +96,7 @@ test.describe("Multimodal Prompts", () => {
     // ============================================
     // VERIFY: Beamer shows the image in writing scene
     // ============================================
-    console.log("Multimodal prompt test: Verifying beamer displays image...");
+    debugLog("Multimodal prompt test: Verifying beamer displays image...");
 
     await waitForBeamerScene(beamer, "sceneWriting", 10000);
 
@@ -116,7 +117,7 @@ test.describe("Multimodal Prompts", () => {
     // ============================================
     // VERIFY: Player sees the image in writing screen
     // ============================================
-    console.log("Multimodal prompt test: Verifying player displays image...");
+    debugLog("Multimodal prompt test: Verifying player displays image...");
 
     await players[0].waitForSelector("#writingScreen.active", {
       timeout: 5000,
@@ -136,7 +137,7 @@ test.describe("Multimodal Prompts", () => {
       "Was siehst du auf diesem Bild?",
     );
 
-    console.log("Multimodal prompt test completed successfully!");
+    debugLog("Multimodal prompt test completed successfully!");
   });
 
   test("image-only prompt (no text) displays correctly", async () => {
@@ -172,7 +173,7 @@ test.describe("Multimodal Prompts", () => {
     // ============================================
     // TEST: Add image-only prompt (no text)
     // ============================================
-    console.log("Image-only prompt test: Adding prompt with image only...");
+    debugLog("Image-only prompt test: Adding prompt with image only...");
 
     await host.click('.sidebar-item:has-text("Prompts")');
     await host.waitForSelector("#prompts.active");
@@ -204,7 +205,7 @@ test.describe("Multimodal Prompts", () => {
     // ============================================
     // VERIFY: Beamer shows the image
     // ============================================
-    console.log("Image-only prompt test: Verifying beamer displays image...");
+    debugLog("Image-only prompt test: Verifying beamer displays image...");
 
     await waitForBeamerScene(beamer, "sceneWriting", 10000);
 
@@ -214,7 +215,7 @@ test.describe("Multimodal Prompts", () => {
     // ============================================
     // VERIFY: Player sees the image
     // ============================================
-    console.log("Image-only prompt test: Verifying player displays image...");
+    debugLog("Image-only prompt test: Verifying player displays image...");
 
     await players[0].waitForSelector("#writingScreen.active", {
       timeout: 5000,
@@ -223,6 +224,6 @@ test.describe("Multimodal Prompts", () => {
     const playerImage = players[0].locator("#promptImage img");
     await expect(playerImage).toBeVisible({ timeout: 5000 });
 
-    console.log("Image-only prompt test completed successfully!");
+    debugLog("Image-only prompt test completed successfully!");
   });
 });

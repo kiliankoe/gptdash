@@ -8,6 +8,9 @@ config();
 // Set E2E_ENABLE_OPENAI=1 to enable OpenAI for e2e tests
 const enableOpenAI = process.env.E2E_ENABLE_OPENAI === "1";
 
+// Set E2E_QUIET=1 to suppress server logs
+const quietMode = process.env.E2E_QUIET === "1";
+
 const webServerEnv = {
   ...process.env,
   BIND_ADDR: "127.0.0.1",
@@ -53,8 +56,8 @@ export default defineConfig({
     url: "http://localhost:6573",
     reuseExistingServer: !process.env.CI,
     timeout: 120000, // 2 minutes for cargo build + server start
-    stdout: "pipe",
-    stderr: "pipe",
+    stdout: quietMode ? "ignore" : "pipe",
+    stderr: quietMode ? "ignore" : "pipe",
     env: webServerEnv,
   },
 

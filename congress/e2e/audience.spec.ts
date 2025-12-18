@@ -5,6 +5,7 @@ import {
   resetGameState,
   createGameClients,
   closeContexts,
+  debugLog,
 } from "./test-utils";
 
 /**
@@ -60,7 +61,7 @@ test.describe("Audience", () => {
     // ============================================
     // SETUP: Host connects, audience joins
     // ============================================
-    console.log("Panic mode test: Setting up game...");
+    debugLog("Panic mode test: Setting up game...");
 
     // Navigate to pages
     await host.goto("/host");
@@ -84,7 +85,7 @@ test.describe("Audience", () => {
     // ============================================
     // TEST: Host enables panic mode
     // ============================================
-    console.log("Panic mode test: Enabling panic mode...");
+    debugLog("Panic mode test: Enabling panic mode...");
 
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await host.waitForSelector("#game.active");
@@ -102,7 +103,7 @@ test.describe("Audience", () => {
     // ============================================
     // TEST: Audience gets disconnected
     // ============================================
-    console.log("Panic mode test: Verifying audience disconnected...");
+    debugLog("Panic mode test: Verifying audience disconnected...");
 
     // Wait for disconnection (status dot should lose connected class)
     await expect(audience[0].locator("#statusDot")).not.toHaveClass(
@@ -113,7 +114,7 @@ test.describe("Audience", () => {
     // ============================================
     // TEST: Audience HTTP access blocked
     // ============================================
-    console.log("Panic mode test: Verifying HTTP access blocked...");
+    debugLog("Panic mode test: Verifying HTTP access blocked...");
 
     // Try to reload the page - should get 403
     const response = await audience[0].goto("/");
@@ -122,7 +123,7 @@ test.describe("Audience", () => {
     // ============================================
     // TEST: Host disables panic mode
     // ============================================
-    console.log("Panic mode test: Disabling panic mode...");
+    debugLog("Panic mode test: Disabling panic mode...");
 
     await host.click("#panicModeBtn");
     await host.waitForTimeout(500);
@@ -133,7 +134,7 @@ test.describe("Audience", () => {
     // ============================================
     // TEST: Audience can access again after panic mode disabled
     // ============================================
-    console.log("Panic mode test: Verifying audience can access again...");
+    debugLog("Panic mode test: Verifying audience can access again...");
 
     // Reload should now work
     const responseAfter = await audience[0].goto("/");
@@ -152,7 +153,7 @@ test.describe("Audience", () => {
       timeout: 5000,
     });
 
-    console.log("Panic mode test completed successfully!");
+    debugLog("Panic mode test completed successfully!");
   });
 
   test("can only vote once per round (no change vote)", async () => {
@@ -161,7 +162,7 @@ test.describe("Audience", () => {
     // ============================================
     // SETUP: Full game flow to voting phase
     // ============================================
-    console.log("Single vote test: Setting up game...");
+    debugLog("Single vote test: Setting up game...");
 
     // Navigate to pages
     await host.goto("/host");
@@ -227,7 +228,7 @@ test.describe("Audience", () => {
     // ============================================
     // TEST: Audience votes and sees confirmation
     // ============================================
-    console.log("Single vote test: Audience voting...");
+    debugLog("Single vote test: Audience voting...");
 
     await audience[0].waitForSelector("#votingScreen.active", {
       timeout: 5000,
@@ -252,7 +253,7 @@ test.describe("Audience", () => {
     // ============================================
     // VERIFY: Confirmation screen without change vote button
     // ============================================
-    console.log("Single vote test: Verifying confirmation screen...");
+    debugLog("Single vote test: Verifying confirmation screen...");
 
     await audience[0].waitForSelector("#confirmedScreen.active", {
       timeout: 5000,
@@ -273,6 +274,6 @@ test.describe("Audience", () => {
     await expect(audience[0].locator("#summaryAiPick")).toBeVisible();
     await expect(audience[0].locator("#summaryFunnyPick")).toBeVisible();
 
-    console.log("Single vote test completed successfully!");
+    debugLog("Single vote test completed successfully!");
   });
 });

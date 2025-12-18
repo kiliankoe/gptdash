@@ -6,6 +6,7 @@ import {
   resetGameState,
   createGameClients,
   closeContexts,
+  debugLog,
 } from "./test-utils";
 
 /**
@@ -76,7 +77,7 @@ test.describe("Player", () => {
     // ============================================
     // SETUP: Connect host and create players
     // ============================================
-    console.log("Player status test: Setting up game...");
+    debugLog("Player status test: Setting up game...");
 
     await Promise.all([
       host.goto("/host"),
@@ -96,7 +97,7 @@ test.describe("Player", () => {
     // ============================================
     // TEST: Initial state - no names, waiting status
     // ============================================
-    console.log("Player status test: Checking initial state...");
+    debugLog("Player status test: Checking initial state...");
 
     // Should show "Nicht registriert" for unregistered players
     const playerCards = host.locator("#playerTokensList .player-status-card");
@@ -118,7 +119,7 @@ test.describe("Player", () => {
     // ============================================
     // TEST: Player 1 registers - name appears
     // ============================================
-    console.log("Player status test: Player 1 registering...");
+    debugLog("Player status test: Player 1 registering...");
 
     await players[0].fill("#tokenInput", tokens[0]);
     await players[0].click("#joinButton");
@@ -140,7 +141,7 @@ test.describe("Player", () => {
     // ============================================
     // SETUP: Get to writing phase
     // ============================================
-    console.log("Player status test: Transitioning to writing...");
+    debugLog("Player status test: Transitioning to writing...");
 
     // Player 2 also registers
     await players[1].fill("#tokenInput", tokens[1]);
@@ -179,7 +180,7 @@ test.describe("Player", () => {
     // ============================================
     // TEST: Player 1 submits - status changes to submitted
     // ============================================
-    console.log("Player status test: Player 1 submitting...");
+    debugLog("Player status test: Player 1 submitting...");
 
     // Navigate to players panel to watch status
     await host.click('.sidebar-item:has-text("Spieler")');
@@ -216,7 +217,7 @@ test.describe("Player", () => {
     // ============================================
     // TEST: Player 2 submits - both now submitted
     // ============================================
-    console.log("Player status test: Player 2 submitting...");
+    debugLog("Player status test: Player 2 submitting...");
 
     await players[1].waitForSelector("#writingScreen.active", {
       timeout: 5000,
@@ -240,7 +241,7 @@ test.describe("Player", () => {
     );
     await expect(noWaitingBadges).toHaveCount(0);
 
-    console.log("Player status test completed successfully!");
+    debugLog("Player status test completed successfully!");
   });
 
   test("host can remove player mid-round and affected votes are reset", async () => {
@@ -249,7 +250,7 @@ test.describe("Player", () => {
     // ============================================
     // SETUP: Get to voting phase with submissions
     // ============================================
-    console.log("Remove player test: Setting up game...");
+    debugLog("Remove player test: Setting up game...");
 
     // Navigate to pages
     await Promise.all([
@@ -360,7 +361,7 @@ test.describe("Player", () => {
     // ============================================
     // TEST: Audience votes for the player-to-be-removed's answer
     // ============================================
-    console.log("Remove player test: Audience voting...");
+    debugLog("Remove player test: Audience voting...");
 
     await audience[0].waitForSelector("#votingScreen.active", {
       timeout: 5000,
@@ -383,7 +384,7 @@ test.describe("Player", () => {
     // ============================================
     // TEST: Host removes first player during voting
     // ============================================
-    console.log("Remove player test: Host removing player...");
+    debugLog("Remove player test: Host removing player...");
 
     // Navigate to Players panel
     await host.click('.sidebar-item:has-text("Spieler")');
@@ -412,7 +413,7 @@ test.describe("Player", () => {
     // ============================================
     // VERIFY: Player is removed
     // ============================================
-    console.log("Remove player test: Verifying player removal...");
+    debugLog("Remove player test: Verifying player removal...");
 
     // Should now only see 1 player
     const playerCardsAfter = host.locator(
@@ -433,7 +434,7 @@ test.describe("Player", () => {
     // ============================================
     // VERIFY: Submission is removed
     // ============================================
-    console.log("Remove player test: Verifying submission removal...");
+    debugLog("Remove player test: Verifying submission removal...");
 
     await host.click('.sidebar-item:has-text("Antworten")');
     await host.waitForSelector("#submissions.active");
@@ -459,7 +460,7 @@ test.describe("Player", () => {
     // ============================================
     // VERIFY: Audience can vote again (their vote was reset)
     // ============================================
-    console.log("Remove player test: Verifying audience can vote again...");
+    debugLog("Remove player test: Verifying audience can vote again...");
 
     // Audience should be back on voting screen (their vote was invalidated)
     // Note: They may need to refresh or the UI may automatically update
@@ -473,7 +474,7 @@ test.describe("Player", () => {
       timeout: 5000,
     });
 
-    console.log("Remove player test completed successfully!");
+    debugLog("Remove player test completed successfully!");
   });
 
   test("host can add new player mid-round during writing phase", async () => {
@@ -482,7 +483,7 @@ test.describe("Player", () => {
     // ============================================
     // SETUP: Start with one player in writing phase
     // ============================================
-    console.log("Add player mid-round test: Setting up game...");
+    debugLog("Add player mid-round test: Setting up game...");
 
     await Promise.all([host.goto("/host"), players[0].goto("/player")]);
 
@@ -535,7 +536,7 @@ test.describe("Player", () => {
     // ============================================
     // TEST: Host adds new player during WRITING phase
     // ============================================
-    console.log("Add player mid-round test: Adding new player...");
+    debugLog("Add player mid-round test: Adding new player...");
 
     // Navigate to Players panel
     await host.click('.sidebar-item:has-text("Spieler")');
@@ -557,7 +558,7 @@ test.describe("Player", () => {
     // ============================================
     // TEST: New player can join and submit during WRITING
     // ============================================
-    console.log("Add player mid-round test: New player joining...");
+    debugLog("Add player mid-round test: New player joining...");
 
     // Load player page in second player context
     await players[1].goto("/player");
@@ -585,7 +586,7 @@ test.describe("Player", () => {
     // ============================================
     // VERIFY: Both submissions appear in host view
     // ============================================
-    console.log("Add player mid-round test: Verifying submissions...");
+    debugLog("Add player mid-round test: Verifying submissions...");
 
     await host.click('.sidebar-item:has-text("Antworten")');
     await host.waitForSelector("#submissions.active");
@@ -607,7 +608,7 @@ test.describe("Player", () => {
     // ============================================
     // VERIFY: Player status shows both players
     // ============================================
-    console.log("Add player mid-round test: Verifying player status...");
+    debugLog("Add player mid-round test: Verifying player status...");
 
     await host.click('.sidebar-item:has-text("Spieler")');
     await host.waitForSelector("#players.active");
@@ -626,7 +627,7 @@ test.describe("Player", () => {
       host.locator('#playerTokensList .player-name:has-text("LateArrival")'),
     ).toBeVisible();
 
-    console.log("Add player mid-round test completed successfully!");
+    debugLog("Add player mid-round test completed successfully!");
   });
 
   test("player reconnects during WRITING phase and can submit", async ({
@@ -637,7 +638,7 @@ test.describe("Player", () => {
     // ============================================
     // SETUP: Get to WRITING phase with connected player
     // ============================================
-    console.log("Player reconnect test: Setting up game...");
+    debugLog("Player reconnect test: Setting up game...");
 
     await host.goto("/host");
     await waitForConnection(host);
@@ -686,7 +687,7 @@ test.describe("Player", () => {
     // ============================================
     // TEST: Close player page and reconnect
     // ============================================
-    console.log("Player reconnect test: Disconnecting player...");
+    debugLog("Player reconnect test: Disconnecting player...");
 
     // Close player page
     await players[0].close();
@@ -695,7 +696,7 @@ test.describe("Player", () => {
     await host.waitForTimeout(500);
 
     // Create new player page and reconnect with token via URL param
-    console.log("Player reconnect test: Reconnecting player...");
+    debugLog("Player reconnect test: Reconnecting player...");
     const reconnectedContext = await browser.newContext();
     contexts.push(reconnectedContext);
     const reconnectedPlayer = await reconnectedContext.newPage();
@@ -706,7 +707,7 @@ test.describe("Player", () => {
     // ============================================
     // VERIFY: Player sees WRITING screen after reconnect
     // ============================================
-    console.log("Player reconnect test: Verifying state recovery...");
+    debugLog("Player reconnect test: Verifying state recovery...");
 
     // Player should see writing screen with the prompt
     await reconnectedPlayer.waitForSelector("#writingScreen.active", {
@@ -721,7 +722,7 @@ test.describe("Player", () => {
     // ============================================
     // VERIFY: Player can submit answer after reconnect
     // ============================================
-    console.log("Player reconnect test: Submitting answer...");
+    debugLog("Player reconnect test: Submitting answer...");
 
     await reconnectedPlayer.fill(
       "#answerInput",
@@ -740,7 +741,7 @@ test.describe("Player", () => {
       { timeout: 5000 },
     );
 
-    console.log("Player reconnect during WRITING test completed successfully!");
+    debugLog("Player reconnect during WRITING test completed successfully!");
   });
 
   test("player reconnects during VOTING phase and sees locked screen", async ({
@@ -751,7 +752,7 @@ test.describe("Player", () => {
     // ============================================
     // SETUP: Get to VOTING phase
     // ============================================
-    console.log("Player reconnect VOTING test: Setting up game...");
+    debugLog("Player reconnect VOTING test: Setting up game...");
 
     await host.goto("/host");
     await waitForConnection(host);
@@ -831,14 +832,14 @@ test.describe("Player", () => {
     // ============================================
     // TEST: Close player page and reconnect
     // ============================================
-    console.log("Player reconnect VOTING test: Disconnecting player...");
+    debugLog("Player reconnect VOTING test: Disconnecting player...");
 
     // Close player page
     await players[0].close();
     await host.waitForTimeout(500);
 
     // Create new player page and reconnect
-    console.log("Player reconnect VOTING test: Reconnecting player...");
+    debugLog("Player reconnect VOTING test: Reconnecting player...");
     const reconnectedContext = await browser.newContext();
     contexts.push(reconnectedContext);
     const reconnectedPlayer = await reconnectedContext.newPage();
@@ -848,7 +849,7 @@ test.describe("Player", () => {
     // ============================================
     // VERIFY: Player sees locked screen after reconnect
     // ============================================
-    console.log("Player reconnect VOTING test: Verifying locked screen...");
+    debugLog("Player reconnect VOTING test: Verifying locked screen...");
 
     await reconnectedPlayer.waitForSelector("#lockedScreen.active", {
       timeout: 5000,
@@ -859,6 +860,6 @@ test.describe("Player", () => {
       "Schau auf die große Leinwand",
     );
 
-    console.log("Player reconnect during VOTING test completed successfully!");
+    debugLog("Player reconnect during VOTING test completed successfully!");
   });
 });

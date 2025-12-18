@@ -8,6 +8,7 @@ import {
   resetGameState,
   createGameClients,
   closeContexts,
+  debugLog,
 } from "./test-utils";
 
 /**
@@ -42,7 +43,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 1: Connect all clients
     // ============================================
-    console.log("Step 1: Connecting all clients...");
+    debugLog("Step 1: Connecting all clients...");
 
     // Navigate to pages in parallel
     await Promise.all([
@@ -70,7 +71,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 2: Host creates player tokens
     // ============================================
-    console.log("Step 2: Creating player tokens...");
+    debugLog("Step 2: Creating player tokens...");
 
     // Navigate to Players panel
     await host.click('.sidebar-item:has-text("Spieler")');
@@ -87,12 +88,12 @@ test.describe("Game Flow", () => {
     expect(tokens[0]).toMatch(/^[A-Z0-9]+$/);
     expect(tokens[1]).toMatch(/^[A-Z0-9]+$/);
 
-    console.log(`Created tokens: ${tokens.join(", ")}`);
+    debugLog(`Created tokens: ${tokens.join(", ")}`);
 
     // ============================================
     // STEP 3: Players join with tokens
     // ============================================
-    console.log("Step 3: Players joining...");
+    debugLog("Step 3: Players joining...");
 
     // Player 1 joins
     await players[0].fill("#tokenInput", tokens[0]);
@@ -117,7 +118,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 4: Audience members join
     // ============================================
-    console.log("Step 4: Audience joining...");
+    debugLog("Step 4: Audience joining...");
 
     // Audience 1 joins (may auto-advance to waiting screen after WS connect)
     if (await audience[0].locator("#joinButton").isVisible()) {
@@ -134,7 +135,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 5: Host adds and queues prompt
     // ============================================
-    console.log("Step 5: Adding and queueing prompt...");
+    debugLog("Step 5: Adding and queueing prompt...");
 
     // Navigate to prompts panel
     await host.click('.sidebar-item:has-text("Prompts")');
@@ -162,7 +163,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 6: Host starts prompt selection (auto-advances to WRITING with 1 prompt)
     // ============================================
-    console.log(
+    debugLog(
       "Step 6: Starting prompt selection (will auto-advance to WRITING)...",
     );
 
@@ -181,7 +182,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 7: Players submit answers
     // ============================================
-    console.log("Step 7: Players submitting answers...");
+    debugLog("Step 7: Players submitting answers...");
 
     // Wait for players to see writing screen
     await players[0].waitForSelector("#writingScreen.active", {
@@ -231,7 +232,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 8: Host transitions to REVEAL
     // ============================================
-    console.log("Step 8: Transitioning to reveal...");
+    debugLog("Step 8: Transitioning to reveal...");
 
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await host.click('button[data-phase="REVEAL"]');
@@ -248,7 +249,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 9: Host navigates through reveals
     // ============================================
-    console.log("Step 9: Navigating reveal carousel...");
+    debugLog("Step 9: Navigating reveal carousel...");
 
     await host.click('.sidebar-item:has-text("Antworten")');
 
@@ -267,7 +268,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 10: Host transitions to VOTING
     // ============================================
-    console.log("Step 10: Transitioning to voting...");
+    debugLog("Step 10: Transitioning to voting...");
 
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await host.click('button[data-phase="VOTING"]');
@@ -300,7 +301,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 11: Audience votes
     // ============================================
-    console.log("Step 11: Audience voting...");
+    debugLog("Step 11: Audience voting...");
 
     // Wait for answer options to appear
     await audience[0].waitForSelector(".answer-option", { timeout: 5000 });
@@ -345,7 +346,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 12: Host transitions to RESULTS
     // ============================================
-    console.log("Step 12: Transitioning to results...");
+    debugLog("Step 12: Transitioning to results...");
 
     await host.click('button[data-phase="RESULTS"]');
 
@@ -365,7 +366,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 13: Verify scores are displayed
     // ============================================
-    console.log("Step 13: Verifying scores...");
+    debugLog("Step 13: Verifying scores...");
 
     // Check host scores panel
     await host.click('.sidebar-item:has-text("Punkte")');
@@ -383,9 +384,7 @@ test.describe("Game Flow", () => {
     // ============================================
     // STEP 14: Host transitions to PODIUM and audience winner screen
     // ============================================
-    console.log(
-      "Step 14: Transitioning to podium and checking winner screens...",
-    );
+    debugLog("Step 14: Transitioning to podium and checking winner screens...");
 
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await host.click('button[data-phase="PODIUM"]');
@@ -411,8 +410,8 @@ test.describe("Game Flow", () => {
       .first()
       .getAttribute("id");
 
-    console.log(`Audience 0 sees: ${audience0Screen}`);
-    console.log(`Audience 1 sees: ${audience1Screen}`);
+    debugLog(`Audience 0 sees: ${audience0Screen}`);
+    debugLog(`Audience 1 sees: ${audience1Screen}`);
 
     // Both should have valid screens (either winner or waiting)
     expect(["winnerFullscreen", "waitingScreen"]).toContain(audience0Screen);
@@ -426,13 +425,13 @@ test.describe("Game Flow", () => {
         (el) => getComputedStyle(el).animationName,
       );
       expect(animationName).toBe("winnerPulse");
-      console.log("Winner screen verified with pulsing animation!");
+      debugLog("Winner screen verified with pulsing animation!");
     }
 
     // ============================================
     // STEP 15: Start a second round and verify UI resets
     // ============================================
-    console.log("Step 15: Starting second round and verifying state reset...");
+    debugLog("Step 15: Starting second round and verifying state reset...");
 
     // Add a second prompt to the pool
     await host.click('.sidebar-item:has-text("Prompts")');
@@ -486,7 +485,7 @@ test.describe("Game Flow", () => {
       "Round 2: Describe a futuristic parliament.",
     );
 
-    console.log(
+    debugLog(
       "Full game flow (including PODIUM winner screen and round 2 start) completed successfully!",
     );
   });

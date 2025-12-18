@@ -7,6 +7,7 @@ import {
   resetGameState,
   createGameClients,
   closeContexts,
+  debugLog,
 } from "./test-utils";
 
 /**
@@ -35,7 +36,7 @@ test.describe("Submissions", () => {
     // ============================================
     // SETUP: Get to writing phase with player
     // ============================================
-    console.log("Duplicate test: Setting up game...");
+    debugLog("Duplicate test: Setting up game...");
 
     // Navigate to pages
     await Promise.all([
@@ -95,7 +96,7 @@ test.describe("Submissions", () => {
     // ============================================
     // TEST 1: Player 1 submits an answer
     // ============================================
-    console.log("Duplicate test: Player 1 submitting answer...");
+    debugLog("Duplicate test: Player 1 submitting answer...");
 
     await players[0].waitForSelector("#writingScreen.active", {
       timeout: 5000,
@@ -115,7 +116,7 @@ test.describe("Submissions", () => {
     // ============================================
     // TEST 2: Player 2 tries to submit exact duplicate
     // ============================================
-    console.log("Duplicate test: Player 2 trying exact duplicate...");
+    debugLog("Duplicate test: Player 2 trying exact duplicate...");
 
     await players[1].waitForSelector("#writingScreen.active", {
       timeout: 5000,
@@ -141,7 +142,7 @@ test.describe("Submissions", () => {
     // ============================================
     // TEST 3: Player 2 submits a different answer
     // ============================================
-    console.log("Duplicate test: Player 2 submitting different answer...");
+    debugLog("Duplicate test: Player 2 submitting different answer...");
 
     await players[1].fill(
       "#answerInput",
@@ -160,7 +161,7 @@ test.describe("Submissions", () => {
     // ============================================
     // TEST 4: Host marks Player 2's submission as duplicate
     // ============================================
-    console.log("Duplicate test: Host marking submission as duplicate...");
+    debugLog("Duplicate test: Host marking submission as duplicate...");
 
     // Handle confirmation dialog
     host.on("dialog", (dialog) => dialog.accept());
@@ -183,7 +184,7 @@ test.describe("Submissions", () => {
     // ============================================
     // TEST 5: Player 2 is notified and can resubmit
     // ============================================
-    console.log("Duplicate test: Verifying player notification...");
+    debugLog("Duplicate test: Verifying player notification...");
 
     // Player 2 should be back on writing screen with an error message
     await players[1].waitForSelector("#writingScreen.active", {
@@ -212,7 +213,7 @@ test.describe("Submissions", () => {
     );
     await expect(playerSubmissionsFinal).toHaveCount(2);
 
-    console.log("Duplicate detection test completed successfully!");
+    debugLog("Duplicate detection test completed successfully!");
   });
 
   test("typo correction flow shows comparison when LLM suggests changes", async () => {
@@ -221,7 +222,7 @@ test.describe("Submissions", () => {
     // ============================================
     // SETUP: Get to writing phase with player
     // ============================================
-    console.log("Typo correction test: Setting up game...");
+    debugLog("Typo correction test: Setting up game...");
 
     await Promise.all([host.goto("/host"), players[0].goto("/player")]);
 
@@ -267,7 +268,7 @@ test.describe("Submissions", () => {
     // ============================================
     // TEST: Player submits answer and sees confirmation
     // ============================================
-    console.log("Typo correction test: Player submitting answer...");
+    debugLog("Typo correction test: Player submitting answer...");
 
     await players[0].waitForSelector("#writingScreen.active", {
       timeout: 5000,
@@ -301,14 +302,14 @@ test.describe("Submissions", () => {
     // One of them must be active
     expect(isOnSubmittedScreen || isOnTypoCheckScreen).toBe(true);
 
-    console.log(
+    debugLog(
       `Typo correction test: Player is on ${isOnSubmittedScreen ? "submitted" : "typo check"} screen`,
     );
 
     // ============================================
     // TEST: Verify typo check UI elements exist
     // ============================================
-    console.log("Typo correction test: Verifying UI elements exist...");
+    debugLog("Typo correction test: Verifying UI elements exist...");
 
     // Check that the typo check screen has all required elements (attached to DOM)
     await expect(players[0].locator("#typoCheckScreen")).toBeAttached();
@@ -328,7 +329,7 @@ test.describe("Submissions", () => {
     // TEST: If on typo check screen, verify the flow works
     // ============================================
     if (isOnTypoCheckScreen) {
-      console.log(
+      debugLog(
         "Typo correction test: LLM suggested changes, testing accept flow...",
       );
 
@@ -345,6 +346,6 @@ test.describe("Submissions", () => {
       });
     }
 
-    console.log("Typo correction test completed successfully!");
+    debugLog("Typo correction test completed successfully!");
   });
 });

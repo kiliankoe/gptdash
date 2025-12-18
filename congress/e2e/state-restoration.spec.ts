@@ -8,7 +8,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { waitForConnection, getPlayerTokens } from "./test-utils";
+import { waitForConnection, getPlayerTokens, debugLog } from "./test-utils";
 
 /**
  * State restoration e2e tests
@@ -64,14 +64,14 @@ async function startServer(backupPath: string): Promise<ServerHandle> {
   serverProcess.stdout?.on("data", (data) => {
     stdout += data.toString();
     if (process.env.DEBUG) {
-      console.log(`[SERVER STDOUT] ${data.toString().trim()}`);
+      debugLog(`[SERVER STDOUT] ${data.toString().trim()}`);
     }
   });
 
   serverProcess.stderr?.on("data", (data) => {
     stderr += data.toString();
     if (process.env.DEBUG) {
-      console.log(`[SERVER STDERR] ${data.toString().trim()}`);
+      debugLog(`[SERVER STDERR] ${data.toString().trim()}`);
     }
   });
 
@@ -230,7 +230,7 @@ test.describe("State Restoration", () => {
     // ============================================
     // PHASE 1: Start server and set up initial state
     // ============================================
-    console.log("Starting server with auto-save enabled...");
+    debugLog("Starting server with auto-save enabled...");
     server = await startServer(backupPath);
 
     let { contexts, host, beamer, players } = await createClients(browser);
@@ -254,7 +254,7 @@ test.describe("State Restoration", () => {
       const tokens = await getPlayerTokens(host);
       expect(tokens).toHaveLength(2);
 
-      console.log(`Created player tokens: ${tokens.join(", ")}`);
+      debugLog(`Created player tokens: ${tokens.join(", ")}`);
 
       // Player 1 joins and registers
       await players[0].goto(`${TEST_BASE_URL}/player`);
@@ -282,27 +282,27 @@ test.describe("State Restoration", () => {
       await host.fill("#promptText", "State restoration test prompt 1");
       await host.click('#prompts button:has-text("Prompt hinzufügen")');
       await host.waitForSelector("#hostPromptsList [data-prompt-id]");
-      console.log("First prompt added");
+      debugLog("First prompt added");
 
       // Clear input and add second prompt
       await host.fill("#promptText", "");
       await host.waitForTimeout(300);
       await host.fill("#promptText", "State restoration test prompt 2");
       await host.click('#prompts button:has-text("Prompt hinzufügen")');
-      console.log("Second prompt add clicked");
+      debugLog("Second prompt add clicked");
 
       // Wait for second prompt - use more reliable selector
       await host.waitForTimeout(1000);
       const promptCount = await host
         .locator("#hostPromptsList [data-prompt-id]")
         .count();
-      console.log(`Prompt count after adds: ${promptCount}`);
+      debugLog(`Prompt count after adds: ${promptCount}`);
 
       // If only 1 prompt, the second add might have failed - that's ok for this test
       expect(promptCount).toBeGreaterThanOrEqual(1);
 
       // Wait for auto-save (interval is 1 second, wait a bit longer to be safe)
-      console.log("Waiting for auto-save...");
+      debugLog("Waiting for auto-save...");
       await sleep(2500);
 
       // Verify backup file was created
@@ -319,10 +319,10 @@ test.describe("State Restoration", () => {
       // ============================================
       // PHASE 2: Stop and restart server
       // ============================================
-      console.log("Stopping server...");
+      debugLog("Stopping server...");
       await stopServer(server);
 
-      console.log("Restarting server...");
+      debugLog("Restarting server...");
       server = await startServer(backupPath);
 
       // ============================================
@@ -366,7 +366,7 @@ test.describe("State Restoration", () => {
         .locator("#hostPromptsList [data-prompt-id]")
         .count();
       expect(restoredPromptCount).toBeGreaterThanOrEqual(1);
-      console.log(`Restored prompt count: ${restoredPromptCount}`);
+      debugLog(`Restored prompt count: ${restoredPromptCount}`);
 
       // Verify at least one prompt text is present
       const promptsText = await host.locator("#hostPromptsList").textContent();
@@ -381,7 +381,7 @@ test.describe("State Restoration", () => {
         timeout: 5000,
       });
 
-      console.log("LOBBY state restoration test passed!");
+      debugLog("LOBBY state restoration test passed!");
     } finally {
       if (contexts.length > 0) {
         await closeContexts(contexts);
@@ -395,7 +395,7 @@ test.describe("State Restoration", () => {
     // ============================================
     // PHASE 1: Set up game in WRITING phase with submissions
     // ============================================
-    console.log("Starting server with auto-save enabled...");
+    debugLog("Starting server with auto-save enabled...");
     server = await startServer(backupPath);
 
     let { contexts, host, beamer, players } = await createClients(browser);
@@ -473,7 +473,7 @@ test.describe("State Restoration", () => {
       expect(submissionCount).toBeGreaterThanOrEqual(2);
 
       // Wait for auto-save
-      console.log("Waiting for auto-save...");
+      debugLog("Waiting for auto-save...");
       await sleep(2500);
 
       // Verify backup contains submissions
@@ -489,7 +489,7 @@ test.describe("State Restoration", () => {
       // ============================================
       // PHASE 2: Restart server
       // ============================================
-      console.log("Stopping and restarting server...");
+      debugLog("Stopping and restarting server...");
       await stopServer(server);
       server = await startServer(backupPath);
 
@@ -533,7 +533,7 @@ test.describe("State Restoration", () => {
         "Writing phase restoration test",
       );
 
-      console.log("WRITING phase state restoration test passed!");
+      debugLog("WRITING phase state restoration test passed!");
     } finally {
       if (contexts.length > 0) {
         await closeContexts(contexts);
@@ -547,7 +547,7 @@ test.describe("State Restoration", () => {
     // ============================================
     // PHASE 1: Set up game in VOTING phase with votes
     // ============================================
-    console.log("Starting server with auto-save enabled...");
+    debugLog("Starting server with auto-save enabled...");
     server = await startServer(backupPath);
 
     let { contexts, host, beamer, players, audience } =
@@ -658,7 +658,7 @@ test.describe("State Restoration", () => {
       );
 
       // Wait for auto-save
-      console.log("Waiting for auto-save...");
+      debugLog("Waiting for auto-save...");
       await sleep(2500);
 
       // Verify backup contains vote data
@@ -673,7 +673,7 @@ test.describe("State Restoration", () => {
       // ============================================
       // PHASE 2: Restart server
       // ============================================
-      console.log("Stopping and restarting server...");
+      debugLog("Stopping and restarting server...");
       await stopServer(server);
       server = await startServer(backupPath);
 
@@ -715,7 +715,7 @@ test.describe("State Restoration", () => {
         timeout: 5000,
       });
 
-      console.log("VOTING phase state restoration test passed!");
+      debugLog("VOTING phase state restoration test passed!");
     } finally {
       if (contexts.length > 0) {
         await closeContexts(contexts);
@@ -729,7 +729,7 @@ test.describe("State Restoration", () => {
     // ============================================
     // PHASE 1: Complete a game to RESULTS and get scores
     // ============================================
-    console.log("Starting server with auto-save enabled...");
+    debugLog("Starting server with auto-save enabled...");
     server = await startServer(backupPath);
 
     let { contexts, host, beamer, players, audience } =
@@ -842,7 +842,7 @@ test.describe("State Restoration", () => {
       expect(scoresText).toContain("ScorePlayer");
 
       // Wait for auto-save
-      console.log("Waiting for auto-save...");
+      debugLog("Waiting for auto-save...");
       await sleep(2500);
 
       // Verify backup contains scores
@@ -857,7 +857,7 @@ test.describe("State Restoration", () => {
       // ============================================
       // PHASE 2: Restart server
       // ============================================
-      console.log("Stopping and restarting server...");
+      debugLog("Stopping and restarting server...");
       await stopServer(server);
       server = await startServer(backupPath);
 
@@ -888,7 +888,7 @@ test.describe("State Restoration", () => {
       // Wait for leaderboard to appear on beamer
       await beamer.waitForSelector("#leaderboardList", { timeout: 5000 });
 
-      console.log("RESULTS phase state restoration test passed!");
+      debugLog("RESULTS phase state restoration test passed!");
     } finally {
       if (contexts.length > 0) {
         await closeContexts(contexts);
@@ -902,7 +902,7 @@ test.describe("State Restoration", () => {
     // ============================================
     // PHASE 1: Complete 2 rounds to verify round counter
     // ============================================
-    console.log("Starting server with auto-save enabled...");
+    debugLog("Starting server with auto-save enabled...");
     server = await startServer(backupPath);
 
     let { contexts, host, beamer, players } = await createClients(browser);
@@ -996,7 +996,7 @@ test.describe("State Restoration", () => {
       await expect(host.locator("#overviewRound")).toHaveText("2");
 
       // Wait for auto-save
-      console.log("Waiting for auto-save...");
+      debugLog("Waiting for auto-save...");
       await sleep(2500);
 
       // Close contexts before restart
@@ -1006,7 +1006,7 @@ test.describe("State Restoration", () => {
       // ============================================
       // PHASE 2: Restart server
       // ============================================
-      console.log("Stopping and restarting server...");
+      debugLog("Stopping and restarting server...");
       await stopServer(server);
       server = await startServer(backupPath);
 
@@ -1024,7 +1024,7 @@ test.describe("State Restoration", () => {
       await expect(host.locator("#overviewRound")).toHaveText("2");
       await expect(host.locator("#overviewPhase")).toHaveText("WRITING");
 
-      console.log("Round number restoration test passed!");
+      debugLog("Round number restoration test passed!");
     } finally {
       if (contexts.length > 0) {
         await closeContexts(contexts);

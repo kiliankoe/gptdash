@@ -4,6 +4,7 @@
   "description": "End-to-end tests for GPTDash",
   "scripts": {
     "test:e2e": "playwright test",
+    "test:e2e:quiet": "E2E_QUIET=1 playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug"
