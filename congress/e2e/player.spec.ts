@@ -628,4 +628,239 @@ test.describe("Player", () => {
 
     console.log("Add player mid-round test completed successfully!");
   });
+
+  test("player reconnects during WRITING phase and can submit", async ({
+    browser,
+  }) => {
+    const { host, players } = clients;
+
+    // ============================================
+    // SETUP: Get to WRITING phase with connected player
+    // ============================================
+    console.log("Player reconnect test: Setting up game...");
+
+    await host.goto("/host");
+    await waitForConnection(host);
+
+    // Create player token
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "1");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForSelector("#playerTokensList .player-status-card");
+
+    const tokens = await getPlayerTokens(host);
+    expect(tokens).toHaveLength(1);
+    const playerToken = tokens[0];
+
+    // Player joins and registers
+    await players[0].goto("/player.html");
+    await players[0].fill("#tokenInput", playerToken);
+    await players[0].click("#joinButton");
+    await players[0].waitForSelector("#registerScreen.active");
+    await players[0].fill("#nameInput", "ReconnectPlayer");
+    await players[0].click("#registerButton");
+    await players[0].waitForSelector("#waitingScreen.active");
+
+    // Add prompt and start game
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+    await host.fill("#promptText", "Reconnect test prompt");
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+    await host.click("#startPromptSelectionBtn");
+    await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
+      timeout: 5000,
+    });
+
+    // Verify player sees writing screen
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+
+    // ============================================
+    // TEST: Close player page and reconnect
+    // ============================================
+    console.log("Player reconnect test: Disconnecting player...");
+
+    // Close player page
+    await players[0].close();
+
+    // Wait a moment for disconnection to register
+    await host.waitForTimeout(500);
+
+    // Create new player page and reconnect with token via URL param
+    console.log("Player reconnect test: Reconnecting player...");
+    const reconnectedContext = await browser.newContext();
+    contexts.push(reconnectedContext);
+    const reconnectedPlayer = await reconnectedContext.newPage();
+
+    // Navigate with token in URL (simulating reconnection with stored token)
+    await reconnectedPlayer.goto(`/player.html?token=${playerToken}`);
+
+    // ============================================
+    // VERIFY: Player sees WRITING screen after reconnect
+    // ============================================
+    console.log("Player reconnect test: Verifying state recovery...");
+
+    // Player should see writing screen with the prompt
+    await reconnectedPlayer.waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+
+    // The prompt text should be visible
+    await expect(reconnectedPlayer.locator("#promptText")).toContainText(
+      "Reconnect test prompt",
+    );
+
+    // ============================================
+    // VERIFY: Player can submit answer after reconnect
+    // ============================================
+    console.log("Player reconnect test: Submitting answer...");
+
+    await reconnectedPlayer.fill(
+      "#answerInput",
+      "Answer submitted after reconnection",
+    );
+    await reconnectedPlayer.click("#submitButton");
+    await reconnectedPlayer.waitForSelector("#submittedScreen.active", {
+      timeout: 5000,
+    });
+
+    // Verify submission appears in host view
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.waitForSelector("#submissions.active");
+    await host.waitForSelector(
+      ".submission-card:has-text('Answer submitted after reconnection')",
+      { timeout: 5000 },
+    );
+
+    console.log("Player reconnect during WRITING test completed successfully!");
+  });
+
+  test("player reconnects during VOTING phase and sees locked screen", async ({
+    browser,
+  }) => {
+    const { host, players } = clients;
+
+    // ============================================
+    // SETUP: Get to VOTING phase
+    // ============================================
+    console.log("Player reconnect VOTING test: Setting up game...");
+
+    await host.goto("/host");
+    await waitForConnection(host);
+
+    // Create player token
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "1");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForSelector("#playerTokensList .player-status-card");
+
+    const tokens = await getPlayerTokens(host);
+    const playerToken = tokens[0];
+
+    // Player joins and registers
+    await players[0].goto("/player.html");
+    await players[0].fill("#tokenInput", playerToken);
+    await players[0].click("#joinButton");
+    await players[0].waitForSelector("#registerScreen.active");
+    await players[0].fill("#nameInput", "VotingReconnectPlayer");
+    await players[0].click("#registerButton");
+    await players[0].waitForSelector("#waitingScreen.active");
+
+    // Add prompt and start game
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+    await host.fill("#promptText", "Voting reconnect test prompt");
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+    await host.click("#startPromptSelectionBtn");
+    await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
+      timeout: 5000,
+    });
+
+    // Player submits answer
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+    await players[0].fill("#answerInput", "Player answer for voting test");
+    await players[0].click("#submitButton");
+    await players[0].waitForSelector("#submittedScreen.active");
+
+    // Add AI submission and set up for REVEAL
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.waitForSelector("#submissions.active");
+    await host.waitForSelector(".submission-card", { timeout: 5000 });
+
+    await host.click('summary:has-text("Manuelle KI-Antwort")');
+    await host.waitForSelector("#manualAiText", { state: "visible" });
+    await host.fill("#manualAiText", "Manual AI answer for voting reconnect.");
+    await host.click('button:has-text("Als KI-Antwort speichern")');
+    await host.waitForSelector(".ai-submission-card", { timeout: 5000 });
+    await host.locator(".ai-submission-card").first().click();
+    await host.waitForTimeout(300);
+
+    // Transition to REVEAL then VOTING
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="REVEAL"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("REVEAL", {
+      timeout: 5000,
+    });
+    await host.click('button[data-phase="VOTING"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("VOTING", {
+      timeout: 5000,
+    });
+
+    // Verify player sees locked screen
+    await players[0].waitForSelector("#lockedScreen.active", {
+      timeout: 5000,
+    });
+
+    // ============================================
+    // TEST: Close player page and reconnect
+    // ============================================
+    console.log("Player reconnect VOTING test: Disconnecting player...");
+
+    // Close player page
+    await players[0].close();
+    await host.waitForTimeout(500);
+
+    // Create new player page and reconnect
+    console.log("Player reconnect VOTING test: Reconnecting player...");
+    const reconnectedContext = await browser.newContext();
+    contexts.push(reconnectedContext);
+    const reconnectedPlayer = await reconnectedContext.newPage();
+
+    await reconnectedPlayer.goto(`/player.html?token=${playerToken}`);
+
+    // ============================================
+    // VERIFY: Player sees locked screen after reconnect
+    // ============================================
+    console.log("Player reconnect VOTING test: Verifying locked screen...");
+
+    await reconnectedPlayer.waitForSelector("#lockedScreen.active", {
+      timeout: 5000,
+    });
+
+    // Verify the locked screen has appropriate message (generic locked screen)
+    await expect(reconnectedPlayer.locator("#lockedScreen")).toContainText(
+      "Schau auf die große Leinwand",
+    );
+
+    console.log(
+      "Player reconnect during VOTING test completed successfully!",
+    );
+  });
 });

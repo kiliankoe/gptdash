@@ -105,14 +105,14 @@ function handleMessage(message) {
       }
 
       if (playerName) {
-        // Player is registered, go to appropriate screen
+        // Player is registered, go to appropriate screen based on phase
         updateConnectionStatus(true, `Beigetreten als ${playerName}`);
-        if (hasSubmitted) {
+        // During WRITING phase, show submitted screen if already submitted
+        // For all other phases, use phase-based screen selection
+        if (currentPhase === "WRITING" && hasSubmitted) {
           showScreen("submittedScreen");
-        } else if (currentPhase === "WRITING") {
-          showWritingScreen();
         } else {
-          showScreen("waitingScreen");
+          updateScreen(currentPhase);
         }
       } else if (playerToken) {
         // Token valid but not registered yet

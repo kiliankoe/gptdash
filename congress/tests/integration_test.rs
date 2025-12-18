@@ -2836,3 +2836,627 @@ async fn test_panic_mode_state_persistence() {
 
     println!("✅ Panic mode state persistence test passed!");
 }
+
+// ============================================================================
+// Prompt Selection Tests (Multiple Prompts with Audience Voting)
+// ============================================================================
+
+/// Test PROMPT_SELECTION with 2 prompts and audience voting
+#[tokio::test]
+async fn test_prompt_selection_audience_voting() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Add 2 distinct prompts to pool and queue them
+    let prompt1 = state
+        .add_prompt_to_pool(
+            Some("What is artificial intelligence?".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+    let prompt2 = state
+        .add_prompt_to_pool(
+            Some("Describe your favorite animal".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+
+    state.queue_prompt(&prompt1.id).await.unwrap();
+    state.queue_prompt(&prompt2.id).await.unwrap();
+
+    // Verify we have 2 queued prompts
+    assert_eq!(state.queued_prompts.read().await.len(), 2);
+
+    // Transition to PROMPT_SELECTION - should NOT auto-advance with 2 prompts
+    state
+        .transition_phase(GamePhase::PromptSelection)
+        .await
+        .unwrap();
+
+    let game = state.get_game().await.unwrap();
+    assert_eq!(
+        game.phase,
+        GamePhase::PromptSelection,
+        "Should stay in PROMPT_SELECTION with 2+ prompts"
+    );
+
+    // Audience votes: 3 votes for prompt2, 1 vote for prompt1
+    state
+        .record_prompt_vote("voter1", &prompt2.id)
+        .await
+        .unwrap();
+    state
+        .record_prompt_vote("voter2", &prompt2.id)
+        .await
+        .unwrap();
+    state
+        .record_prompt_vote("voter3", &prompt2.id)
+        .await
+        .unwrap();
+    state
+        .record_prompt_vote("voter4", &prompt1.id)
+        .await
+        .unwrap();
+
+    // Verify vote counts
+    let counts = state.get_prompt_vote_counts().await;
+    assert_eq!(counts.get(&prompt2.id), Some(&3));
+    assert_eq!(counts.get(&prompt1.id), Some(&1));
+
+    // Transition to WRITING - this should select the winning prompt
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Verify winning prompt (prompt2) was selected
+    let round = state.get_current_round().await.expect("Should have round");
+    let selected = round.selected_prompt.expect("Should have selected prompt");
+    assert_eq!(
+        selected.id, prompt2.id,
+        "Prompt with most votes should be selected"
+    );
+
+    // Verify losing prompt was returned to pool
+    let pool = state.prompt_pool.read().await;
+    assert!(
+        pool.iter().any(|p| p.id == prompt1.id),
+        "Losing prompt should be returned to pool"
+    );
+    assert!(
+        !pool.iter().any(|p| p.id == prompt2.id),
+        "Winning prompt should not be in pool"
+    );
+
+    // Verify prompt_votes were cleared
+    assert!(
+        state.prompt_votes.read().await.is_empty(),
+        "Prompt votes should be cleared after selection"
+    );
+
+    println!("✅ Prompt selection audience voting test passed!");
+}
+
+/// Test PROMPT_SELECTION tie resolution (last queued prompt wins due to max_by_key behavior)
+#[tokio::test]
+async fn test_prompt_selection_tie_resolution() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Add 2 VERY DISTINCT prompts to avoid fuzzy deduplication
+    let prompt1 = state
+        .add_prompt_to_pool(
+            Some("What is the capital of France?".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+    let prompt2 = state
+        .add_prompt_to_pool(
+            Some("Describe your favorite pizza topping".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Queue prompt1 first, then prompt2
+    state.queue_prompt(&prompt1.id).await.unwrap();
+    state.queue_prompt(&prompt2.id).await.unwrap();
+
+    // Transition to PROMPT_SELECTION
+    state
+        .transition_phase(GamePhase::PromptSelection)
+        .await
+        .unwrap();
+
+    // Equal votes: 1 vote each (tie scenario)
+    state
+        .record_prompt_vote("voter1", &prompt1.id)
+        .await
+        .unwrap();
+    state
+        .record_prompt_vote("voter2", &prompt2.id)
+        .await
+        .unwrap();
+
+    // Transition to WRITING - tie resolution uses max_by_key which returns LAST maximum
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Verify last queued prompt won (max_by_key returns last element on tie)
+    let round = state.get_current_round().await.expect("Should have round");
+    let selected = round.selected_prompt.expect("Should have selected prompt");
+    assert_eq!(
+        selected.id, prompt2.id,
+        "Last queued prompt wins on tie (max_by_key behavior)"
+    );
+
+    // Verify the other prompt was returned to pool
+    let pool = state.prompt_pool.read().await;
+    assert!(
+        pool.iter().any(|p| p.id == prompt1.id),
+        "Losing prompt should be returned to pool"
+    );
+
+    println!("✅ Prompt selection tie resolution test passed!");
+}
+
+/// Test host can directly select a prompt from pool (bypassing queue/vote system)
+#[tokio::test]
+async fn test_host_direct_prompt_selection() {
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+
+    state.create_game().await;
+
+    // Add a prompt to the pool (NOT queued)
+    let prompt = state
+        .add_prompt_to_pool(
+            Some("How many planets are in the solar system?".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Host directly selects the prompt from pool (bypasses queue/vote system)
+    let result = handle_message(
+        ClientMessage::HostSelectPrompt {
+            prompt_id: prompt.id.clone(),
+            model: None,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    match result {
+        Some(ServerMessage::PromptSelected { prompt: selected }) => {
+            assert_eq!(
+                selected.id, prompt.id,
+                "Host should be able to directly select prompt from pool"
+            );
+        }
+        _ => panic!("Expected PromptSelected message"),
+    }
+
+    // Verify prompt was selected and round is ready
+    let round = state.get_current_round().await.expect("Should have round");
+    let selected = round.selected_prompt.expect("Should have selected prompt");
+    assert_eq!(
+        selected.id, prompt.id,
+        "Prompt should be selected for current round"
+    );
+
+    // Verify prompt was removed from pool
+    let pool = state.prompt_pool.read().await;
+    assert!(
+        !pool.iter().any(|p| p.id == prompt.id),
+        "Selected prompt should be removed from pool"
+    );
+
+    println!("✅ Host direct prompt selection test passed!");
+}
+
+// ============================================================================
+// Vote Timing Validation Tests (500ms Anti-Automation)
+// ============================================================================
+
+/// Test that votes submitted within 500ms of VOTING phase start are shadow-rejected
+#[tokio::test]
+async fn test_vote_timing_early_rejection() {
+    // Ensure anti-automation is NOT disabled
+    std::env::remove_var("SKIP_VOTE_ANTI_AUTOMATION");
+
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+    let audience_role = Role::Audience;
+
+    state.create_game().await;
+
+    // Create player and setup round
+    let create_result = handle_message(
+        ClientMessage::HostCreatePlayers { count: 1 },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    let player_tokens = match create_result {
+        Some(ServerMessage::PlayersCreated { players }) => players,
+        _ => panic!("Expected PlayersCreated"),
+    };
+
+    // Setup round with prompt
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt_to_pool(
+            Some("Vote timing test prompt".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Player submits
+    handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some(player_tokens[0].token.clone()),
+            text: "Player answer for timing test".to_string(),
+        },
+        &Role::Player,
+        &state,
+    )
+    .await;
+
+    // Add AI submission and set reveal order
+    let ai_sub = state
+        .submit_answer(&round.id, None, "AI answer".to_string())
+        .await
+        .unwrap();
+    let submissions = state.get_submissions(&round.id).await;
+    let reveal_order: Vec<_> = submissions.iter().map(|s| s.id.clone()).collect();
+    state
+        .set_reveal_order(&round.id, reveal_order)
+        .await
+        .unwrap();
+    state
+        .set_ai_submission(&round.id, ai_sub.id.clone())
+        .await
+        .unwrap();
+
+    // Transition through Reveal to Voting
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Reveal,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Manually set voting phase start to NOW (so next vote is within 500ms)
+    state.set_voting_phase_started().await;
+
+    // Set game phase to Voting manually (to avoid automatic timing setup)
+    {
+        let mut game = state.game.write().await;
+        if let Some(g) = game.as_mut() {
+            g.phase = GamePhase::Voting;
+        }
+    }
+
+    // Generate a valid vote challenge (required for vote validation)
+    state.generate_vote_challenge().await;
+    let challenge_nonce = state
+        .get_vote_challenge_nonce()
+        .await
+        .expect("Should have challenge nonce after generating");
+
+    // Immediately submit a vote (should be within 500ms and shadow-rejected)
+    let player_sub = submissions
+        .iter()
+        .find(|s| s.author_kind == gptdash::types::AuthorKind::Player)
+        .expect("Should have player submission");
+
+    let vote_result = handle_message(
+        ClientMessage::Vote {
+            voter_token: "early_voter".to_string(),
+            ai: player_sub.id.clone(),
+            funny: player_sub.id.clone(),
+            msg_id: "early_vote".to_string(),
+            challenge_nonce: challenge_nonce.clone(),
+            challenge_response: compute_challenge_response(&challenge_nonce, "early_voter"),
+            is_webdriver: false,
+        },
+        &audience_role,
+        &state,
+    )
+    .await;
+
+    // VoteAck should be returned (shadow rejection returns ack to not reveal detection)
+    match vote_result {
+        Some(ServerMessage::VoteAck { msg_id }) => {
+            assert_eq!(msg_id, "early_vote");
+        }
+        _ => panic!("Expected VoteAck message"),
+    }
+
+    // But vote should NOT be stored (shadow rejection)
+    let votes = state.votes.read().await;
+    assert_eq!(
+        votes.len(),
+        0,
+        "Vote within 500ms should be shadow-rejected and not stored"
+    );
+
+    println!("✅ Vote timing early rejection test passed!");
+}
+
+/// Test that votes submitted after 500ms are accepted
+#[tokio::test]
+async fn test_vote_timing_after_window() {
+    // Ensure anti-automation is NOT disabled
+    std::env::remove_var("SKIP_VOTE_ANTI_AUTOMATION");
+
+    let state = Arc::new(AppState::new());
+    let host_role = Role::Host;
+    let audience_role = Role::Audience;
+
+    state.create_game().await;
+
+    // Create player and setup round
+    let create_result = handle_message(
+        ClientMessage::HostCreatePlayers { count: 1 },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    let player_tokens = match create_result {
+        Some(ServerMessage::PlayersCreated { players }) => players,
+        _ => panic!("Expected PlayersCreated"),
+    };
+
+    // Setup round with prompt
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::PromptSelection,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    handle_message(ClientMessage::HostStartRound, &host_role, &state).await;
+
+    let round = state.get_current_round().await.expect("Should have round");
+    let prompt = state
+        .add_prompt_to_pool(
+            Some("Vote timing test prompt 2".to_string()),
+            None,
+            PromptSource::Host,
+            None,
+        )
+        .await
+        .unwrap();
+    state
+        .select_prompt(&round.id, &prompt.id, None)
+        .await
+        .unwrap();
+
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Writing,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Player submits
+    handle_message(
+        ClientMessage::SubmitAnswer {
+            player_token: Some(player_tokens[0].token.clone()),
+            text: "Player answer for timing test 2".to_string(),
+        },
+        &Role::Player,
+        &state,
+    )
+    .await;
+
+    // Add AI submission and set reveal order
+    let ai_sub = state
+        .submit_answer(&round.id, None, "AI answer 2".to_string())
+        .await
+        .unwrap();
+    let submissions = state.get_submissions(&round.id).await;
+    let reveal_order: Vec<_> = submissions.iter().map(|s| s.id.clone()).collect();
+    state
+        .set_reveal_order(&round.id, reveal_order)
+        .await
+        .unwrap();
+    state
+        .set_ai_submission(&round.id, ai_sub.id.clone())
+        .await
+        .unwrap();
+
+    // Transition through Reveal to Voting
+    handle_message(
+        ClientMessage::HostTransitionPhase {
+            phase: GamePhase::Reveal,
+        },
+        &host_role,
+        &state,
+    )
+    .await;
+
+    // Manually set voting phase start to 600ms ago (outside the 500ms window)
+    let past_time = chrono::Utc::now() - chrono::Duration::milliseconds(600);
+    *state.voting_phase_started_at.write().await = Some(past_time);
+
+    // Set game phase to Voting manually
+    {
+        let mut game = state.game.write().await;
+        if let Some(g) = game.as_mut() {
+            g.phase = GamePhase::Voting;
+        }
+    }
+
+    // Generate a valid challenge nonce
+    state.generate_vote_challenge().await;
+    let challenge_nonce = state
+        .get_vote_challenge_nonce()
+        .await
+        .expect("Should have challenge nonce");
+
+    // Submit a vote (should be accepted - outside 500ms window)
+    let player_sub = submissions
+        .iter()
+        .find(|s| s.author_kind == gptdash::types::AuthorKind::Player)
+        .expect("Should have player submission");
+
+    let vote_result = handle_message(
+        ClientMessage::Vote {
+            voter_token: "late_voter".to_string(),
+            ai: player_sub.id.clone(),
+            funny: player_sub.id.clone(),
+            msg_id: "late_vote".to_string(),
+            challenge_nonce: challenge_nonce.clone(),
+            challenge_response: compute_challenge_response(&challenge_nonce, "late_voter"),
+            is_webdriver: false,
+        },
+        &audience_role,
+        &state,
+    )
+    .await;
+
+    // VoteAck should be returned
+    match vote_result {
+        Some(ServerMessage::VoteAck { msg_id }) => {
+            assert_eq!(msg_id, "late_vote");
+        }
+        _ => panic!("Expected VoteAck message"),
+    }
+
+    // Vote SHOULD be stored (outside the 500ms window)
+    let votes = state.votes.read().await;
+    assert_eq!(
+        votes.len(),
+        1,
+        "Vote after 500ms should be accepted and stored"
+    );
+
+    println!("✅ Vote timing after window test passed!");
+}
+
+// ============================================================================
+// Audience Prompt Submission Tests
+// ============================================================================
+
+/// Test fuzzy deduplication of similar prompts from audience
+#[tokio::test]
+async fn test_audience_prompt_fuzzy_deduplication() {
+    let state = Arc::new(AppState::new());
+
+    state.create_game().await;
+
+    // Submit first prompt
+    let result1 = state
+        .add_prompt_to_pool(
+            Some("What is the meaning of life?".to_string()),
+            None,
+            PromptSource::Audience,
+            Some("voter1".to_string()),
+        )
+        .await;
+    assert!(result1.is_ok(), "First prompt should succeed");
+
+    // Submit a very similar prompt (slightly different wording/case)
+    // Fuzzy deduplication should merge them
+    let result2 = state
+        .add_prompt_to_pool(
+            Some("what is meaning of life".to_string()),
+            None,
+            PromptSource::Audience,
+            Some("voter2".to_string()),
+        )
+        .await;
+    assert!(result2.is_ok(), "Second similar prompt should succeed");
+
+    // Verify only 1 prompt exists (fuzzy dedup merged them)
+    let pool = state.prompt_pool.read().await;
+    assert_eq!(
+        pool.len(),
+        1,
+        "Similar prompts should be merged into one (fuzzy dedup)"
+    );
+
+    // Verify submission_count was incremented
+    assert_eq!(
+        pool[0].submission_count, 2,
+        "Merged prompt should have submission_count of 2"
+    );
+
+    // Verify both submitter_ids are recorded
+    assert!(
+        pool[0].submitter_ids.contains(&"voter1".to_string()),
+        "First submitter should be recorded"
+    );
+    assert!(
+        pool[0].submitter_ids.contains(&"voter2".to_string()),
+        "Second submitter should be recorded"
+    );
+
+    println!("✅ Audience prompt fuzzy deduplication test passed!");
+}
