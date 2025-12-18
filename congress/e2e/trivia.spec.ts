@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext } from "@playwright/test";
+import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import {
   type GameClients,
   waitForConnection,
@@ -8,6 +8,37 @@ import {
   closeContexts,
   setupGameToWriting,
 } from "./test-utils";
+
+/**
+ * Helper function to add a trivia question with any number of choices (2-4)
+ */
+async function addTriviaQuestion(
+  host: Page,
+  question: string,
+  choices: string[],
+  correctIndex: number,
+): Promise<void> {
+  await host.fill("#triviaQuestionText", question);
+
+  // Add extra choice buttons if needed (UI starts with 2 choices)
+  const extraChoices = choices.length - 2;
+  for (let i = 0; i < extraChoices; i++) {
+    await host.click("#addTriviaChoiceBtn");
+    // Wait for the new choice field to appear
+    await host.waitForSelector(`#triviaChoice${2 + i}`, { timeout: 5000 });
+  }
+
+  // Fill in choices
+  for (let i = 0; i < choices.length; i++) {
+    await host.fill(`#triviaChoice${i}`, choices[i]);
+  }
+
+  // Mark correct answer
+  await host.click(`#triviaCorrect${correctIndex}`);
+
+  // Submit
+  await host.click('button:has-text("Frage hinzufuegen")');
+}
 
 /**
  * Trivia feature tests
@@ -32,7 +63,7 @@ test.describe("Trivia", () => {
     await closeContexts(contexts);
   });
 
-  test("host can add trivia question with 3 choices", async () => {
+  test("host can add trivia question with 2 choices (default)", async () => {
     const { host } = clients;
 
     await host.goto("/host");
@@ -42,20 +73,13 @@ test.describe("Trivia", () => {
     await host.click('.sidebar-item:has-text("Trivia")');
     await host.waitForSelector("#trivia.active");
 
-    // Fill in question
-    await host.fill(
-      "#triviaQuestionText",
+    // Add trivia with 2 choices (default, no add button needed)
+    await addTriviaQuestion(
+      host,
       "Was ist die Hauptstadt von Deutschland?",
+      ["Paris", "Berlin"],
+      1, // Berlin is correct
     );
-
-    // Fill in choices and mark B as correct
-    await host.fill("#triviaChoice0", "Paris");
-    await host.fill("#triviaChoice1", "Berlin");
-    await host.fill("#triviaChoice2", "Rom");
-    await host.click("#triviaCorrect1"); // Mark B as correct
-
-    // Add question
-    await host.click('button:has-text("Frage hinzufuegen")');
 
     // Verify question appears in list
     await expect(
@@ -86,15 +110,15 @@ test.describe("Trivia", () => {
       timeout: 5000,
     });
 
-    // Add trivia question
+    // Add trivia question with 3 choices
     await host.click('.sidebar-item:has-text("Trivia")');
     await host.waitForSelector("#trivia.active");
-    await host.fill("#triviaQuestionText", "Test trivia during writing?");
-    await host.fill("#triviaChoice0", "Option A");
-    await host.fill("#triviaChoice1", "Option B");
-    await host.fill("#triviaChoice2", "Option C");
-    await host.click("#triviaCorrect0");
-    await host.click('button:has-text("Frage hinzufuegen")');
+    await addTriviaQuestion(
+      host,
+      "Test trivia during writing?",
+      ["Option A", "Option B", "Option C"],
+      0, // Option A is correct
+    );
     await host.waitForSelector(".trivia-question-card");
 
     // Present trivia
@@ -126,15 +150,15 @@ test.describe("Trivia", () => {
     // Setup game to WRITING phase
     await setupGameToWriting(host, players);
 
-    // Add and present trivia
+    // Add and present trivia with 4 choices (max)
     await host.click('.sidebar-item:has-text("Trivia")');
     await host.waitForSelector("#trivia.active");
-    await host.fill("#triviaQuestionText", "Audience vote test?");
-    await host.fill("#triviaChoice0", "Answer A");
-    await host.fill("#triviaChoice1", "Answer B");
-    await host.fill("#triviaChoice2", "Answer C");
-    await host.click("#triviaCorrect1");
-    await host.click('button:has-text("Frage hinzufuegen")');
+    await addTriviaQuestion(
+      host,
+      "Audience vote test?",
+      ["Answer A", "Answer B", "Answer C", "Answer D"],
+      1, // Answer B is correct
+    );
     await host.waitForSelector(".trivia-question-card");
     await host.click('.trivia-question-card button:has-text("Praesentieren")');
     await expect(host.locator("#activeTriviaCard")).toBeVisible({
@@ -199,15 +223,15 @@ test.describe("Trivia", () => {
     // Setup game to WRITING phase
     await setupGameToWriting(host, players);
 
-    // Add and present trivia
+    // Add and present trivia with 3 choices
     await host.click('.sidebar-item:has-text("Trivia")');
     await host.waitForSelector("#trivia.active");
-    await host.fill("#triviaQuestionText", "Resolve test question?");
-    await host.fill("#triviaChoice0", "Wrong A");
-    await host.fill("#triviaChoice1", "Correct B");
-    await host.fill("#triviaChoice2", "Wrong C");
-    await host.click("#triviaCorrect1"); // B is correct
-    await host.click('button:has-text("Frage hinzufuegen")');
+    await addTriviaQuestion(
+      host,
+      "Resolve test question?",
+      ["Wrong A", "Correct B", "Wrong C"],
+      1, // B is correct
+    );
     await host.waitForSelector(".trivia-question-card");
     await host.click('.trivia-question-card button:has-text("Praesentieren")');
     await expect(host.locator("#activeTriviaCard")).toBeVisible();
@@ -250,9 +274,9 @@ test.describe("Trivia", () => {
     await expect(beamer.locator("#triviaResultOverlay")).toBeVisible({
       timeout: 5000,
     });
-    await expect(
-      beamer.locator(".trivia-result-choice.correct"),
-    ).toContainText("Correct B");
+    await expect(beamer.locator(".trivia-result-choice.correct")).toContainText(
+      "Correct B",
+    );
 
     // Audience should see result screen
     await expect(audience[0].locator("#triviaResultScreen.active")).toBeVisible(
@@ -283,15 +307,10 @@ test.describe("Trivia", () => {
     await players[0].click("#submitButton");
     await players[0].waitForSelector("#submittedScreen.active");
 
-    // Add and present trivia
+    // Add and present trivia with 2 choices (simplest case)
     await host.click('.sidebar-item:has-text("Trivia")');
     await host.waitForSelector("#trivia.active");
-    await host.fill("#triviaQuestionText", "Phase change clear test?");
-    await host.fill("#triviaChoice0", "A");
-    await host.fill("#triviaChoice1", "B");
-    await host.fill("#triviaChoice2", "C");
-    await host.click("#triviaCorrect0");
-    await host.click('button:has-text("Frage hinzufuegen")');
+    await addTriviaQuestion(host, "Phase change clear test?", ["A", "B"], 0);
     await host.waitForSelector(".trivia-question-card");
     await host.click('.trivia-question-card button:has-text("Praesentieren")');
     await expect(beamer.locator("#triviaOverlay")).toBeVisible({
@@ -308,7 +327,9 @@ test.describe("Trivia", () => {
     });
 
     // Trivia overlay should be cleared
-    await expect(beamer.locator("#triviaOverlay")).toBeHidden({ timeout: 5000 });
+    await expect(beamer.locator("#triviaOverlay")).toBeHidden({
+      timeout: 5000,
+    });
     await expect(beamer.locator("#triviaResultOverlay")).toBeHidden();
 
     // Beamer should show reveal scene
@@ -325,15 +346,10 @@ test.describe("Trivia", () => {
     // Setup game to WRITING phase
     await setupGameToWriting(host, players);
 
-    // Add and present trivia
+    // Add and present trivia with 2 choices (simplest case)
     await host.click('.sidebar-item:has-text("Trivia")');
     await host.waitForSelector("#trivia.active");
-    await host.fill("#triviaQuestionText", "Clear test?");
-    await host.fill("#triviaChoice0", "A");
-    await host.fill("#triviaChoice1", "B");
-    await host.fill("#triviaChoice2", "C");
-    await host.click("#triviaCorrect0");
-    await host.click('button:has-text("Frage hinzufuegen")');
+    await addTriviaQuestion(host, "Clear test?", ["A", "B"], 0);
     await host.waitForSelector(".trivia-question-card");
     await host.click('.trivia-question-card button:has-text("Praesentieren")');
     await expect(beamer.locator("#triviaOverlay")).toBeVisible({
@@ -349,7 +365,9 @@ test.describe("Trivia", () => {
     });
 
     // Both overlays should be hidden (no result shown)
-    await expect(beamer.locator("#triviaOverlay")).toBeHidden({ timeout: 5000 });
+    await expect(beamer.locator("#triviaOverlay")).toBeHidden({
+      timeout: 5000,
+    });
     await expect(beamer.locator("#triviaResultOverlay")).toBeHidden();
 
     // Beamer should still be in WRITING scene (not showing results)
@@ -366,13 +384,8 @@ test.describe("Trivia", () => {
     await host.click('.sidebar-item:has-text("Trivia")');
     await host.waitForSelector("#trivia.active");
 
-    // Add question
-    await host.fill("#triviaQuestionText", "Question to delete?");
-    await host.fill("#triviaChoice0", "A");
-    await host.fill("#triviaChoice1", "B");
-    await host.fill("#triviaChoice2", "C");
-    await host.click("#triviaCorrect0");
-    await host.click('button:has-text("Frage hinzufuegen")');
+    // Add question with 3 choices
+    await addTriviaQuestion(host, "Question to delete?", ["A", "B", "C"], 0);
     await host.waitForSelector(".trivia-question-card");
 
     // Verify question is there
@@ -402,15 +415,15 @@ test.describe("Trivia", () => {
     // Setup game to WRITING phase
     await setupGameToWriting(host, players);
 
-    // Add and present trivia
+    // Add and present trivia with 4 choices (max)
     await host.click('.sidebar-item:has-text("Trivia")');
     await host.waitForSelector("#trivia.active");
-    await host.fill("#triviaQuestionText", "Reconnect test question?");
-    await host.fill("#triviaChoice0", "Alpha");
-    await host.fill("#triviaChoice1", "Beta");
-    await host.fill("#triviaChoice2", "Gamma");
-    await host.click("#triviaCorrect2");
-    await host.click('button:has-text("Frage hinzufuegen")');
+    await addTriviaQuestion(
+      host,
+      "Reconnect test question?",
+      ["Alpha", "Beta", "Gamma", "Delta"],
+      2, // Gamma is correct
+    );
     await host.waitForSelector(".trivia-question-card");
     await host.click('.trivia-question-card button:has-text("Praesentieren")');
     await expect(host.locator("#activeTriviaCard")).toBeVisible();
@@ -454,15 +467,15 @@ test.describe("Trivia", () => {
     await host.goto("/host");
     await waitForConnection(host);
 
-    // Add trivia question
+    // Add trivia question with 3 choices
     await host.click('.sidebar-item:has-text("Trivia")');
     await host.waitForSelector("#trivia.active");
-    await host.fill("#triviaQuestionText", "Export persistence test?");
-    await host.fill("#triviaChoice0", "Export A");
-    await host.fill("#triviaChoice1", "Export B");
-    await host.fill("#triviaChoice2", "Export C");
-    await host.click("#triviaCorrect1");
-    await host.click('button:has-text("Frage hinzufuegen")');
+    await addTriviaQuestion(
+      host,
+      "Export persistence test?",
+      ["Export A", "Export B", "Export C"],
+      1, // Export B is correct
+    );
     await host.waitForSelector(".trivia-question-card");
 
     // Navigate to State Export panel
