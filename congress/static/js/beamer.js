@@ -9,6 +9,8 @@ import {
   TTSManager,
   QRCodeManager,
   escapeHtml,
+  updateConnectionStatus,
+  renderPromptDisplay,
 } from "./common.js";
 
 // Game state
@@ -80,26 +82,8 @@ function generateQRCodes() {
 }
 
 function connectWebSocket() {
-  ws = new WSConnection("beamer", handleMessage, handleStatusChange);
+  ws = new WSConnection("beamer", handleMessage, updateConnectionStatus);
   ws.connect();
-}
-
-function handleStatusChange(connected, text) {
-  const dot = document.getElementById("statusDot");
-  const statusText = document.getElementById("statusText");
-
-  if (dot) {
-    if (connected) {
-      dot.classList.add("connected");
-    } else {
-      dot.classList.remove("connected");
-    }
-  }
-
-  if (statusText) {
-    statusText.textContent =
-      text || (connected ? "Verbunden" : "Nicht verbunden");
-  }
 }
 
 function handleMessage(msg) {
@@ -300,22 +284,7 @@ function handlePromptSelected(msg) {
 function updatePromptDisplay(prompt) {
   const promptText = document.getElementById("writingPromptText");
   const promptImage = document.getElementById("writingPromptImage");
-
-  if (promptText) {
-    promptText.textContent = prompt.text || "(Bildfrage)";
-    // If image-only, hide the text element
-    promptText.style.display = prompt.text ? "block" : "none";
-  }
-
-  if (promptImage) {
-    if (prompt.image_url) {
-      promptImage.innerHTML = `<img src="${escapeHtml(prompt.image_url)}" alt="Prompt-Bild" class="prompt-image-display">`;
-      promptImage.style.display = "block";
-    } else {
-      promptImage.innerHTML = "";
-      promptImage.style.display = "none";
-    }
-  }
+  renderPromptDisplay(prompt, promptText, promptImage);
 }
 
 function handleSubmissions(msg) {
@@ -962,34 +931,6 @@ function onTimerComplete() {
     }
   });
 }
-
-// Sync phase-specific timers based on current phase
-setInterval(() => {
-  // Get the active timer element based on phase
-  let activeTimerEl = null;
-  if (gameState.phase === "WRITING") {
-    activeTimerEl = document.getElementById("writingTimer");
-  } else if (gameState.phase === "VOTING") {
-    activeTimerEl = document.getElementById("votingTimer");
-  }
-
-  if (!activeTimerEl) return;
-
-  const time = activeTimerEl.textContent;
-  if (!time || time === "") return;
-
-  // Parse time to check for warning threshold
-  const parts = time.split(":");
-  const minutes = parseInt(parts[0] || "0", 10);
-  const seconds = parseInt(parts[1] || "0", 10);
-  const isWarning = minutes === 0 && seconds <= 10;
-
-  if (isWarning) {
-    activeTimerEl.classList.add("warning");
-  } else {
-    activeTimerEl.classList.remove("warning");
-  }
-}, 100);
 
 // ========================
 // Manual Winners Handler (Panic Mode)

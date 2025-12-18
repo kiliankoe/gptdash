@@ -9,7 +9,7 @@ import {
   showError,
   hideError,
   updateConnectionStatus,
-  escapeHtml,
+  renderPromptDisplay,
 } from "./common.js";
 
 let wsConn = null;
@@ -111,8 +111,11 @@ function handleMessage(message) {
         // For all other phases, use phase-based screen selection
         if (currentPhase === "WRITING" && hasSubmitted) {
           showScreen("submittedScreen");
-        } else {
+        } else if (currentPhase) {
           updateScreen(currentPhase);
+        } else {
+          // Phase not yet known (welcome not received), show waiting screen
+          showScreen("waitingScreen");
         }
       } else if (playerToken) {
         // Token valid but not registered yet
@@ -428,39 +431,7 @@ function updateScreen(phase) {
 function showWritingScreen() {
   const promptEl = document.getElementById("promptText");
   const promptImageEl = document.getElementById("promptImage");
-
-  if (!currentPrompt) {
-    if (promptEl) {
-      promptEl.textContent = "";
-      promptEl.style.display = "none";
-    }
-    if (promptImageEl) {
-      promptImageEl.innerHTML = "";
-      promptImageEl.style.display = "none";
-    }
-    showScreen("writingScreen");
-    return;
-  }
-
-  // Handle text
-  if (promptEl) {
-    const text =
-      currentPrompt.text ||
-      (typeof currentPrompt === "string" ? currentPrompt : "");
-    promptEl.textContent = text || "(Bildfrage - siehe Bild oben)";
-    promptEl.style.display = text ? "block" : "none";
-  }
-
-  // Handle image
-  if (promptImageEl) {
-    if (currentPrompt.image_url) {
-      promptImageEl.innerHTML = `<img src="${escapeHtml(currentPrompt.image_url)}" alt="Prompt-Bild" class="prompt-image-display">`;
-      promptImageEl.style.display = "block";
-    } else {
-      promptImageEl.innerHTML = "";
-      promptImageEl.style.display = "none";
-    }
-  }
+  renderPromptDisplay(currentPrompt, promptEl, promptImageEl);
   showScreen("writingScreen");
 }
 
@@ -586,17 +557,30 @@ function editManually() {
   showWritingScreen();
 }
 
-if (typeof window !== "undefined") {
-  Object.assign(window, {
-    joinGame,
-    registerName,
-    submitAnswer,
-    editAnswer,
-    acceptCorrection,
-    rejectCorrection,
-    editManually,
+// Action handlers for event delegation
+const actions = {
+  joinGame,
+  registerName,
+  submitAnswer,
+  editAnswer,
+  acceptCorrection,
+  rejectCorrection,
+  editManually,
+};
+
+function setupEventDelegation() {
+  document.addEventListener("click", (e) => {
+    const actionEl = e.target.closest("[data-action]");
+    if (!actionEl) return;
+
+    const action = actionEl.dataset.action;
+    if (actions[action]) {
+      e.preventDefault();
+      actions[action]();
+    }
   });
 }
 
 // Initialize on page load
+setupEventDelegation();
 init();

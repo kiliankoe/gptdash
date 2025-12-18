@@ -306,10 +306,13 @@ export function maybeAutoQueueOverviewPrompt() {
   const { text, image_url } = pendingOverviewPromptAutoQueue;
 
   const candidates = (gameState.prompts || [])
-    .filter((p) => p.source === "host")
-    .filter((p) => !queuedIds.has(p.id))
-    .filter((p) => (p.text ?? null) === (text ?? null))
-    .filter((p) => (p.image_url ?? null) === (image_url ?? null))
+    .filter(
+      (p) =>
+        p.source === "host" &&
+        !queuedIds.has(p.id) &&
+        (p.text ?? null) === (text ?? null) &&
+        (p.image_url ?? null) === (image_url ?? null),
+    )
     .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
 
   if (candidates.length === 0) return;

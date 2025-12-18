@@ -38,7 +38,7 @@
                     <p>Du bist gleich bei GPTDash dabei, dem Spiel, bei dem Spieler versuchen, eine KI zu imitieren.</p>
                     <p>Deine Aufgabe: Finde heraus, welche Antwort die echte KI ist!</p>
 
-                    <button onclick="joinAudience()" id="joinButton">Mitmachen</button>
+                    <button data-action="joinAudience" id="joinButton">Mitmachen</button>
 
                     <div id="welcomeError" class="error-message" style="display: none;"></div>
 
@@ -60,7 +60,7 @@
 
                 <!-- Prompt Submission Section -->
                 <div class="card prompt-submission-card" id="promptSubmissionCard">
-                    <div class="prompt-submission-header" onclick="togglePromptSubmission()">
+                    <div class="prompt-submission-header" data-action="togglePromptSubmission">
                         <h3>&#x1F4A1; Prompt vorschlagen</h3>
                         <span class="toggle-icon collapsed" id="promptToggleIcon">&#x25BC;</span>
                     </div>
@@ -70,7 +70,7 @@
                         <div class="prompt-char-count">
                             <span id="promptCharCount">0</span>/200
                         </div>
-                        <button onclick="submitPrompt()" id="submitPromptButton">Vorschlagen</button>
+                        <button data-action="submitPrompt" id="submitPromptButton">Vorschlagen</button>
                         <div id="promptError" class="error-message" style="display: none;"></div>
                         <div id="promptSuccess" class="success-message" style="display: none;">
                             &#x2705; Prompt wurde vorgeschlagen!
@@ -108,7 +108,7 @@
                         <p>Deine Antwort wurde gespeichert.</p>
                         <p id="triviaVoteSummary" class="text-center" style="margin-top: 10px; font-style: italic;"></p>
 
-                        <button onclick="changeTriviaVote()" class="secondary">Antwort aendern</button>
+                        <button data-action="changeTriviaVote" class="secondary">Antwort aendern</button>
 
                         <div class="help-text">
                             Warte auf die Aufloesung...
@@ -145,7 +145,7 @@
                         <!-- Prompt options will be inserted here -->
                     </div>
 
-                    <button onclick="submitPromptVote()" id="promptVoteButton" disabled>Abstimmen</button>
+                    <button data-action="submitPromptVote" id="promptVoteButton" disabled>Abstimmen</button>
 
                     <div id="promptVoteError" class="error-message" style="display: none;"></div>
 
@@ -164,7 +164,7 @@
                         <p>Deine Prompt-Wahl wurde gespeichert.</p>
                         <p id="promptVoteSummary" class="text-center" style="margin-top: 10px; font-style: italic;"></p>
 
-                        <button onclick="changePromptVote()" class="secondary">Stimme ändern</button>
+                        <button data-action="changePromptVote" class="secondary">Stimme ändern</button>
 
                         <div class="help-text">
                             Warte auf die Auswahl des Gewinners...
@@ -205,7 +205,7 @@
 
                     <div class="vote-warning">Du kannst nur einmal abstimmen!</div>
 
-                    <button onclick="submitVote()" id="voteButton" disabled>Abstimmen</button>
+                    <button data-action="submitVote" id="voteButton" disabled>Abstimmen</button>
 
                     <div id="voteError" class="error-message" style="display: none;"></div>
                 </div>

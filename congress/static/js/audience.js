@@ -1014,17 +1014,30 @@ function showTriviaResultScreen() {
   showScreen("triviaResultScreen");
 }
 
-if (typeof window !== "undefined") {
-  Object.assign(window, {
-    joinAudience,
-    submitVote,
-    togglePromptSubmission,
-    submitPrompt,
-    submitPromptVote,
-    changePromptVote,
-    changeTriviaVote,
+// Action handlers for event delegation
+const actions = {
+  joinAudience,
+  submitVote,
+  togglePromptSubmission,
+  submitPrompt,
+  submitPromptVote,
+  changePromptVote,
+  changeTriviaVote,
+};
+
+function setupEventDelegation() {
+  document.addEventListener("click", (e) => {
+    const actionEl = e.target.closest("[data-action]");
+    if (!actionEl) return;
+
+    const action = actionEl.dataset.action;
+    if (actions[action]) {
+      e.preventDefault();
+      actions[action]();
+    }
   });
 }
 
 // Initialize on page load
+setupEventDelegation();
 init();

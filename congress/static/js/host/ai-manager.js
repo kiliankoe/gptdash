@@ -188,7 +188,7 @@ export function handleAiGenerationStatus(message) {
 /**
  * Update AI generation status UI
  */
-export function updateAiGenerationStatusUI(message) {
+function updateAiGenerationStatusUI(message) {
   const statusEl = document.getElementById("aiGenerationStatus");
   if (!statusEl) return;
 

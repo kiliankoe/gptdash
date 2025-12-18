@@ -691,6 +691,99 @@ class ChallengeSolver {
   }
 }
 
+/**
+ * Handle phase change with round detection
+ * Shared utility for detecting round changes and updating phase state
+ * @param {object} msg - Phase change message from server
+ * @param {object} state - State object with phase and roundNo properties
+ * @param {function} onRoundChange - Callback when round number changes
+ */
+function handlePhaseChange(msg, state, onRoundChange) {
+  if (
+    typeof msg.round_no === "number" &&
+    state.roundNo !== null &&
+    msg.round_no !== state.roundNo
+  ) {
+    onRoundChange();
+  }
+  state.phase = msg.phase;
+  if (typeof msg.round_no === "number") {
+    state.roundNo = msg.round_no;
+  }
+}
+
+/**
+ * Render prompt display with text and/or image
+ * Hides text element for image-only prompts
+ * @param {object} prompt - Prompt object with text and image_url properties
+ * @param {HTMLElement} textEl - Text display element
+ * @param {HTMLElement} imageEl - Image container element
+ */
+function renderPromptDisplay(prompt, textEl, imageEl) {
+  if (textEl) {
+    textEl.textContent = prompt?.text || "";
+    textEl.style.display = prompt?.text ? "block" : "none";
+  }
+  if (imageEl) {
+    if (prompt?.image_url) {
+      imageEl.innerHTML = `<img src="${escapeHtml(prompt.image_url)}" alt="Prompt image" class="prompt-image-display">`;
+      imageEl.style.display = "block";
+    } else {
+      imageEl.innerHTML = "";
+      imageEl.style.display = "none";
+    }
+  }
+}
+
+/**
+ * Get display name from an entity with fallback
+ * @param {object} entity - Object with display_name or ref_id property
+ * @param {number} fallbackLength - Length of ref_id substring for fallback (default: 12)
+ * @returns {string} Display name
+ */
+function getDisplayName(entity, fallbackLength = 12) {
+  return (
+    entity.display_name ||
+    entity.ref_id?.substring(0, fallbackLength) ||
+    "Unknown"
+  );
+}
+
+/**
+ * Message dispatcher for WebSocket messages
+ * Provides a registry-based approach to handle messages by type
+ */
+class MessageDispatcher {
+  constructor(role) {
+    this.role = role;
+    this.handlers = new Map();
+  }
+
+  /**
+   * Register a handler for a message type
+   * @param {string} messageType - Message type to handle (msg.t)
+   * @param {function} handler - Handler function
+   * @returns {MessageDispatcher} this for chaining
+   */
+  on(messageType, handler) {
+    this.handlers.set(messageType, handler);
+    return this;
+  }
+
+  /**
+   * Dispatch a message to the appropriate handler
+   * @param {object} msg - WebSocket message with .t property
+   */
+  dispatch(msg) {
+    const handler = this.handlers.get(msg.t);
+    if (handler) {
+      handler(msg);
+    } else {
+      console.warn(`[${this.role}] Unhandled message type: ${msg.t}`);
+    }
+  }
+}
+
 // ES6 module exports (for host.js and its modules)
 export {
   WSConnection,
@@ -709,6 +802,10 @@ export {
   QRCodeManager,
   TTSManager,
   ChallengeSolver,
+  handlePhaseChange,
+  renderPromptDisplay,
+  getDisplayName,
+  MessageDispatcher,
 };
 
 // Also expose on window for non-module scripts (beamer, player, audience)
@@ -730,5 +827,9 @@ if (typeof window !== "undefined") {
     QRCodeManager,
     TTSManager,
     ChallengeSolver,
+    handlePhaseChange,
+    renderPromptDisplay,
+    getDisplayName,
+    MessageDispatcher,
   });
 }

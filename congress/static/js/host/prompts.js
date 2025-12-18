@@ -150,7 +150,7 @@ export function selectPromptById(promptId, wsConn) {
 /**
  * Update prompt statistics display
  */
-export function updatePromptStats() {
+function updatePromptStats() {
   const stats = gameState.promptStats;
 
   // Update stat values
@@ -539,26 +539,4 @@ export function startPromptSelection(wsConn) {
     t: "host_transition_phase",
     phase: "PROMPT_SELECTION",
   });
-}
-
-/**
- * Try to auto-queue a prompt that was just added from overview
- */
-export function maybeAutoQueueOverviewPrompt(wsConn) {
-  if (!pendingOverviewPromptAutoQueue) return;
-
-  const queuedIds = new Set(gameState.queuedPrompts.map((p) => p.id));
-  const { text, image_url } = pendingOverviewPromptAutoQueue;
-
-  const candidates = (gameState.prompts || [])
-    .filter((p) => p.source === "host")
-    .filter((p) => !queuedIds.has(p.id))
-    .filter((p) => (p.text ?? null) === (text ?? null))
-    .filter((p) => (p.image_url ?? null) === (image_url ?? null))
-    .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-
-  if (candidates.length === 0) return;
-
-  queuePrompt(candidates[0].id, wsConn);
-  pendingOverviewPromptAutoQueue = null;
 }
