@@ -963,6 +963,7 @@ button.secondary:hover {
 }
 
 .winner-fullscreen.active {
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override display:none and ensure winner overlay shows on top */
   display: flex !important;
 }
 

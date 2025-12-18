@@ -793,7 +793,7 @@ function updateResultReveals() {
 
   // AI Winner: Use manual winner > ai_submission_id > most voted
   let aiDisplayId = gameState.manualAiWinner;
-  let aiIsManual = !!aiDisplayId;
+  const aiIsManual = !!aiDisplayId;
   if (!aiDisplayId) {
     aiDisplayId = gameState.currentRound?.ai_submission_id;
   }
@@ -809,7 +809,7 @@ function updateResultReveals() {
 
   // Funny Winner: Use manual winner > most voted
   let funnyDisplayId = gameState.manualFunnyWinner;
-  let funnyIsManual = !!funnyDisplayId;
+  const funnyIsManual = !!funnyDisplayId;
   if (!funnyDisplayId) {
     let maxFunnyVotes = 0;
     for (const [id, count] of Object.entries(funnyCounts)) {

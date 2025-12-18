@@ -1117,14 +1117,17 @@ body {
 }
 
 .audience-block.first {
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override base .audience-block gradient for 1st place */
   background: linear-gradient(180deg, #66f2ff, #0099aa) !important;
 }
 
 .audience-block.second {
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override base .audience-block gradient for 2nd place */
   background: linear-gradient(180deg, #99f5ff, #4dc4d1) !important;
 }
 
 .audience-block.third {
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override base .audience-block gradient for 3rd place */
   background: linear-gradient(180deg, #b3f7ff, #66d9e6) !important;
 }
 
