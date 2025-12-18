@@ -581,11 +581,6 @@ async function submitVote() {
   hideError("voteError");
 }
 
-function changeVote() {
-  hasVoted = false;
-  showVotingScreen();
-}
-
 function updateVoteSummary() {
   const aiIndex = submissions.findIndex((s) => s.id === selectedAiAnswer);
   const funnyIndex = submissions.findIndex((s) => s.id === selectedFunnyAnswer);
@@ -1023,7 +1018,6 @@ if (typeof window !== "undefined") {
   Object.assign(window, {
     joinAudience,
     submitVote,
-    changeVote,
     togglePromptSubmission,
     submitPrompt,
     submitPromptVote,

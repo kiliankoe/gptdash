@@ -130,6 +130,18 @@ pub async fn handle_vote(
                 msg: "Invalid vote. Please pick two different answers from this round.".to_string(),
             })
         }
+        VoteResult::UnknownVoter => {
+            // Shadow reject - don't tell attacker their fabricated token was detected
+            tracing::warn!("Vote from unknown voter (fabricated token?)");
+            Some(ServerMessage::VoteAck { msg_id })
+        }
+        VoteResult::AlreadyVoted => {
+            tracing::info!("Vote rejected: voter already voted this round");
+            Some(ServerMessage::Error {
+                code: "ALREADY_VOTED".to_string(),
+                msg: "Du hast in dieser Runde bereits abgestimmt.".to_string(),
+            })
+        }
     }
 }
 

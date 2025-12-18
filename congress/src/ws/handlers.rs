@@ -489,6 +489,9 @@ mod tests {
         state.create_game().await;
         state.start_round().await.ok();
 
+        // Create audience member (required for voter validation)
+        state.get_or_create_audience_member("voter1").await;
+
         // Set game to VOTING phase (votes only accepted during voting)
         state.game.write().await.as_mut().unwrap().phase = crate::types::GamePhase::Voting;
 

@@ -364,6 +364,18 @@ button.secondary:hover {
   text-align: center;
 }
 
+/* Vote Warning */
+.vote-warning {
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 193, 7, 0.15);
+  border: 1px solid rgba(255, 193, 7, 0.5);
+  border-radius: 6px;
+  color: #ffc107;
+}
+
 /* ========================
    SCREEN: WELCOME
    ======================== */

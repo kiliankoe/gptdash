@@ -28,6 +28,10 @@ async fn test_full_game_flow() {
     let game = state.get_game().await.expect("Game should exist");
     assert_eq!(game.phase, GamePhase::Lobby);
 
+    // 1b. Create audience members (required for voter validation)
+    state.get_or_create_audience_member("voter_1").await;
+    state.get_or_create_audience_member("voter_2").await;
+
     // 2. Create players
     let create_players_result = handle_message(
         ClientMessage::HostCreatePlayers { count: 2 },
@@ -1355,6 +1359,9 @@ async fn test_remove_player_mid_round() {
     let audience_role = Role::Audience;
 
     state.create_game().await;
+
+    // Create audience member (required for voter validation)
+    state.get_or_create_audience_member("voter1").await;
 
     // Create two players
     let create_result = handle_message(
@@ -3254,6 +3261,9 @@ async fn test_vote_timing_after_window() {
     let audience_role = Role::Audience;
 
     state.create_game().await;
+
+    // Create audience member (required for voter validation)
+    state.get_or_create_audience_member("late_voter").await;
 
     // Create player and setup round
     let create_result = handle_message(

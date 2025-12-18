@@ -17,6 +17,10 @@ pub enum VoteResult {
     WrongPhase,
     /// Vote is invalid (e.g., picks don't exist for this round)
     InvalidPick,
+    /// Voter token not found in audience_members (possible fabricated identity)
+    UnknownVoter,
+    /// Voter has already cast a vote this round (only one vote allowed)
+    AlreadyVoted,
 }
 
 impl AppState {
@@ -29,6 +33,15 @@ impl AppState {
         funny_pick: SubmissionId,
         msg_id: String,
     ) -> VoteResult {
+        // Validate voter exists in audience_members (prevent fabricated tokens)
+        {
+            let members = self.audience_members.read().await;
+            if !members.contains_key(&voter_id) {
+                tracing::warn!("Vote rejected: unknown voter_id {}", voter_id);
+                return VoteResult::UnknownVoter;
+            }
+        }
+
         // Check game phase and panic mode
         {
             let game = self.game.read().await;
@@ -82,16 +95,20 @@ impl AppState {
             }
         }
 
-        // Find and remove any existing vote from this voter for this round
+        // Check if voter has already voted this round (only one vote allowed)
         {
-            let mut votes = self.votes.write().await;
-            let existing_vote_id = votes
+            let votes = self.votes.read().await;
+            let already_voted = votes
                 .iter()
-                .find(|(_, v)| v.voter_id == voter_id && v.round_id == round.id)
-                .map(|(id, _)| id.clone());
+                .any(|(_, v)| v.voter_id == voter_id && v.round_id == round.id);
 
-            if let Some(vote_id) = existing_vote_id {
-                votes.remove(&vote_id);
+            if already_voted {
+                tracing::info!(
+                    "Vote rejected: voter {} already voted in round {}",
+                    voter_id,
+                    round.id
+                );
+                return VoteResult::AlreadyVoted;
             }
         }
 
@@ -288,13 +305,15 @@ mod tests {
         assert_eq!(ai_counts.get("sub1"), None);
     }
 
-    /// Helper to set up state in VOTING phase
+    /// Helper to set up state in VOTING phase with a test voter
     async fn setup_voting_phase() -> AppState {
         let state = AppState::new();
         state.create_game().await;
         state.start_round().await.unwrap();
         // Set game to VOTING phase
         state.game.write().await.as_mut().unwrap().phase = GamePhase::Voting;
+        // Create a test audience member (required for voter validation)
+        state.get_or_create_audience_member("voter1").await;
         state
     }
 
@@ -366,7 +385,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_submit_vote_new_msg_id_replaces_vote() {
+    async fn test_submit_vote_second_vote_rejected() {
         let state = setup_voting_phase().await;
 
         let round = state.get_current_round().await.unwrap();
@@ -388,12 +407,18 @@ mod tests {
             .unwrap();
 
         // First vote
-        state
-            .submit_vote("voter1".to_string(), sub1.id, sub2.id, "msg1".to_string())
+        let result1 = state
+            .submit_vote(
+                "voter1".to_string(),
+                sub1.id.clone(),
+                sub2.id.clone(),
+                "msg1".to_string(),
+            )
             .await;
+        assert_eq!(result1, VoteResult::Recorded);
 
-        // New msg_id - should replace
-        let result = state
+        // Second vote with new msg_id - should be rejected (only one vote allowed)
+        let result2 = state
             .submit_vote(
                 "voter1".to_string(),
                 sub3.id.clone(),
@@ -401,19 +426,21 @@ mod tests {
                 "msg2".to_string(),
             )
             .await;
-        assert_eq!(result, VoteResult::Recorded);
+        assert_eq!(result2, VoteResult::AlreadyVoted);
 
-        // Should still only have 1 vote, but updated
+        // Should still only have 1 vote, unchanged
         assert_eq!(state.votes.read().await.len(), 1);
         let vote = state.votes.read().await.values().next().unwrap().clone();
-        assert_eq!(vote.ai_pick_submission_id, sub3.id);
-        assert_eq!(vote.funny_pick_submission_id, sub4.id);
+        assert_eq!(vote.ai_pick_submission_id, sub1.id);
+        assert_eq!(vote.funny_pick_submission_id, sub2.id);
     }
 
     #[tokio::test]
     async fn test_submit_vote_no_active_round() {
         let state = AppState::new();
         state.create_game().await;
+        // Create audience member (required for voter validation)
+        state.get_or_create_audience_member("voter1").await;
         // Set phase to VOTING but don't start a round
         state.game.write().await.as_mut().unwrap().phase = GamePhase::Voting;
 
@@ -434,6 +461,8 @@ mod tests {
         let state = AppState::new();
         state.create_game().await;
         state.start_round().await.unwrap();
+        // Create audience member (required for voter validation)
+        state.get_or_create_audience_member("voter1").await;
         // Game starts in LOBBY phase by default
 
         let result = state
@@ -454,6 +483,8 @@ mod tests {
         let state = AppState::new();
         state.create_game().await;
         state.start_round().await.unwrap();
+        // Create audience member (required for voter validation)
+        state.get_or_create_audience_member("voter1").await;
         state.game.write().await.as_mut().unwrap().phase = GamePhase::Writing;
 
         let result = state
@@ -474,6 +505,8 @@ mod tests {
         let state = AppState::new();
         state.create_game().await;
         state.start_round().await.unwrap();
+        // Create audience member (required for voter validation)
+        state.get_or_create_audience_member("voter1").await;
         state.game.write().await.as_mut().unwrap().phase = GamePhase::Reveal;
 
         let result = state
@@ -494,6 +527,8 @@ mod tests {
         let state = AppState::new();
         state.create_game().await;
         state.start_round().await.unwrap();
+        // Create audience member (required for voter validation)
+        state.get_or_create_audience_member("voter1").await;
         state.game.write().await.as_mut().unwrap().phase = GamePhase::Results;
 
         let result = state
@@ -548,5 +583,82 @@ mod tests {
 
         assert_eq!(result, VoteResult::InvalidPick);
         assert_eq!(state.votes.read().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_submit_vote_rejected_for_unknown_voter() {
+        let state = setup_voting_phase().await;
+
+        let round = state.get_current_round().await.unwrap();
+        let sub1 = state
+            .submit_answer(&round.id, None, "A".to_string())
+            .await
+            .unwrap();
+        let sub2 = state
+            .submit_answer(&round.id, None, "B".to_string())
+            .await
+            .unwrap();
+
+        // Try to vote with a fabricated voter token (not in audience_members)
+        let result = state
+            .submit_vote(
+                "fabricated_voter".to_string(),
+                sub1.id,
+                sub2.id,
+                "msg1".to_string(),
+            )
+            .await;
+
+        assert_eq!(result, VoteResult::UnknownVoter);
+        assert_eq!(state.votes.read().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_voters_can_each_vote_once() {
+        let state = setup_voting_phase().await;
+        // Create additional voters
+        state.get_or_create_audience_member("voter2").await;
+        state.get_or_create_audience_member("voter3").await;
+
+        let round = state.get_current_round().await.unwrap();
+        let sub1 = state
+            .submit_answer(&round.id, None, "A".to_string())
+            .await
+            .unwrap();
+        let sub2 = state
+            .submit_answer(&round.id, None, "B".to_string())
+            .await
+            .unwrap();
+
+        // All three voters vote
+        let r1 = state
+            .submit_vote(
+                "voter1".to_string(),
+                sub1.id.clone(),
+                sub2.id.clone(),
+                "msg1".to_string(),
+            )
+            .await;
+        let r2 = state
+            .submit_vote(
+                "voter2".to_string(),
+                sub1.id.clone(),
+                sub2.id.clone(),
+                "msg2".to_string(),
+            )
+            .await;
+        let r3 = state
+            .submit_vote(
+                "voter3".to_string(),
+                sub2.id.clone(),
+                sub1.id.clone(),
+                "msg3".to_string(),
+            )
+            .await;
+
+        assert_eq!(r1, VoteResult::Recorded);
+        assert_eq!(r2, VoteResult::Recorded);
+        assert_eq!(r3, VoteResult::Recorded);
+        assert_eq!(state.votes.read().await.len(), 3);
     }
 }

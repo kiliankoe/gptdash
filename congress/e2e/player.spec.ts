@@ -859,8 +859,6 @@ test.describe("Player", () => {
       "Schau auf die große Leinwand",
     );
 
-    console.log(
-      "Player reconnect during VOTING test completed successfully!",
-    );
+    console.log("Player reconnect during VOTING test completed successfully!");
   });
 });

@@ -1844,6 +1844,10 @@ mod tests {
         state.create_game().await;
         let round = state.start_round().await.unwrap();
 
+        // Create audience members (required for voter validation)
+        state.get_or_create_audience_member("voter1").await;
+        state.get_or_create_audience_member("voter2").await;
+
         // Create player with submission
         let player = state.create_player().await;
         let sub = state
