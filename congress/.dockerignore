@@ -1,0 +1,8 @@
+target/
+.git/
+.env
+state_backup.json
+*.md
+e2e/
+tests/
+.claude/
