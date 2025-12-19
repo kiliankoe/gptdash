@@ -1,5 +1,7 @@
-import { check } from "k6";
 import ws from "k6/ws";
+import { check } from "k6";
+import { sha256 } from "k6/crypto";
+import { sleep } from "k6";
 
 // Common browser User-Agents
 const userAgents = [
@@ -47,6 +49,13 @@ function randomUserAgent() {
   return userAgents[Math.floor(Math.random() * userAgents.length)];
 }
 
+function biasedIndexByPower(n, alpha = 2) {
+  // produce a value in [0,1) biased toward 0 when alpha>1
+  const u = Math.random();
+  const v = Math.pow(u, alpha);
+  return Math.floor(v * n);
+}
+
 export default function () {
   const token = randomAudienceToken();
 
@@ -57,7 +66,9 @@ export default function () {
     Origin: "http://127.0.0.1:6573",
   };
 
-  const res = ws.connect(url, { headers }, (socket) => {
+  var nonce;
+
+  const res = ws.connect(url, { headers }, function (socket) {
     socket.on("open", () => {
       log(`VU ${__VU} connected with token ${token}`);
     });
@@ -74,43 +85,58 @@ export default function () {
         return;
       }
 
-      if (
-        !data ||
-        data.t !== "submissions" ||
-        !Array.isArray(data.list) ||
-        data.list.length < 1
-      ) {
+      if (!data) {
+        log("not valid data?")
         return;
       }
 
-      // Pick two random (distinct if possible) submission ids
-      const n = data.list.length;
-      const idxA = Math.floor(Math.random() * n);
-      let idxB = Math.floor(Math.random() * n);
-      if (n > 1) {
-        while (idxB === idxA) idxB = Math.floor(Math.random() * n);
+      if (data.t === "vote_challenge") {
+        nonce = data.nonce;
+        log("Updated nonce to " + nonce)
       }
 
-      const vote = {
-        t: "vote",
-        voter_token: token,
-        ai: data.list[idxA].id,
-        funny: data.list[idxB].id,
-        msg_id: "msg_" + randomString(12),
-      };
-
-      const delayMs = Math.floor(Math.random() * 10001); // 0..10000 ms
-      setTimeout(() => {
-        try {
-          socket.send(JSON.stringify(vote));
-          log(
-            `VU ${__VU} sent vote after ${delayMs}ms: ${JSON.stringify(vote)}`,
-            1,
-          );
-        } catch (e) {
-          console.error(`VU ${__VU} failed to send vote:`, e);
+      if (data.t === "submissions") {
+        // Pick two random (distinct if possible) submission ids
+        const n = data.list.length;
+        const idxA = biasedIndexByPower(n, 2);
+        let idxB = biasedIndexByPower(n, 0.5);
+        if (n > 1) {
+          while (idxB === idxA) idxB = Math.floor(Math.random() * n);
         }
-      }, delayMs);
+
+        const vote = {
+          t: "vote",
+          voter_token: token,
+          ai: data.list[idxA].id,
+          funny: data.list[idxB].id,
+          msg_id: "msg_" + randomString(12),
+          challenge_nonce: nonce,
+          challenge_response: sha256(nonce + token, "hex").slice(0, 16),
+          is_webdriver: false
+        };
+
+        const delayMs = Math.floor(500 + Math.random() * 10001); // 0..10000 ms
+        sleep(delayMs / 1000)
+          try {
+            socket.send(JSON.stringify(vote));
+            log(
+              `VU ${__VU} sent vote after ${delayMs}ms: ${JSON.stringify(
+                vote
+              )}`,
+              1
+            );
+          } catch (e) {
+            console.error(`VU ${__VU} failed to send vote:`, e);
+          }
+
+        // send vote back; use socket.send or socket.send(JSON.stringify(vote)) depending on server expectations
+        // try {
+        //   socket.send(JSON.stringify(vote));
+        //   log(`VU ${__VU} sent vote: ${JSON.stringify(vote)}`, 1);
+        // } catch (e) {
+        //   console.error(`VU ${__VU} failed to send vote:`, e);
+        // }
+      }
     });
 
     socket.on("error", (e) => {
