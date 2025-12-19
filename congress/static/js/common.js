@@ -218,11 +218,13 @@ function hideError(elementId) {
 
 /**
  * Escape HTML to prevent XSS
+ * Note: innerHTML escapes < > & but NOT quotes, so we escape those manually
+ * to prevent attribute injection attacks like: title="${escapeHtml(userInput)}"
  */
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 /**
