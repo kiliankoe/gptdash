@@ -176,6 +176,9 @@ pub struct Player {
 pub struct AudienceMember {
     pub voter_id: VoterId,
     pub display_name: String,
+    /// ISO timestamp of last connection (for TTL-based cleanup)
+    #[serde(default)]
+    pub last_seen: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

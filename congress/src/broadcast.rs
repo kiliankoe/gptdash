@@ -170,3 +170,21 @@ pub fn spawn_rate_limiter_cleanup(abuse_config: Arc<AbuseConfig>) {
         }
     });
 }
+
+/// Spawn background task that periodically cleans up stale audience members
+/// Removes members with 0 points who haven't connected in TTL minutes
+pub fn spawn_audience_cleanup_task(state: Arc<AppState>, ttl_minutes: u64) {
+    tracing::info!(
+        "Audience cleanup task started (TTL: {} min, check every 1 min)",
+        ttl_minutes
+    );
+
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+
+        loop {
+            interval.tick().await;
+            state.cleanup_stale_audience(ttl_minutes).await;
+        }
+    });
+}

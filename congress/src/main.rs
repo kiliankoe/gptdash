@@ -103,6 +103,9 @@ async fn main() {
     // Spawn background task for cleaning up stale rate limiter entries (prevents memory leaks)
     broadcast::spawn_rate_limiter_cleanup(abuse_config.clone());
 
+    // Spawn background task for cleaning up stale audience members (10-min TTL, 0 points)
+    broadcast::spawn_audience_cleanup_task(state.clone(), 10);
+
     // Note: Voting deadline is a soft/visual timer; the host advances phases manually.
 
     // Protected host routes (with HTTP Basic Auth)

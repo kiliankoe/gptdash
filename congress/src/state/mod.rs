@@ -39,6 +39,8 @@ pub struct AppState {
     pub prompt_votes: Arc<RwLock<HashMap<VoterId, PromptId>>>,
     /// Audience members with auto-generated display names (persists across games)
     pub audience_members: Arc<RwLock<HashMap<VoterId, AudienceMember>>>,
+    /// Cache of used display names for O(1) uniqueness checks (avoids O(n) cloning)
+    pub used_display_names: Arc<RwLock<HashSet<String>>>,
     /// Vote challenge nonce (changes per voting round, used for anti-automation)
     pub vote_challenge_nonce: Arc<RwLock<Option<String>>>,
     /// Timestamp when VOTING phase started (for server-side timing validation)
@@ -95,6 +97,7 @@ impl AppState {
             queued_prompts: Arc::new(RwLock::new(Vec::new())),
             prompt_votes: Arc::new(RwLock::new(HashMap::new())),
             audience_members: Arc::new(RwLock::new(HashMap::new())),
+            used_display_names: Arc::new(RwLock::new(HashSet::new())),
             vote_challenge_nonce: Arc::new(RwLock::new(None)),
             voting_phase_started_at: Arc::new(RwLock::new(None)),
             trivia_questions: Arc::new(RwLock::new(Vec::new())),
@@ -265,29 +268,30 @@ impl AppState {
     // Audience Member Management (auto-generated friendly names)
     // =========================================================================
 
+    /// Helper to capitalize each word
+    fn capitalize_name(name: &str) -> String {
+        name.split(' ')
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     /// Generate a unique friendly name for an audience member
     /// Uses petname crate to generate adjective-noun combinations
-    fn generate_unique_name(existing_names: &HashSet<String>) -> String {
-        // Helper to capitalize each word
-        fn capitalize(name: &str) -> String {
-            name.split(' ')
-                .map(|word| {
-                    let mut chars = word.chars();
-                    match chars.next() {
-                        None => String::new(),
-                        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ")
-        }
-
+    /// Takes a reference to the used_display_names set for O(1) lookups
+    fn generate_unique_name(used_names: &HashSet<String>) -> String {
         // Try to generate a unique 2-word name (adjective + noun)
         for _ in 0..100 {
             // petname::petname() generates a name using thread-local RNG
             if let Some(name) = petname::petname(2, " ") {
-                let capitalized = capitalize(&name);
-                if !existing_names.contains(&capitalized) {
+                let capitalized = Self::capitalize_name(&name);
+                if !used_names.contains(&capitalized) {
                     return capitalized;
                 }
             }
@@ -296,37 +300,41 @@ impl AppState {
         // Fallback: add a random number suffix if all attempts fail
         let base_name = petname::petname(2, " ").unwrap_or_else(|| "Mystery Guest".to_string());
         let suffix: u16 = rand::random::<u16>() % 1000;
-        format!("{} {}", capitalize(&base_name), suffix)
+        format!("{} {}", Self::capitalize_name(&base_name), suffix)
     }
 
     /// Get or create an audience member with an auto-generated display name
     /// Returns the member (newly created or existing)
+    /// Also updates last_seen timestamp for existing members
     pub async fn get_or_create_audience_member(&self, voter_id: &str) -> AudienceMember {
-        // Check if member already exists
+        // Check if member already exists - if so, update last_seen
         {
-            let members = self.audience_members.read().await;
-            if let Some(member) = members.get(voter_id) {
+            let mut members = self.audience_members.write().await;
+            if let Some(member) = members.get_mut(voter_id) {
+                member.last_seen = Some(chrono::Utc::now().to_rfc3339());
                 return member.clone();
             }
         }
 
-        // Generate a unique name
-        let existing_names: HashSet<String> = {
-            let members = self.audience_members.read().await;
-            members.values().map(|m| m.display_name.clone()).collect()
+        // Generate a unique name using the cached set (O(1) lookup instead of O(n) clone)
+        let display_name = {
+            let used_names = self.used_display_names.read().await;
+            Self::generate_unique_name(&used_names)
         };
-        let display_name = Self::generate_unique_name(&existing_names);
 
         // Create and store the new member
         let member = AudienceMember {
             voter_id: voter_id.to_string(),
-            display_name,
+            display_name: display_name.clone(),
+            last_seen: Some(chrono::Utc::now().to_rfc3339()),
         };
 
+        // Insert into both the members map and the used names set
         self.audience_members
             .write()
             .await
             .insert(voter_id.to_string(), member.clone());
+        self.used_display_names.write().await.insert(display_name);
 
         tracing::info!(
             "Created new audience member: {} -> {}",
@@ -351,7 +359,78 @@ impl AppState {
     pub async fn clear_audience_members(&self) {
         let count = self.audience_members.read().await.len();
         self.audience_members.write().await.clear();
+        self.used_display_names.write().await.clear();
         tracing::info!("Cleared {} audience members", count);
+    }
+
+    /// Cleanup stale audience members who:
+    /// - Have 0 points AND
+    /// - Haven't connected in the given TTL duration
+    ///
+    /// Returns the number of members removed
+    pub async fn cleanup_stale_audience(&self, ttl_minutes: u64) -> usize {
+        use crate::types::ScoreKind;
+        use chrono::{DateTime, Duration, Utc};
+
+        let now = Utc::now();
+        let ttl = Duration::minutes(ttl_minutes as i64);
+
+        // Get set of voter_ids that have points (should not be removed)
+        let voters_with_points: std::collections::HashSet<String> = {
+            let scores = self.scores.read().await;
+            scores
+                .iter()
+                .filter(|s| s.kind == ScoreKind::Audience && s.total > 0)
+                .map(|s| s.ref_id.clone())
+                .collect()
+        };
+
+        // Find members to remove
+        let members_to_remove: Vec<(String, String)> = {
+            let members = self.audience_members.read().await;
+            members
+                .iter()
+                .filter(|(voter_id, member)| {
+                    // Skip if they have points
+                    if voters_with_points.contains(*voter_id) {
+                        return false;
+                    }
+
+                    // Check if stale (no last_seen or last_seen > TTL ago)
+                    match &member.last_seen {
+                        None => true, // No last_seen = stale (legacy data)
+                        Some(ts) => {
+                            if let Ok(last_seen) = DateTime::parse_from_rfc3339(ts) {
+                                now - last_seen.with_timezone(&Utc) > ttl
+                            } else {
+                                true // Invalid timestamp = stale
+                            }
+                        }
+                    }
+                })
+                .map(|(voter_id, member)| (voter_id.clone(), member.display_name.clone()))
+                .collect()
+        };
+
+        let count = members_to_remove.len();
+        if count > 0 {
+            // Remove from audience_members and used_display_names
+            let mut members = self.audience_members.write().await;
+            let mut used_names = self.used_display_names.write().await;
+
+            for (voter_id, display_name) in members_to_remove {
+                members.remove(&voter_id);
+                used_names.remove(&display_name);
+            }
+
+            tracing::info!(
+                "Cleaned up {} stale audience members (TTL: {} min)",
+                count,
+                ttl_minutes
+            );
+        }
+
+        count
     }
 
     /// Get prompt pool for host (filtered by shadowban status)
@@ -876,8 +955,15 @@ impl AppState {
         *self.player_status.write().await = export.player_status;
         *self.shadowbanned_audience.write().await = export.shadowbanned_audience;
         *self.prompt_pool.write().await = export.prompt_pool;
-        *self.audience_members.write().await = export.audience_members;
+        *self.audience_members.write().await = export.audience_members.clone();
         *self.trivia_questions.write().await = export.trivia_questions;
+
+        // Rebuild used_display_names from imported audience_members
+        *self.used_display_names.write().await = export
+            .audience_members
+            .values()
+            .map(|m| m.display_name.clone())
+            .collect();
 
         // Broadcast state refresh to all clients
         if let Some(ref game) = export.game {

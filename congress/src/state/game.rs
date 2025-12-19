@@ -432,6 +432,16 @@ impl AppState {
                     });
                 }
 
+                // Clear voting state when transitioning from RESULTS/PODIUM to a new round
+                // This frees memory from accumulated votes and allows voters to vote again
+                if (game_clone.phase == GamePhase::Results || game_clone.phase == GamePhase::Podium)
+                    && (effective_phase == GamePhase::Lobby
+                        || effective_phase == GamePhase::PromptSelection)
+                {
+                    // If going to Lobby, clear all; if PromptSelection, keep nothing (new round)
+                    self.clear_completed_round_votes(None).await;
+                }
+
                 // Broadcast phase change to all clients
                 self.broadcast_phase_change().await;
 
@@ -507,6 +517,33 @@ impl AppState {
     pub async fn clear_prompt_pool(&self) {
         self.prompt_pool.write().await.clear();
         tracing::info!("Prompt pool cleared");
+    }
+
+    /// Clear voting state from completed rounds to free memory
+    /// Called when transitioning from RESULTS/PODIUM to a new round
+    /// Keeps votes for current round (if any) but clears processed_vote_msg_ids
+    pub async fn clear_completed_round_votes(&self, keep_round_id: Option<&str>) {
+        // Clear processed_vote_msg_ids (allows voters to vote again in next round)
+        let count = self.processed_vote_msg_ids.read().await.len();
+        self.processed_vote_msg_ids.write().await.clear();
+
+        // Clear votes from all rounds except the one we're keeping (if any)
+        let mut votes = self.votes.write().await;
+        let before = votes.len();
+        if let Some(keep_id) = keep_round_id {
+            votes.retain(|_, v| v.round_id == keep_id);
+        } else {
+            votes.clear();
+        }
+        let after = votes.len();
+        drop(votes);
+
+        tracing::info!(
+            "Cleared between-round voting state: {} msg_ids, {} votes removed ({} kept)",
+            count,
+            before - after,
+            after
+        );
     }
 
     /// Toggle panic mode on/off
