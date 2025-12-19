@@ -46,13 +46,22 @@ body {
   background: #1e293b;
   border-right: 2px solid #334155;
   padding: 20px 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar-item {
+  display: block;
+  width: 100%;
   padding: 12px 30px;
   cursor: pointer;
   transition: all 0.2s;
+  border: none;
   border-left: 3px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
 }
 
 .sidebar-item:hover {
@@ -785,20 +794,6 @@ select:focus {
   justify-content: space-between;
   align-items: center;
   flex: 1;
-}
-
-/* Drop indicator line */
-.drop-indicator {
-  height: 4px;
-  background: #fbbf24;
-  border-radius: 2px;
-  margin: 4px 0;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.drop-indicator.active {
-  opacity: 1;
 }
 
 /* Reorder info text */

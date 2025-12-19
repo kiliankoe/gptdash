@@ -1,100 +1,23 @@
-/* 39C3 Style Guide - Power Cycles */
-
-/* Font Faces */
-@font-face {
-  font-family: "Kario39C3";
-  src:
-    url("../fonts/Kario39C3VarWEB-Roman.woff2") format("woff2"),
-    url("../fonts/Kario39C3VarWEB-Roman.woff") format("woff"),
-    url("../fonts/Kario39C3Var-Roman.ttf") format("truetype");
-  font-weight: 10 100;
-  font-stretch: 30% 160%;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "OfficerSans";
-  src:
-    url("../fonts/OfficerSansWeb-Regular.woff2") format("woff2"),
-    url("../fonts/OfficerSansWeb-Regular.woff") format("woff");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "OfficerSans";
-  src:
-    url("../fonts/OfficerSansWeb-Bold.woff2") format("woff2"),
-    url("../fonts/OfficerSansWeb-Bold.woff") format("woff");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "OfficerSans";
-  src:
-    url("../fonts/OfficerSansWeb-RegularItalic.woff2") format("woff2"),
-    url("../fonts/OfficerSansWeb-RegularItalic.woff") format("woff");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "OfficerSans";
-  src:
-    url("../fonts/OfficerSansWeb-BoldItalic.woff2") format("woff2"),
-    url("../fonts/OfficerSansWeb-BoldItalic.woff") format("woff");
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
-}
-
-/* CSS Variables - 39C3 Color Palette */
-:root {
-  --color-dark: #141414;
-  --color-neutral: #faf5f5;
-  --color-primary: #00ff00;
-  --color-secondary: #9673ff;
-  --color-additional-01: #ff3719;
-  --color-additional-02: #66f2ff;
-
-  /* Primary tints */
-  --color-primary-900: #009900;
-  --color-primary-800: #00be00;
-  --color-primary-700: #00d300;
-  --color-primary-600: #00ea00;
-  --color-primary-500: #00fc00;
-  --color-primary-400: #00ff00;
-  --color-primary-300: #6cff57;
-  --color-primary-200: #a3ff90;
-  --color-primary-100: #ccffbe;
-  --color-primary-50: #ebffe5;
-
-  /* Secondary tints */
-  --color-secondary-900: #0015cd;
-  --color-secondary-800: #1621dc;
-  --color-secondary-700: #3626e4;
-  --color-secondary-600: #4d2eed;
-  --color-secondary-500: #5c33f4;
-  --color-secondary-400: #7952fe;
-  --color-secondary-300: #9673ff;
-  --color-secondary-200: #b69dfe;
-  --color-secondary-100: #d4c4fe;
-  --color-secondary-50: #efe7ff;
-
-  /* Typography */
-  --font-headline: "Kario39C3", sans-serif;
-  --font-body: "OfficerSans", sans-serif;
-}
+/* 39C3 Style Guide - Power Cycles - Beamer View */
+@import url("fonts.css");
+@import url("variables.css");
 
 /* Reset */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Base */
@@ -672,13 +595,6 @@ body {
   color: var(--color-dark);
 }
 
-.reveal-nav {
-  display: flex;
-  justify-content: center;
-  gap: 40px;
-  margin-top: 40px;
-}
-
 .reveal-indicator {
   display: flex;
   gap: 12px;
@@ -919,13 +835,13 @@ body {
 }
 
 .leaderboard-rank.gold {
-  color: #ffd700;
+  color: var(--color-gold);
 }
 .leaderboard-rank.silver {
-  color: #c0c0c0;
+  color: var(--color-silver);
 }
 .leaderboard-rank.bronze {
-  color: #cd7f32;
+  color: var(--color-bronze);
 }
 
 .leaderboard-name {
@@ -1063,19 +979,31 @@ body {
 
 .podium-block.first {
   height: 200px;
-  background: linear-gradient(180deg, #ffd700, #b8860b);
+  background: linear-gradient(
+    180deg,
+    var(--color-gold),
+    var(--color-gold-dark)
+  );
   color: var(--color-dark);
 }
 
 .podium-block.second {
   height: 150px;
-  background: linear-gradient(180deg, #c0c0c0, #808080);
+  background: linear-gradient(
+    180deg,
+    var(--color-silver),
+    var(--color-silver-dark)
+  );
   color: var(--color-dark);
 }
 
 .podium-block.third {
   height: 100px;
-  background: linear-gradient(180deg, #cd7f32, #8b4513);
+  background: linear-gradient(
+    180deg,
+    var(--color-bronze),
+    var(--color-bronze-dark)
+  );
   color: var(--color-dark);
 }
 
@@ -1333,14 +1261,6 @@ body {
 /* ========================
    UTILITIES
    ======================== */
-.hidden {
-  display: none;
-}
-
-.animate-in {
-  animation: slideUp 0.6s ease-out;
-}
-
 .text-center {
   text-align: center;
 }

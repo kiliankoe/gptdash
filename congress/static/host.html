@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GPTDash - Host Control Panel</title>
-    <!-- TODO: Add HTTP Basic Auth protection for this page -->
     <link rel="stylesheet" href="/css/common.css">
     <link rel="stylesheet" href="/css/host.css">
     <script src="/js/qrcode.min.js"></script>
@@ -18,7 +17,7 @@
         <h1>GPTDash Host-Kontrollzentrum</h1>
         <div class="status-bar">
             <div class="status-item">
-                <div class="status-dot" id="statusDot"></div>
+                <div class="status-dot" id="statusDot" role="status" aria-label="Verbindungsstatus"></div>
                 <span id="statusText">Nicht verbunden</span>
             </div>
             <div class="status-item">
@@ -33,17 +32,17 @@
     <!-- Main Container -->
     <div class="container">
         <!-- Sidebar Navigation -->
-        <div class="sidebar">
-            <div class="sidebar-item active" onclick="showPanel('overview')">Übersicht</div>
-            <div class="sidebar-item" onclick="showPanel('game')">Spiel-Steuerung</div>
-            <div class="sidebar-item" onclick="showPanel('players')">Spieler</div>
-            <div class="sidebar-item" onclick="showPanel('prompts')">Prompts</div>
-            <div class="sidebar-item" onclick="showPanel('trivia')">Trivia</div>
-            <div class="sidebar-item" onclick="showPanel('submissions')">Antworten</div>
-            <div class="sidebar-item" onclick="showPanel('scores')">Punkte</div>
-            <div class="sidebar-item" onclick="showPanel('state')">State-Export</div>
-            <div class="sidebar-item" onclick="showPanel('logs')">Nachrichten-Log</div>
-        </div>
+        <nav class="sidebar" aria-label="Host-Navigation">
+            <button type="button" class="sidebar-item active" onclick="showPanel('overview')">Übersicht</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('game')">Spiel-Steuerung</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('players')">Spieler</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('prompts')">Prompts</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('trivia')">Trivia</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('submissions')">Antworten</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('scores')">Punkte</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('state')">State-Export</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('logs')">Nachrichten-Log</button>
+        </nav>
 
         <!-- Main Content -->
         <div class="main">
@@ -92,8 +91,8 @@
 
                         <div class="card">
                             <div class="card-header">Aktuelle Runde & Timer</div>
-                            <div id="overviewCurrentRoundInfo" style="margin-bottom: 10px;">
-                                <p style="opacity: 0.6;">Keine aktive Runde. Füge einen Prompt hinzu und starte eine Runde.</p>
+                            <div id="overviewCurrentRoundInfo" class="mb-10">
+                                <p class="text-secondary">Keine aktive Runde. Füge einen Prompt hinzu und starte eine Runde.</p>
                             </div>
                             <div class="overview-timer-row">
                                 <span>Verbleibend: <strong id="hostTimer" style="font-size: 1.5em; font-family: monospace;">--:--</strong></span>
@@ -107,10 +106,10 @@
 
                         <div class="card">
                             <div class="card-header">Prompts (Normal-Flow)</div>
-                            <textarea id="overviewPromptText" placeholder="Prompt-Text eingeben (oder nur Bild)..." style="margin-bottom: 10px;"></textarea>
-                            <details style="margin: 10px 0;">
+                            <textarea id="overviewPromptText" placeholder="Prompt-Text eingeben (oder nur Bild)..." class="mb-10"></textarea>
+                            <details class="my-10">
                                 <summary style="cursor: pointer; opacity: 0.8;">Bild hinzufügen (Multimodal)</summary>
-                                <div style="margin-top: 10px;">
+                                <div class="mt-10">
                                     <input type="url" id="overviewPromptImageUrl" placeholder="https://example.com/image.png" style="width: 100%; margin-bottom: 10px;">
                                     <div id="overviewPromptImagePreview" style="margin-bottom: 10px; text-align: center;"></div>
                                 </div>
@@ -125,7 +124,7 @@
                                 <div>
                                     <div class="overview-subtitle">Warteschlange (max. 3)</div>
                                     <div id="overviewQueuedPromptsList">
-                                        <p style="opacity: 0.6;">Keine Prompts in der Warteschlange.</p>
+                                        <p class="text-secondary">Keine Prompts in der Warteschlange.</p>
                                     </div>
                                     <button id="overviewStartPromptSelectionBtn" onclick="startPromptSelection()" style="display: none; margin-top: 10px;" class="primary">▶ Runde starten</button>
                                 </div>
@@ -140,7 +139,7 @@
                                         </select>
                                     </div>
                                     <div id="overviewPromptPoolList">
-                                        <p style="opacity: 0.6;">Lade Prompts…</p>
+                                        <p class="text-secondary">Lade Prompts…</p>
                                     </div>
                                 </div>
                             </div>
@@ -167,7 +166,7 @@
                                 <button onclick="showPanel('players')" class="secondary">Erweitert…</button>
                             </div>
                             <div id="overviewPlayerTokensList">
-                                <p style="opacity: 0.6;">Noch keine Spieler erstellt</p>
+                                <p class="text-secondary">Noch keine Spieler erstellt</p>
                             </div>
                         </div>
 
@@ -176,7 +175,7 @@
                             <div style="text-align: center; padding: 20px;">
                                 <div id="playerQRCode" style="display: inline-block; margin-bottom: 15px;"></div>
                                 <div style="font-size: 18px; font-weight: bold;" id="playerJoinUrl">Laden...</div>
-                                <button onclick="copyPlayerUrl()" style="margin-top: 10px;">URL kopieren</button>
+                                <button onclick="copyPlayerUrl()" class="mt-10">URL kopieren</button>
                             </div>
                         </div>
                     </div>
@@ -209,7 +208,7 @@
                         <button class="secondary" onclick="transitionPhase('INTERMISSION')">Pause</button>
                         <button class="danger" onclick="resetGame()">Spiel zurücksetzen</button>
                     </div>
-                    <div class="button-group" style="margin-top: 10px;">
+                    <div class="button-group mt-10">
                         <button class="secondary" onclick="clearPromptPool()">Prompt-Pool leeren</button>
                         <button class="secondary" onclick="clearAudienceMembers()">Publikum-Daten leeren</button>
                     </div>
@@ -228,11 +227,11 @@
                     <button id="panicModeBtn" class="danger" onclick="togglePanicMode()">PANIK-MODUS aktivieren</button>
 
                     <div id="manualWinnerSection" style="display: none; margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
-                        <h4 style="margin-bottom: 10px;">Manuelle Gewinner-Auswahl</h4>
+                        <h4 class="mb-10">Manuelle Gewinner-Auswahl</h4>
                         <p style="opacity: 0.8; margin-bottom: 10px;">Wähle die Gewinner basierend auf dem Applaus des Publikums.</p>
                         <div id="manualWinnerButtons">
                             <!-- Will be populated with submission buttons when submissions exist -->
-                            <p style="opacity: 0.6;">Antworten werden hier angezeigt, sobald verfügbar.</p>
+                            <p class="text-secondary">Antworten werden hier angezeigt, sobald verfügbar.</p>
                         </div>
                     </div>
                 </div>
@@ -254,7 +253,7 @@
                 <div class="card">
                     <div class="card-header">Spieler-Tokens</div>
                     <div id="playerTokensList">
-                        <p style="opacity: 0.6;">Noch keine Spieler erstellt</p>
+                        <p class="text-secondary">Noch keine Spieler erstellt</p>
                     </div>
                 </div>
             </div>
@@ -289,9 +288,9 @@
                 <div class="card">
                     <div class="card-header">Prompt hinzufügen</div>
                     <textarea id="promptText" placeholder="Gib hier deinen Prompt ein..."></textarea>
-                    <details style="margin: 10px 0;">
+                    <details class="my-10">
                         <summary style="cursor: pointer; opacity: 0.8;">Bild hinzufügen (Multimodal)</summary>
-                        <div style="margin-top: 10px;">
+                        <div class="mt-10">
                             <p style="opacity: 0.7; font-size: 0.9em; margin-bottom: 10px;">
                                 Füge eine Bild-URL hinzu für eine multimodale Runde. Das Bild wird auf Beamer und Player-Geräten angezeigt.
                             </p>
@@ -305,7 +304,7 @@
                 <div class="card" style="border: 2px solid #51cf66;">
                     <div class="card-header" style="color: #51cf66;">Warteschlange für nächste Runde (max. 3)</div>
                     <div id="queuedPromptsList">
-                        <p style="opacity: 0.6;">Keine Prompts in der Warteschlange. Wähle Prompts aus dem Pool.</p>
+                        <p class="text-secondary">Keine Prompts in der Warteschlange. Wähle Prompts aus dem Pool.</p>
                     </div>
                     <button id="startPromptSelectionBtn" onclick="startPromptSelection()" style="display: none; margin-top: 15px; background: #51cf66;" class="primary">▶ Runde starten</button>
                 </div>
@@ -349,9 +348,9 @@
                 <!-- Active Trivia Controls -->
                 <div class="card" id="activeTriviaCard" style="border: 2px solid #ffd43b; display: none;">
                     <div class="card-header" style="color: #ffd43b;">Aktive Trivia-Frage</div>
-                    <div id="activeTriviaQuestion" style="margin-bottom: 15px;">
+                    <div id="activeTriviaQuestion" class="mb-15">
                         <p style="font-size: 1.1em; font-weight: bold;" id="activeTriviaText"></p>
-                        <div id="activeTriviaChoices" style="margin-top: 10px;"></div>
+                        <div id="activeTriviaChoices" class="mt-10"></div>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
                         <span>Stimmen: <strong id="activeTriviaVoteCount">0</strong></span>
@@ -365,19 +364,19 @@
                 <!-- Trivia Result Controls (after resolving) -->
                 <div class="card" id="triviaResultCard" style="border: 2px solid #40c057; display: none;">
                     <div class="card-header" style="color: #40c057;">Trivia-Ergebnis wird angezeigt</div>
-                    <p style="margin-bottom: 15px;">Das Ergebnis der Trivia-Frage wird gerade auf dem Beamer und bei den Zuschauern angezeigt.</p>
+                    <p class="mb-15">Das Ergebnis der Trivia-Frage wird gerade auf dem Beamer und bei den Zuschauern angezeigt.</p>
                     <button onclick="clearTriviaResult()" class="secondary">Ergebnis ausblenden</button>
                 </div>
 
                 <!-- Add Question Form -->
                 <div class="card">
                     <div class="card-header">Trivia-Frage hinzufuegen</div>
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Frage:</label>
+                    <div class="mb-15">
+                        <label class="form-label-bold">Frage:</label>
                         <textarea id="triviaQuestionText" placeholder="Gib hier die Trivia-Frage ein..." style="min-height: 60px;"></textarea>
                     </div>
 
-                    <div style="margin-bottom: 15px;">
+                    <div class="mb-15">
                         <label style="display: block; margin-bottom: 10px; font-weight: bold;">Antworten (2-4, markiere die richtige):</label>
                         <div id="triviaChoicesContainer"></div>
                         <button type="button" id="addTriviaChoiceBtn" onclick="addTriviaChoice()" style="margin-top: 8px; padding: 5px 10px; font-size: 0.9em;">+ Antwort hinzufuegen</button>
@@ -393,7 +392,7 @@
                         Trivia-Fragen koennen waehrend der WRITING-Phase praesentiert werden, um das Publikum zu unterhalten.
                     </p>
                     <div id="triviaQuestionsList">
-                        <p style="opacity: 0.6;">Noch keine Trivia-Fragen vorhanden. Fuege oben eine hinzu.</p>
+                        <p class="text-secondary">Noch keine Trivia-Fragen vorhanden. Fuege oben eine hinzu.</p>
                     </div>
                 </div>
             </div>
@@ -406,9 +405,9 @@
                     <div class="card-header" style="color: #4dabf7;">KI-Antwort Verwaltung</div>
 
                     <!-- Model selector -->
-                    <div style="margin-bottom: 15px;">
-                        <label for="modelSelector" style="display: block; margin-bottom: 5px; font-weight: bold;">KI-Modell:</label>
-                        <select id="modelSelector" onchange="setSelectedModel(this.value)" style="width: 100%;">
+                    <div class="mb-15">
+                        <label for="modelSelector" class="form-label-bold">KI-Modell:</label>
+                        <select id="modelSelector" onchange="setSelectedModel(this.value)" class="w-full">
                             <option value="">Alle Provider (Standard)</option>
                             <!-- Options populated dynamically from /api/models -->
                         </select>
@@ -417,25 +416,25 @@
                         </p>
                     </div>
 
-                    <div id="aiGenerationStatus" style="margin-bottom: 15px;">
-                        <p style="opacity: 0.6;">KI-Status: Warte auf Prompt-Auswahl</p>
+                    <div id="aiGenerationStatus" class="mb-15">
+                        <p class="text-secondary">KI-Status: Warte auf Prompt-Auswahl</p>
                     </div>
 
-                    <div id="aiSubmissionsList" style="margin-bottom: 15px;">
+                    <div id="aiSubmissionsList" class="mb-15">
                         <!-- AI submissions will be listed here for selection -->
                     </div>
 
-                    <div class="button-group" style="margin-bottom: 15px;">
+                    <div class="button-group" class="mb-15">
                         <button onclick="regenerateAi()" class="secondary">KI neu generieren</button>
                     </div>
 
-                    <details style="margin-top: 10px;">
+                    <details class="mt-10">
                         <summary style="cursor: pointer; opacity: 0.8;">Manuelle KI-Antwort (Notfall-Override)</summary>
-                        <div style="margin-top: 10px;">
+                        <div class="mt-10">
                             <p style="opacity: 0.7; font-size: 0.9em; margin-bottom: 10px;">
                                 Falls die automatische KI-Generierung fehlschlägt, kannst du hier manuell eine KI-Antwort eingeben.
                             </p>
-                            <textarea id="manualAiText" placeholder="Manuelle KI-Antwort eingeben..." style="margin-bottom: 10px;"></textarea>
+                            <textarea id="manualAiText" placeholder="Manuelle KI-Antwort eingeben..." class="mb-10"></textarea>
                             <button onclick="writeManualAiSubmission()">Als KI-Antwort speichern</button>
                         </div>
                     </details>
@@ -448,13 +447,13 @@
                         <span>Ziehe die Antworten per Drag &amp; Drop in die gewünschte Reihenfolge</span>
                     </div>
                     <div id="submissionsList" class="submissions-list">
-                        <p style="opacity: 0.6;">Noch keine Antworten</p>
+                        <p class="text-secondary">Noch keine Antworten</p>
                     </div>
 
-                    <details style="margin-top: 15px;">
+                    <details class="mt-15">
                         <summary style="cursor: pointer; opacity: 0.7; font-size: 13px;">Manuelle ID-Eingabe (Fallback)</summary>
-                        <div style="margin-top: 10px;">
-                            <textarea id="revealOrderInput" placeholder="sub_123, sub_456, sub_789" style="margin-bottom: 10px;"></textarea>
+                        <div class="mt-10">
+                            <textarea id="revealOrderInput" placeholder="sub_123, sub_456, sub_789" class="mb-10"></textarea>
                             <button onclick="setRevealOrder()" class="secondary">Reihenfolge festlegen</button>
                         </div>
                     </details>
@@ -477,14 +476,14 @@
                 <div class="card">
                     <div class="card-header">Spieler-Punkte</div>
                     <div id="playerScores">
-                        <p style="opacity: 0.6;">Noch keine Punkte</p>
+                        <p class="text-secondary">Noch keine Punkte</p>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header">Top Publikum</div>
                     <div id="audienceScores">
-                        <p style="opacity: 0.6;">Noch keine Publikums-Punkte</p>
+                        <p class="text-secondary">Noch keine Publikums-Punkte</p>
                     </div>
                 </div>
             </div>
@@ -519,13 +518,13 @@
                         Alle verbundenen Clients werden über den neuen Zustand informiert.
                     </p>
 
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px;">JSON-Datei hochladen:</label>
-                        <input type="file" id="stateImportFile" accept=".json" onchange="handleStateFileSelect(event)" style="margin-bottom: 10px;">
+                    <div class="mb-15">
+                        <label class="form-label">JSON-Datei hochladen:</label>
+                        <input type="file" id="stateImportFile" accept=".json" onchange="handleStateFileSelect(event)" class="mb-10">
                     </div>
 
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px;">Oder JSON einfügen:</label>
+                    <div class="mb-15">
+                        <label class="form-label">Oder JSON einfügen:</label>
                         <textarea id="stateImportText" placeholder='{"schema_version": 1, ...}' style="height: 150px; font-family: monospace; font-size: 12px;"></textarea>
                     </div>
 
@@ -533,7 +532,7 @@
                         <button onclick="validateStateImport()" class="secondary">Validieren</button>
                         <button onclick="executeStateImport()" class="danger">Importieren</button>
                     </div>
-                    <div id="stateImportStatus" style="margin-top: 10px;"></div>
+                    <div id="stateImportStatus" class="mt-10"></div>
                 </div>
             </div>
 
@@ -543,7 +542,7 @@
 
                 <div class="card">
                     <button onclick="clearLog()" class="secondary">Log leeren</button>
-                    <div id="messageLog" class="log" style="margin-top: 15px;">
+                    <div id="messageLog" class="log" class="mt-15">
                         <!-- Log entries will appear here -->
                     </div>
                 </div>

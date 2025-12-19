@@ -5,6 +5,23 @@
   box-sizing: border-box;
 }
 
+/* Focus styles for keyboard navigation */
+:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Base Styles */
 body {
   font-family:
@@ -260,4 +277,78 @@ textarea {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Spacing utilities */
+.mt-5 {
+  margin-top: 5px;
+}
+.mt-8 {
+  margin-top: 8px;
+}
+.mt-10 {
+  margin-top: 10px;
+}
+.mt-15 {
+  margin-top: 15px;
+}
+.mb-5 {
+  margin-bottom: 5px;
+}
+.mb-10 {
+  margin-bottom: 10px;
+}
+.mb-15 {
+  margin-bottom: 15px;
+}
+.my-10 {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+/* Flex utilities */
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.gap-10 {
+  gap: 10px;
+}
+.gap-15 {
+  gap: 15px;
+}
+
+/* Typography utilities */
+.text-secondary {
+  opacity: 0.6;
+}
+.text-muted {
+  opacity: 0.8;
+}
+.text-small {
+  font-size: 0.9em;
+}
+.text-center {
+  text-align: center;
+}
+.text-bold {
+  font-weight: bold;
+}
+
+/* Form utilities */
+.form-label {
+  display: block;
+  margin-bottom: 5px;
+}
+.form-label-bold {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+/* Width utilities */
+.w-full {
+  width: 100%;
 }

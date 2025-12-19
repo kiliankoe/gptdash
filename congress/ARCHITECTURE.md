@@ -1,76 +1,5 @@
 # GPTDash Architecture
 
-## Project Structure
-
-```
-src/
-├── lib.rs              # Library crate (exposes public API for tests)
-├── main.rs             # Entry point, server setup
-├── types.rs            # Core type definitions (Game, Round, Player, etc.)
-├── protocol.rs         # WebSocket message protocol (source of truth for all messages)
-├── auth.rs             # HTTP Basic Authentication for host/beamer
-├── abuse.rs            # Anti-abuse middleware (rate limiting, bot blocking)
-├── api.rs              # HTTP API endpoints (state export/import)
-├── broadcast.rs        # Background tasks (vote broadcaster, auto-save, cleanup)
-├── state/              # State management
-│   ├── mod.rs          # AppState struct + core methods
-│   ├── game.rs         # Game lifecycle, phase transitions
-│   ├── player.rs       # Player management, reconnection
-│   ├── round.rs        # Round lifecycle, LLM generation
-│   ├── submission.rs   # Submission handling
-│   ├── vote.rs         # Vote handling, aggregation, idempotency
-│   ├── score.rs        # Scoring computation
-│   ├── trivia.rs       # Trivia question management
-│   └── export.rs       # State export/import
-├── llm/                # LLM provider abstraction
-│   ├── mod.rs          # LlmProvider trait, LlmManager, config
-│   ├── openai.rs       # OpenAI implementation
-│   └── ollama.rs       # Ollama implementation
-└── ws/                 # WebSocket handling
-    ├── mod.rs          # Connection handling, state recovery
-    ├── handlers.rs     # Message dispatch, authorization
-    ├── host.rs         # Host-only command handlers
-    ├── player.rs       # Player message handlers
-    └── audience.rs     # Audience message handlers
-
-tests/
-└── integration_test.rs # End-to-end integration tests
-
-e2e/                    # Playwright end-to-end tests
-├── *.spec.ts           # Test suites for all game flows
-└── test-utils.ts       # Shared test helpers
-
-static/
-├── css/
-│   ├── common.css      # Shared styles (reset, buttons, forms, cards)
-│   ├── beamer.css      # Beamer display styles
-│   ├── player.css      # Player interface styles
-│   ├── audience.css    # Audience interface styles
-│   └── host.css        # Host panel styles
-├── fonts/              # 39C3 typography (Kario, Officer Sans)
-├── img/                # Image assets
-├── js/
-│   ├── common.js       # Shared utilities (WebSocket, timers, TTS)
-│   ├── beamer.js       # Beamer logic
-│   ├── player.js       # Player logic
-│   ├── audience.js     # Audience logic
-│   ├── host.js         # Host main file
-│   ├── qrcode.min.js   # QR code generation library
-│   └── host/           # Host panel modules
-│       ├── ui.js           # UI rendering, navigation
-│       ├── state.js        # State management utilities
-│       ├── overview.js     # Overview panel
-│       ├── players.js      # Player management
-│       ├── prompts.js      # Prompt management
-│       ├── submissions.js  # Submission handling
-│       ├── ai-manager.js   # AI submission management
-│       └── state-export.js # State export/import UI
-├── index.html          # Audience interface (/)
-├── beamer.html         # Beamer display (/beamer)
-├── player.html         # Player interface (/player)
-└── host.html           # Host control panel (/host, auth protected)
-```
-
 ## Module Responsibilities
 
 ### `state/`
@@ -143,7 +72,28 @@ All views are static HTML/CSS/JS served from `static/` with WebSocket auto-recon
 
 ## Frontend Architecture
 
-**CSS**: Shared `common.css` (reset, buttons, forms, cards, animations) + view-specific files.
+### CSS Structure
+
+Two design systems coexist:
+
+**39C3 Design System** (audience, beamer):
+- `fonts.css` - 39C3 font faces (Kario, OfficerSans)
+- `variables.css` - Color palette, typography variables, medal colors
+- `audience.css` / `beamer.css` - Import shared files via `@import`
+
+**Gradient Design System** (player, host):
+- `common.css` - Reset, buttons, forms, cards, utility classes
+- `player.css` / `host.css` - Extend common.css
+
+**Utility Classes** (in common.css):
+- Spacing: `.mt-10`, `.mb-15`, `.my-10`
+- Typography: `.text-secondary`, `.text-muted`, `.form-label`
+- Layout: `.flex-row`, `.gap-10`, `.w-full`
+
+**Accessibility**:
+- `:focus-visible` styles for keyboard navigation
+- `@media (prefers-reduced-motion)` in all CSS files
+- Semantic HTML: `<nav>` for navigation, `<button>` for interactive elements
 
 **JavaScript**: Shared `common.js` provides:
 - `WSConnection`: Auto-reconnecting WebSocket with 2s delay
