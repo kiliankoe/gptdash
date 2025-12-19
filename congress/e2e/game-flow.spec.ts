@@ -38,6 +38,9 @@ test.describe("Game Flow", () => {
   test("complete game from lobby to results with multiple players and audience", async ({
     browser,
   }) => {
+    // Extended test with 27 steps covering 2 rounds + game reset + new game with new players
+    test.setTimeout(120000); // 120 seconds (2 minutes)
+
     const { host, beamer, players, audience } = clients;
 
     // ============================================
@@ -485,8 +488,446 @@ test.describe("Game Flow", () => {
       "Round 2: Describe a futuristic parliament.",
     );
 
+    // ============================================
+    // STEP 16: Players submit answers for Round 2
+    // ============================================
+    debugLog("Step 16: Players submitting round 2 answers...");
+
+    // Player 1 submits round 2 answer
+    await players[0].fill(
+      "#answerInput",
+      "A holographic assembly where AI representatives debate alongside humans in a transparent dome.",
+    );
+    await players[0].click("#submitButton");
+    await players[0].waitForSelector("#submittedScreen.active");
+
+    // Player 2 submits round 2 answer
+    await players[1].fill(
+      "#answerInput",
+      "Parliament meets in virtual reality, with instant translation and emotion sensing for all members.",
+    );
+    await players[1].click("#submitButton");
+    await players[1].waitForSelector("#submittedScreen.active");
+
+    // ============================================
+    // STEP 17: Set AI answer and transition through Reveal
+    // ============================================
+    debugLog("Step 17: Setting AI answer and transitioning through reveal...");
+
+    // Set manual AI answer for round 2
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.waitForSelector("#submissions.active");
+    await host.waitForSelector(".submission-card", { timeout: 5000 });
+    // Open the manual AI answer details section - click and ensure it expands
+    const summaryElement = host.locator(
+      'summary:has-text("Manuelle KI-Antwort")',
+    );
+    await summaryElement.click();
+    await host.waitForTimeout(300);
+    // If still not visible, try clicking again (details might need re-toggle)
+    if (!(await host.locator("#manualAiText").isVisible())) {
+      await summaryElement.click();
+      await host.waitForTimeout(300);
+    }
+    await host.waitForSelector("#manualAiText", {
+      state: "visible",
+      timeout: 5000,
+    });
+    await host.fill(
+      "#manualAiText",
+      "Round 2 AI answer: Quantum-networked telepresence pods allow global participation.",
+    );
+    await host.click('button:has-text("Als KI-Antwort speichern")');
+    await host.waitForSelector(".ai-submission-card", { timeout: 5000 });
+    await host.locator(".ai-submission-card").first().click();
+    await host.waitForTimeout(300);
+
+    // Transition to REVEAL
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="REVEAL"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("REVEAL", {
+      timeout: 5000,
+    });
+
+    // Navigate through reveals
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.click('#submissions button:has-text("Weiter")');
+    await host.waitForTimeout(500);
+    await host.click('#submissions button:has-text("Weiter")');
+    await host.waitForTimeout(500);
+
+    // ============================================
+    // STEP 18: Audience votes and transition to Results/Podium
+    // ============================================
+    debugLog("Step 18: Audience voting for round 2...");
+
+    // Transition to VOTING
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="VOTING"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("VOTING", {
+      timeout: 5000,
+    });
+
+    // Audience votes (reusing existing audience pages - no refresh)
+    await audience[0].waitForSelector("#votingScreen.active", {
+      timeout: 5000,
+    });
+    await audience[0].waitForSelector(".answer-option", { timeout: 5000 });
+    await audience[0]
+      .locator("#aiAnswerOptions .answer-option")
+      .first()
+      .click();
+    await audience[0]
+      .locator("#funnyAnswerOptions .answer-option")
+      .last()
+      .click();
+    await audience[0].click("#voteButton");
+    await audience[0].waitForSelector("#confirmedScreen.active", {
+      timeout: 5000,
+    });
+
+    await audience[1].waitForSelector("#votingScreen.active", {
+      timeout: 5000,
+    });
+    await audience[1].waitForSelector(".answer-option", { timeout: 5000 });
+    await audience[1].locator("#aiAnswerOptions .answer-option").last().click();
+    await audience[1]
+      .locator("#funnyAnswerOptions .answer-option")
+      .first()
+      .click();
+    await audience[1].click("#voteButton");
+    await audience[1].waitForSelector("#confirmedScreen.active", {
+      timeout: 5000,
+    });
+
+    // Transition to RESULTS then PODIUM
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="RESULTS"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("RESULTS", {
+      timeout: 5000,
+    });
+
+    await host.click('button[data-phase="PODIUM"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("PODIUM", {
+      timeout: 5000,
+    });
+
+    // ============================================
+    // STEP 19: Verify final scores before reset
+    // ============================================
+    debugLog("Step 19: Verifying final scores before reset...");
+
+    // Navigate to scores panel
+    await host.click('.sidebar-item:has-text("Punkte")');
+    await host.waitForSelector("#scores.active");
+
+    // Store audience display names for later comparison (shown in header)
+    const audience0Name =
+      (await audience[0].locator("#headerDisplayName").textContent()) || "";
+    const audience1Name =
+      (await audience[1].locator("#headerDisplayName").textContent()) || "";
+    debugLog(`Audience names: ${audience0Name}, ${audience1Name}`);
+
+    // Verify player scores exist (they played 2 rounds)
+    await expect(host.locator("#playerScores")).toBeVisible();
+
+    // ============================================
+    // STEP 20: Reset game for new players
+    // ============================================
+    debugLog("Step 20: Resetting game for new players...");
+
+    // Accept confirmation dialog
+    host.on("dialog", (dialog) => dialog.accept());
+
+    // Navigate to game control and reset
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.waitForSelector("#game.active");
+    await host.click('button:has-text("Spiel zurücksetzen")');
+    await host.waitForTimeout(500);
+
+    // Verify phase returns to LOBBY
+    await expect(host.locator("#overviewPhase")).toHaveText("LOBBY", {
+      timeout: 5000,
+    });
+    await waitForBeamerScene(beamer, "sceneLobby");
+
+    // Verify round counter reset
+    await expect(host.locator("#overviewRound")).toHaveText("0");
+
+    // ============================================
+    // STEP 21: Verify old players see token entry screen
+    // ============================================
+    debugLog("Step 21: Verifying old players see token entry screen...");
+
+    // After reset, old player pages will show waitingScreen (stale client state).
+    // To trigger token validation, we reload the pages - this causes reconnection
+    // with the now-invalid token, triggering INVALID_PLAYER_TOKEN error → joinScreen
+    await players[0].reload();
+    await players[1].reload();
+
+    // Old player pages should now show token entry (their tokens are invalid on server)
+    await players[0].waitForSelector("#joinScreen.active", { timeout: 5000 });
+    await players[1].waitForSelector("#joinScreen.active", { timeout: 5000 });
+
+    // Verify token input is visible
+    await expect(players[0].locator("#tokenInput")).toBeVisible();
+    await expect(players[1].locator("#tokenInput")).toBeVisible();
+
+    // Verify error message about invalid token is shown
+    await expect(players[0].locator("#joinError")).toContainText(
+      "Ungültiger Token",
+    );
+    await expect(players[1].locator("#joinError")).toContainText(
+      "Ungültiger Token",
+    );
+
+    // ============================================
+    // STEP 22: Verify prompts still available in pool
+    // ============================================
+    debugLog("Step 22: Verifying prompts functionality after reset...");
+
+    // Navigate to Prompts panel
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+
+    // Add a fresh prompt for the new game
+    await host.fill(
+      "#promptText",
+      "New game prompt: What would a robot's vacation look like?",
+    );
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+
+    // ============================================
+    // STEP 23: Verify audience still connected (no refresh needed)
+    // ============================================
+    debugLog("Step 23: Verifying audience connections survived reset...");
+
+    // Audience should still be on waiting screen (their connections survived the reset)
+    await audience[0].waitForSelector("#waitingScreen.active", {
+      timeout: 5000,
+    });
+    await audience[1].waitForSelector("#waitingScreen.active", {
+      timeout: 5000,
+    });
+
+    // Their display names should persist (shown in header)
+    await expect(audience[0].locator("#headerDisplayName")).toHaveText(
+      audience0Name,
+    );
+    await expect(audience[1].locator("#headerDisplayName")).toHaveText(
+      audience1Name,
+    );
+
+    // ============================================
+    // STEP 24: Test audience page refresh and reconnection
+    // ============================================
+    debugLog("Step 24: Testing audience page refresh and reconnection...");
+
+    // One audience member refreshes their page to test reconnection
+    await audience[0].reload();
+    await audience[0].waitForSelector("#waitingScreen.active", {
+      timeout: 5000,
+    });
+
+    // After reconnection, same display name should be preserved
+    await expect(audience[0].locator("#headerDisplayName")).toHaveText(
+      audience0Name,
+    );
+
+    // ============================================
+    // STEP 25: Create new players and start new game
+    // ============================================
+    debugLog("Step 25: Creating new players for new game...");
+
+    // Create new player tokens
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "2");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    // Wait for tokens to appear AND be fully rendered (not just the container)
+    await host.waitForSelector("#playerTokensList .player-status-card");
+    // Additional wait to ensure server state is synchronized
+    await host.waitForTimeout(500);
+    const newTokens = await getPlayerTokens(host);
+    debugLog(`New tokens: ${newTokens.join(", ")}`);
+    // Verify we got valid tokens
+    expect(newTokens.length).toBe(2);
+    expect(newTokens[0]).toMatch(/^[A-Z0-9]{5}$/);
+    expect(newTokens[1]).toMatch(/^[A-Z0-9]{5}$/);
+
+    // Verify new tokens were created (2 new tokens for the new game)
+    expect(newTokens.length).toBe(2);
+    expect(newTokens[0].length).toBeGreaterThan(0);
+    expect(newTokens[1].length).toBeGreaterThan(0);
+
+    // Verify new tokens show in host UI
+    const tokenCards = await host.locator("#playerTokensList .player-token");
+    await expect(tokenCards).toHaveCount(2);
+
+    // Create fresh browser contexts for new players
+    const charlieContext = await browser.newContext();
+    const dianaContext = await browser.newContext();
+    contexts.push(charlieContext, dianaContext);
+    const charlie = await charlieContext.newPage();
+    const diana = await dianaContext.newPage();
+
+    // Charlie joins with new token
+    await charlie.goto("/player");
+    await charlie.waitForSelector("#tokenInput", { state: "visible" });
+    await charlie.fill("#tokenInput", newTokens[0]);
+    await charlie.click("#joinButton");
+    await charlie.waitForSelector("#registerScreen.active");
+    // Wait for any animations to settle before interacting
+    await charlie.waitForTimeout(500);
+    await charlie.waitForSelector("#registerButton", { state: "visible" });
+    await charlie.fill("#nameInput", "Charlie");
+    await charlie.waitForSelector("#registerButton", { state: "visible" });
+    await charlie.click("#registerButton");
+    await charlie.waitForSelector("#waitingScreen.active");
+
+    // Diana joins with new token
+    await diana.goto("/player");
+    await diana.waitForSelector("#tokenInput", { state: "visible" });
+    await diana.fill("#tokenInput", newTokens[1]);
+    await diana.click("#joinButton");
+    await diana.waitForSelector("#registerScreen.active");
+    // Wait for any animations to settle before interacting
+    await diana.waitForTimeout(500);
+    await diana.waitForSelector("#registerButton", { state: "visible" });
+    await diana.fill("#nameInput", "Diana");
+    await diana.waitForSelector("#registerButton", { state: "visible" });
+    await diana.click("#registerButton");
+    await diana.waitForSelector("#waitingScreen.active");
+
+    // Verify old players (Alice/Bob) are still on joinScreen from step 21
+    await expect(players[0].locator("#joinScreen")).toBeVisible();
+    await expect(players[1].locator("#joinScreen")).toBeVisible();
+
+    // ============================================
+    // STEP 26: Run new game round through voting
+    // ============================================
+    debugLog("Step 26: Running new game round through voting...");
+
+    // Queue and start prompt
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+    });
+    await host.click("#startPromptSelectionBtn");
+    await expect(host.locator("#overviewPhase")).toHaveText("WRITING");
+    await expect(host.locator("#overviewRound")).toHaveText("1"); // Back to round 1!
+
+    // New players submit answers
+    await charlie.waitForSelector("#writingScreen.active");
+    await charlie.fill(
+      "#answerInput",
+      "Robots vacation at server farms, defragmenting their memories.",
+    );
+    await charlie.click("#submitButton");
+    await charlie.waitForSelector("#submittedScreen.active");
+
+    await diana.waitForSelector("#writingScreen.active");
+    await diana.fill(
+      "#answerInput",
+      "A robot vacation involves visiting antique technology museums.",
+    );
+    await diana.click("#submitButton");
+    await diana.waitForSelector("#submittedScreen.active");
+
+    // Set AI answer
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.waitForSelector("#submissions.active");
+    await host.waitForSelector(".submission-card", { timeout: 5000 });
+    const summaryElement2 = host.locator(
+      'summary:has-text("Manuelle KI-Antwort")',
+    );
+    await summaryElement2.click();
+    await host.waitForTimeout(300);
+    // If still not visible, try clicking again (details might need re-toggle)
+    if (!(await host.locator("#manualAiText").isVisible())) {
+      await summaryElement2.click();
+      await host.waitForTimeout(300);
+    }
+    await host.waitForSelector("#manualAiText", {
+      state: "visible",
+      timeout: 5000,
+    });
+    await host.fill(
+      "#manualAiText",
+      "New game AI: Solar panel sunbathing and WiFi meditation retreats.",
+    );
+    await host.click('button:has-text("Als KI-Antwort speichern")');
+    await host.waitForSelector(".ai-submission-card");
+    await host.locator(".ai-submission-card").first().click();
+
+    // Transition through REVEAL to VOTING
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="REVEAL"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("REVEAL");
+
+    await host.click('.sidebar-item:has-text("Antworten")');
+    await host.click('#submissions button:has-text("Weiter")');
+    await host.click('#submissions button:has-text("Weiter")');
+
+    await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
+    await host.click('button[data-phase="VOTING"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("VOTING");
+
+    // Audience votes again
+    await audience[0].waitForSelector("#votingScreen.active");
+    await audience[0]
+      .locator("#aiAnswerOptions .answer-option")
+      .first()
+      .click();
+    await audience[0]
+      .locator("#funnyAnswerOptions .answer-option")
+      .first()
+      .click();
+    await audience[0].click("#voteButton");
+    await audience[0].waitForSelector("#confirmedScreen.active");
+
+    await audience[1].waitForSelector("#votingScreen.active");
+    await audience[1]
+      .locator("#aiAnswerOptions .answer-option")
+      .first()
+      .click();
+    await audience[1]
+      .locator("#funnyAnswerOptions .answer-option")
+      .first()
+      .click();
+    await audience[1].click("#voteButton");
+    await audience[1].waitForSelector("#confirmedScreen.active");
+
+    // ============================================
+    // STEP 27: Verify new game scores are reset
+    // ============================================
+    debugLog("Step 27: Verifying new game scores are reset...");
+
+    // Transition to RESULTS
+    await host.click('button[data-phase="RESULTS"]');
+    await expect(host.locator("#overviewPhase")).toHaveText("RESULTS");
+
+    // Navigate to scores panel
+    await host.click('.sidebar-item:has-text("Punkte")');
+    await host.waitForSelector("#scores.active");
+
+    // Verify new players appear in scores, old players don't
+    const playerScoresText =
+      (await host.locator("#playerScores").textContent()) || "";
+    expect(playerScoresText).not.toContain("Alice");
+    expect(playerScoresText).not.toContain("Bob");
+    expect(playerScoresText).toContain("Charlie");
+    expect(playerScoresText).toContain("Diana");
+
+    // Verify audience scores exist
+    await expect(host.locator("#audienceScores")).toBeVisible();
+
     debugLog(
-      "Full game flow (including PODIUM winner screen and round 2 start) completed successfully!",
+      "Multi-game flow completed! Verified: round 2, game reset, audience persistence, " +
+        "new player registration, new game round, and score isolation.",
     );
   });
 });

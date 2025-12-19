@@ -121,18 +121,24 @@ function updateConnectionStatus(connected, text) {
  * Show/hide screens
  */
 function showScreen(screenId) {
+  const screen = document.getElementById(screenId);
+  if (!screen) {
+    console.warn("Screen not found:", screenId);
+    return;
+  }
+
+  // Don't re-animate if already showing this screen
+  if (screen.classList.contains("active")) {
+    return;
+  }
+
   // Hide all screens
-  document.querySelectorAll(".screen").forEach((screen) => {
-    screen.classList.remove("active");
+  document.querySelectorAll(".screen").forEach((s) => {
+    s.classList.remove("active");
   });
 
   // Show target screen
-  const screen = document.getElementById(screenId);
-  if (screen) {
-    screen.classList.add("active");
-  } else {
-    console.warn("Screen not found:", screenId);
-  }
+  screen.classList.add("active");
 }
 
 /**
