@@ -8,7 +8,7 @@ src/
 ├── main.rs             # Entry point, server setup
 ├── types.rs            # Core type definitions (Game, Round, Player, etc.)
 ├── protocol.rs         # WebSocket message protocol (source of truth for all messages)
-├── auth.rs             # HTTP Basic Authentication for host panel
+├── auth.rs             # HTTP Basic Authentication for host/beamer
 ├── abuse.rs            # Anti-abuse middleware (rate limiting, bot blocking)
 ├── api.rs              # HTTP API endpoints (state export/import)
 ├── broadcast.rs        # Background tasks (vote broadcaster, auto-save, cleanup)
@@ -136,10 +136,10 @@ Audience members get auto-generated friendly names on first connect (e.g., "Happ
 
 All views are static HTML/CSS/JS served from `static/` with WebSocket auto-reconnect.
 
-- **Beamer** (`/beamer`): Full-screen stage display with scenes for all phases, vote bars (2 Hz updates), reveal carousel with TTS, timer countdown, leaderboards
+- **Beamer** (`/beamer`): Full-screen stage display with scenes for all phases, vote bars (2 Hz updates), reveal carousel with TTS, timer countdown, leaderboards. Auth protected.
 - **Player** (`/player`): Mobile interface for token entry, name registration, answer submission with character counter, typo correction flow
 - **Audience** (`/`): Mobile voting interface with two-category ballot, prompt submission, trivia voting, top-3 winner green screen in Podium phase
-- **Host** (`/host`): Desktop control panel with sidebar navigation, real-time status, full game control, panic mode, state export/import
+- **Host** (`/host`): Desktop control panel with sidebar navigation, real-time status, full game control, panic mode, state export/import. Auth protected.
 
 ## Frontend Architecture
 
@@ -156,7 +156,7 @@ View-specific files handle UI logic. Host panel is further modularized into `js/
 ## Security
 
 ### Authentication
-Host panel protected by HTTP Basic Auth via `HOST_USERNAME`/`HOST_PASSWORD` env vars. Credentials validated with constant-time comparison.
+Host panel and beamer display protected by HTTP Basic Auth via `HOST_USERNAME`/`HOST_PASSWORD` env vars. Credentials validated with constant-time comparison. Both HTTP routes and WebSocket connections (`role=host`, `role=beamer`) are protected.
 
 ### Anti-Abuse (src/abuse.rs)
 Applied to `/ws` route only:

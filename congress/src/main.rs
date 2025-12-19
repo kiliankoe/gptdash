@@ -108,9 +108,10 @@ async fn main() {
 
     // Note: Voting deadline is a soft/visual timer; the host advances phases manually.
 
-    // Protected host routes (with HTTP Basic Auth)
+    // Protected host/beamer routes (with HTTP Basic Auth)
     let host_routes = Router::new()
         .route("/host", get(auth::serve_host))
+        .route("/beamer", get(auth::serve_beamer))
         .route("/api/state/export", get(api::export_state))
         .route("/api/state/import", post(api::import_state))
         .route("/api/models", get(api::list_available_models))
@@ -119,10 +120,9 @@ async fn main() {
             auth::host_auth_middleware,
         ));
 
-    // Public page routes (beamer and player)
+    // Public page routes (player only)
     // Block direct .html access - only clean routes should work
     let page_routes = Router::new()
-        .route("/beamer", get(auth::serve_beamer))
         .route("/player", get(auth::serve_player))
         .route("/host.html", get(|| async { StatusCode::NOT_FOUND }))
         .route("/player.html", get(|| async { StatusCode::NOT_FOUND }))

@@ -125,7 +125,7 @@ Tie-breakers: Higher AI-detect points, then earliest correct vote timestamp.
 ## Client Views
 
 - **Host** (`/host`): Desktop control panel with sidebar navigation, real-time status, full game control, panic mode, state export/import. Protected by HTTP Basic Auth.
-- **Beamer** (`/beamer`): Full-screen stage display with scenes for all phases, vote bars, reveal carousel with TTS, timer countdown, leaderboards.
+- **Beamer** (`/beamer`): Full-screen stage display with scenes for all phases, vote bars, reveal carousel with TTS, timer countdown, leaderboards. Protected by HTTP Basic Auth (same credentials as Host).
 - **Player** (`/player`): Mobile interface for token entry, name registration, answer submission with character counter.
 - **Audience** (`/`): Mobile voting interface with two-category ballot, prompt submission, trivia voting.
 

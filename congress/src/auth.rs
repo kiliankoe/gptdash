@@ -167,24 +167,27 @@ fn query_param_equals(request: &Request<Body>, key: &str, expected: &str) -> boo
     false
 }
 
-/// Middleware to require HTTP Basic Auth for host WebSocket connections.
+/// Middleware to require HTTP Basic Auth for host and beamer WebSocket connections.
 ///
-/// This prevents clients from taking over by connecting to `/ws?role=host`.
+/// This prevents clients from taking over by connecting to `/ws?role=host`
+/// or cheating by viewing the beamer display via `/ws?role=beamer`.
 pub async fn host_ws_auth_middleware(
     State(auth_config): State<Arc<AuthConfig>>,
     request: Request<Body>,
     next: Next,
 ) -> Response<Body> {
     let is_host_ws = request.uri().path() == "/ws" && query_param_equals(&request, "role", "host");
+    let is_beamer_ws =
+        request.uri().path() == "/ws" && query_param_equals(&request, "role", "beamer");
 
-    if !is_host_ws {
+    if !is_host_ws && !is_beamer_ws {
         return next.run(request).await;
     }
 
     // If host auth is disabled, keep dev behavior (allow) but log loudly.
     if !auth_config.is_enabled() {
         tracing::warn!(
-            "Host WebSocket requested but host authentication is DISABLED; set HOST_USERNAME and HOST_PASSWORD to prevent host takeover"
+            "Protected WebSocket role requested but host authentication is DISABLED; set HOST_USERNAME and HOST_PASSWORD"
         );
         return next.run(request).await;
     }
