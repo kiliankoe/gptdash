@@ -263,15 +263,14 @@ export function updateOverviewPromptPool() {
       .getElementById("overviewPromptSearchInput")
       ?.value.trim()
       .toLowerCase() ?? "";
-  const sourceFilter =
-    document.getElementById("overviewPromptSourceFilter")?.value ?? "all";
 
   const queuedIds = new Set(gameState.queuedPrompts.map((p) => p.id));
   const queueFull = gameState.queuedPrompts.length >= 3;
 
   const prompts = (gameState.prompts || [])
     .filter((p) => {
-      if (sourceFilter !== "all" && p.source !== sourceFilter) return false;
+      // Only show host prompts on overview
+      if (p.source !== "host") return false;
       if (!query) return true;
       const haystack = `${p.text ?? ""} ${p.image_url ?? ""}`.toLowerCase();
       return haystack.includes(query);

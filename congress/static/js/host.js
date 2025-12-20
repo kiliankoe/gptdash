@@ -75,10 +75,8 @@ import {
   updateSubmissionsList,
 } from "./host/submissions.js";
 import {
-  clearLog,
   copyPlayerUrl,
   generateJoinQRCodes,
-  log,
   showAlert,
   updateCurrentRoundInfo,
   updateScores,
@@ -914,7 +912,6 @@ if (typeof window !== "undefined") {
     executeStateImport,
 
     // Utilities
-    clearLog,
     copyPlayerUrl,
     copyToClipboard,
   });

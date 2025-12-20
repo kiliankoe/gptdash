@@ -3,12 +3,7 @@
  */
 
 import { gameState } from "./state.js";
-import {
-  escapeHtml,
-  formatTime,
-  copyToClipboard,
-  QRCodeManager,
-} from "../common.js";
+import { escapeHtml, copyToClipboard, QRCodeManager } from "../common.js";
 
 /**
  * Update connection status display
@@ -20,11 +15,9 @@ export function updateStatus(connected) {
   if (connected) {
     dot.classList.add("connected");
     text.textContent = "Verbunden";
-    log("Mit Spiel-Server verbunden", "info");
   } else {
     dot.classList.remove("connected");
     text.textContent = "Nicht verbunden";
-    log("Verbindung getrennt", "info");
   }
 }
 
@@ -134,34 +127,6 @@ export function showAlert(message, type = "info") {
   setTimeout(() => {
     container.innerHTML = "";
   }, 5000);
-}
-
-/**
- * Log message to the log panel
- */
-export function log(message, type = "info") {
-  const logDiv = document.getElementById("messageLog");
-  if (!logDiv) return;
-  const entry = document.createElement("div");
-  entry.className = `log-entry ${type}`;
-
-  const timestamp = formatTime();
-  const ts = document.createElement("span");
-  ts.className = "timestamp";
-  ts.textContent = `[${timestamp}]`;
-
-  entry.appendChild(ts);
-  entry.appendChild(document.createTextNode(` ${message}`));
-
-  logDiv.appendChild(entry);
-  logDiv.scrollTop = logDiv.scrollHeight;
-}
-
-/**
- * Clear the message log
- */
-export function clearLog() {
-  document.getElementById("messageLog").innerHTML = "";
 }
 
 /**

@@ -41,7 +41,6 @@
             <button type="button" class="sidebar-item" onclick="showPanel('submissions')">Antworten</button>
             <button type="button" class="sidebar-item" onclick="showPanel('scores')">Punkte</button>
             <button type="button" class="sidebar-item" onclick="showPanel('state')">State-Export</button>
-            <button type="button" class="sidebar-item" onclick="showPanel('logs')">Nachrichten-Log</button>
         </nav>
 
         <!-- Main Content -->
@@ -84,7 +83,6 @@
                             <div class="overview-actions">
                                 <button id="overviewPrimaryActionBtn" class="primary" onclick="runOverviewPrimaryAction()">…</button>
                                 <button id="overviewSecondaryActionBtn" class="secondary" onclick="runOverviewSecondaryAction()">…</button>
-                                <button class="secondary" onclick="showPanel('game')">Erweitert…</button>
                             </div>
                             <div class="overview-hint" id="overviewFlowHint"></div>
                         </div>
@@ -117,7 +115,6 @@
                             <div class="button-group">
                                 <button onclick="addPromptFromOverview(false)" class="secondary">Prompt hinzufügen</button>
                                 <button onclick="addPromptFromOverview(true)" class="primary">+ In Warteschlange</button>
-                                <button onclick="showPanel('prompts')" class="secondary">Erweitert…</button>
                             </div>
 
                             <div class="overview-split">
@@ -129,14 +126,9 @@
                                     <button id="overviewStartPromptSelectionBtn" onclick="startPromptSelection()" style="display: none; margin-top: 10px;" class="primary">▶ Runde starten</button>
                                 </div>
                                 <div>
-                                    <div class="overview-subtitle">Prompt-Pool (Kurzansicht)</div>
+                                    <div class="overview-subtitle">Host-Prompts</div>
                                     <div class="overview-prompt-search">
                                         <input type="text" id="overviewPromptSearchInput" placeholder="Prompts durchsuchen..." oninput="filterOverviewPrompts()">
-                                        <select id="overviewPromptSourceFilter" onchange="filterOverviewPrompts()">
-                                            <option value="all">Alle</option>
-                                            <option value="host">Host</option>
-                                            <option value="audience">Publikum</option>
-                                        </select>
                                     </div>
                                     <div id="overviewPromptPoolList">
                                         <p class="text-secondary">Lade Prompts…</p>
@@ -145,16 +137,6 @@
                             </div>
                         </div>
 
-                        <div class="card">
-                            <div class="card-header">Antworten zeigen (Reveal)</div>
-                            <div class="button-group">
-                                <button onclick="revealPrev()" class="secondary">← Zurück</button>
-                                <button onclick="revealNext()">Weiter →</button>
-                                <button onclick="transitionPhase('VOTING')" class="secondary">→ Abstimmen</button>
-                                <button onclick="showPanel('submissions')" class="secondary">Erweitert…</button>
-                            </div>
-                            <div class="overview-muted" id="overviewRevealStatus"></div>
-                        </div>
                     </div>
 
                     <div class="overview-side">
@@ -163,7 +145,6 @@
                             <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
                                 <input type="number" id="overviewPlayerCount" value="3" min="1" max="10" style="max-width: 100px; margin-bottom: 0;">
                                 <button onclick="hostCreatePlayersFromOverview()">Spieler erstellen</button>
-                                <button onclick="showPanel('players')" class="secondary">Erweitert…</button>
                             </div>
                             <div id="overviewPlayerTokensList">
                                 <p class="text-secondary">Noch keine Spieler erstellt</p>
@@ -536,17 +517,6 @@
                 </div>
             </div>
 
-            <!-- Logs Panel -->
-            <div class="panel" id="logs">
-                <h2>Nachrichten-Log</h2>
-
-                <div class="card">
-                    <button onclick="clearLog()" class="secondary">Log leeren</button>
-                    <div id="messageLog" class="log" class="mt-15">
-                        <!-- Log entries will appear here -->
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
