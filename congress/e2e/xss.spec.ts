@@ -67,9 +67,12 @@ test.describe("XSS Prevention", () => {
 
     // Expand the prompt submission section (it's collapsed by default)
     await audience[0].click('[data-action="togglePromptSubmission"]');
-    await audience[0].waitForSelector("#promptSubmissionContent:not(.collapsed)", {
-      timeout: 2000,
-    });
+    await audience[0].waitForSelector(
+      "#promptSubmissionContent:not(.collapsed)",
+      {
+        timeout: 2000,
+      },
+    );
 
     // Find and fill the prompt input field
     await audience[0].fill("#promptInput", XSS_PAYLOAD);

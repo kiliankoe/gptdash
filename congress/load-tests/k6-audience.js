@@ -86,13 +86,13 @@ export default function () {
       }
 
       if (!data) {
-        log("not valid data?")
+        log("not valid data?");
         return;
       }
 
       if (data.t === "vote_challenge") {
         nonce = data.nonce;
-        log("Updated nonce to " + nonce)
+        log("Updated nonce to " + nonce);
       }
 
       if (data.t === "submissions") {
@@ -112,22 +112,20 @@ export default function () {
           msg_id: "msg_" + randomString(12),
           challenge_nonce: nonce,
           challenge_response: sha256(nonce + token, "hex").slice(0, 16),
-          is_webdriver: false
+          is_webdriver: false,
         };
 
         const delayMs = Math.floor(500 + Math.random() * 10001); // 0..10000 ms
-        sleep(delayMs / 1000)
-          try {
-            socket.send(JSON.stringify(vote));
-            log(
-              `VU ${__VU} sent vote after ${delayMs}ms: ${JSON.stringify(
-                vote
-              )}`,
-              1
-            );
-          } catch (e) {
-            console.error(`VU ${__VU} failed to send vote:`, e);
-          }
+        sleep(delayMs / 1000);
+        try {
+          socket.send(JSON.stringify(vote));
+          log(
+            `VU ${__VU} sent vote after ${delayMs}ms: ${JSON.stringify(vote)}`,
+            1,
+          );
+        } catch (e) {
+          console.error(`VU ${__VU} failed to send vote:`, e);
+        }
 
         // send vote back; use socket.send or socket.send(JSON.stringify(vote)) depending on server expectations
         // try {
