@@ -135,6 +135,41 @@ export default function () {
         //   console.error(`VU ${__VU} failed to send vote:`, e);
         // }
       }
+
+      if (data.t === "trivia_question") {
+        // Pick two random (distinct if possible) submission ids
+        const n = data.choices.length;
+        const idxA = biasedIndexByPower(n, 2);
+
+        const vote = {
+          t: "submit_trivia_vote",
+          voter_token: token,
+          choice_index: idxA,
+          is_webdriver: false,
+        };
+
+        const delayMs = Math.floor(500 + Math.random() * 10001); // 0..10000 ms
+        sleep(delayMs / 1000)
+          try {
+            socket.send(JSON.stringify(vote));
+            log(
+              `VU ${__VU} sent vote after ${delayMs}ms: ${JSON.stringify(
+                vote
+              )}`,
+              1
+            );
+          } catch (e) {
+            console.error(`VU ${__VU} failed to send vote:`, e);
+          }
+
+        // send vote back; use socket.send or socket.send(JSON.stringify(vote)) depending on server expectations
+        // try {
+        //   socket.send(JSON.stringify(vote));
+        //   log(`VU ${__VU} sent vote: ${JSON.stringify(vote)}`, 1);
+        // } catch (e) {
+        //   console.error(`VU ${__VU} failed to send vote:`, e);
+        // }
+      }
     });
 
     socket.on("error", (e) => {
