@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPTDash - 39C3 Power Cycles</title>
+    <link rel="stylesheet" href="/css/audience.css">
+</head>
+
+<body>
+    <div class="audience-container">
+        <!-- Header Bar -->
+        <header class="header-bar">
+            <div class="header-left">
+                <img src="/img/manekineko.gif" alt="" role="presentation" class="header-mascot">
+                <div class="header-logo">39C3</div>
+            </div>
+            <div class="header-right">
+                <span class="header-display-name" id="headerDisplayName" style="display: none;"></span>
+                <div class="status-badge">
+                    <div class="status-dot" id="statusDot" role="status" aria-label="Verbindungsstatus"></div>
+                    <span id="statusText">Verbinde...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <main class="content">
+            <!-- Welcome Screen -->
+            <div class="screen active" id="welcomeScreen">
+                <div class="welcome-title">
+                    <span class="power">GPT</span>
+                    <span class="cycles">Dash</span>
+                </div>
+                <div class="card">
+                    <h2>Willkommen!</h2>
+                    <p>Du bist gleich bei GPTDash dabei, dem Spiel, bei dem Spieler versuchen, eine KI zu imitieren.</p>
+                    <p>Deine Aufgabe: Finde heraus, welche Antwort die echte KI ist!</p>
+
+                    <button data-action="joinAudience" id="joinButton">Mitmachen</button>
+
+                    <div id="welcomeError" class="error-message" style="display: none;"></div>
+
+                    <div class="help-text">
+                        Du kannst bei jeder Runde abstimmen und um den besten Publikums-Score kämpfen!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Waiting Screen -->
+            <div class="screen" id="waitingScreen">
+                <div class="card">
+                    <div class="waiting-content">
+                        <div class="waiting-icon" id="waitingIcon">&#x23F3;</div>
+                        <h3 id="waitingTitle">Warte auf die nächste Runde...</h3>
+                        <p id="waitingMessage">Schau auf die große Leinwand!</p>
+                    </div>
+                </div>
+
+                <!-- Prompt Submission Section -->
+                <div class="card prompt-submission-card" id="promptSubmissionCard">
+                    <div class="prompt-submission-header" data-action="togglePromptSubmission">
+                        <h3>&#x1F4A1; Prompt vorschlagen</h3>
+                        <span class="toggle-icon collapsed" id="promptToggleIcon">&#x25BC;</span>
+                    </div>
+                    <div class="prompt-submission-content collapsed" id="promptSubmissionContent">
+                        <p>Schlage eine Prompt vor!</p>
+                        <textarea id="promptInput" placeholder="" maxlength="200" rows="3"></textarea>
+                        <div class="prompt-char-count">
+                            <span id="promptCharCount">0</span>/200
+                        </div>
+                        <button data-action="submitPrompt" id="submitPromptButton">Vorschlagen</button>
+                        <div id="promptError" class="error-message" style="display: none;"></div>
+                        <div id="promptSuccess" class="success-message" style="display: none;">
+                            &#x2705; Prompt wurde vorgeschlagen!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trivia Voting Screen -->
+            <div class="screen" id="triviaScreen">
+                <div class="card">
+                    <h2>&#x1F3AF; Trivia</h2>
+                    <div class="trivia-question-text" id="triviaQuestionText">
+                        Trivia-Frage wird geladen...
+                    </div>
+
+                    <div class="trivia-options" id="triviaOptions">
+                        <!-- Trivia options will be inserted here -->
+                    </div>
+
+                    <div id="triviaError" class="error-message" style="display: none;"></div>
+
+                    <div class="help-text">
+                        Waehle die richtige Antwort!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trivia Vote Confirmed Screen -->
+            <div class="screen" id="triviaConfirmedScreen">
+                <div class="card">
+                    <div class="success-content">
+                        <div class="success-icon">&#x2705;</div>
+                        <h3>Trivia-Stimme abgegeben!</h3>
+                        <p>Deine Antwort wurde gespeichert.</p>
+                        <p id="triviaVoteSummary" class="text-center" style="margin-top: 10px; font-style: italic;"></p>
+
+                        <button data-action="changeTriviaVote" class="secondary">Antwort aendern</button>
+
+                        <div class="help-text">
+                            Warte auf die Aufloesung...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trivia Result Screen -->
+            <div class="screen" id="triviaResultScreen">
+                <div class="card">
+                    <h2>&#x1F3AF; Trivia Ergebnis</h2>
+                    <div class="trivia-question-text" id="triviaResultQuestionText">
+                        Trivia-Frage...
+                    </div>
+
+                    <div class="trivia-result-options" id="triviaResultOptions">
+                        <!-- Result options will be inserted here -->
+                    </div>
+
+                    <div class="trivia-total-votes" id="triviaResultTotal">
+                        Gesamt: 0 Stimmen
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prompt Voting Screen -->
+            <div class="screen" id="promptVotingScreen">
+                <div class="card">
+                    <h2>&#x1F4AC; Wähle einen Prompt!</h2>
+                    <p class="text-center mb-16">Für welchen Prompt soll gespielt werden?</p>
+
+                    <div class="prompt-options" id="promptOptions">
+                        <!-- Prompt options will be inserted here -->
+                    </div>
+
+                    <button data-action="submitPromptVote" id="promptVoteButton" disabled>Abstimmen</button>
+
+                    <div id="promptVoteError" class="error-message" style="display: none;"></div>
+
+                    <div class="help-text">
+                        Stimme für den Prompt ab, der gespielt werden soll!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prompt Vote Confirmed Screen -->
+            <div class="screen" id="promptVoteConfirmedScreen">
+                <div class="card">
+                    <div class="success-content">
+                        <div class="success-icon">&#x2705;</div>
+                        <h3>Stimme abgegeben!</h3>
+                        <p>Deine Prompt-Wahl wurde gespeichert.</p>
+                        <p id="promptVoteSummary" class="text-center" style="margin-top: 10px; font-style: italic;"></p>
+
+                        <button data-action="changePromptVote" class="secondary">Stimme ändern</button>
+
+                        <div class="help-text">
+                            Warte auf die Auswahl des Gewinners...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Voting Screen -->
+            <div class="screen" id="votingScreen">
+                <div class="card" id="votingContent">
+                    <h2>Gib deine Stimme ab</h2>
+                    <div style="text-align: center; margin-bottom: 15px;">
+                        <span style="font-size: 2em; font-family: monospace; font-weight: bold;"
+                            id="audienceTimer">--:--</span>
+                    </div>
+                    <p class="text-center mb-16">Wähle eine Antwort pro Kategorie</p>
+
+                    <div class="vote-section">
+                        <h3>
+                            <span class="icon">&#x1F916;</span>
+                            <span class="text-primary">Welche Antwort ist die KI?</span>
+                        </h3>
+                        <div class="answer-options" id="aiAnswerOptions">
+                            <!-- Answer options will be inserted here -->
+                        </div>
+                    </div>
+
+                    <div class="vote-section">
+                        <h3>
+                            <span class="icon">&#x1F602;</span>
+                            <span class="text-secondary">Welche ist am lustigsten?</span>
+                        </h3>
+                        <div class="answer-options" id="funnyAnswerOptions">
+                            <!-- Answer options will be inserted here -->
+                        </div>
+                    </div>
+
+                    <div class="vote-warning">Du kannst nur einmal abstimmen!</div>
+
+                    <button data-action="submitVote" id="voteButton" disabled>Abstimmen</button>
+
+                    <div id="voteError" class="error-message" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Vote Confirmed Screen -->
+            <div class="screen" id="confirmedScreen">
+                <div class="card">
+                    <div class="success-content">
+                        <div class="success-icon">&#x2705;</div>
+                        <h3>Stimme abgegeben!</h3>
+                        <p>Deine Stimme wurde gespeichert.</p>
+
+                        <div class="vote-summary">
+                            <div class="vote-summary-item">
+                                <span class="label">KI-Wahl:</span>
+                                <span class="value" id="summaryAiPick">Antwort ?</span>
+                            </div>
+                            <div class="vote-summary-item">
+                                <span class="label">Lustigste:</span>
+                                <span class="value" id="summaryFunnyPick">Antwort ?</span>
+                            </div>
+                        </div>
+
+                        <div class="help-text">
+                            Warte auf die Auflösung!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Screen -->
+            <div class="screen" id="resultsScreen">
+                <div class="card">
+                    <div class="results-content">
+                        <div class="results-icon">&#x1F4CA;</div>
+                        <h3>Auflösung kommt gleich</h3>
+                        <p>Schau auf die große Leinwand für die Auflösung!</p>
+                    </div>
+
+                    <div id="winnerBadge" style="display: none;">
+                        <div class="winner-badge">
+                            <div class="icon">&#x1F3C6;</div>
+                            <h3>Top-Detektiv!</h3>
+                            <p>Du hast die KI richtig erkannt!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Winner Fullscreen (Top 3 in PODIUM phase) -->
+            <div class="screen winner-fullscreen" id="winnerFullscreen">
+                <div class="winner-pulse-container">
+                    <div class="winner-trophy">&#x1F3C6;</div>
+                    <h1>TOP 3!</h1>
+                    <p>Halte dein Handy hoch!</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="/js/audience.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPTDash - Player</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/player.css">
+</head>
+
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>GPTDash</h1>
+            <div class="subtitle">Spieler-Portal</div>
+        </div>
+
+        <div class="status-indicator">
+            <div class="status-dot" id="statusDot" role="status" aria-label="Verbindungsstatus"></div>
+            <div class="status-text" id="statusText">Verbinden...</div>
+        </div>
+
+        <!-- Join Screen -->
+        <div class="screen active" id="joinScreen">
+            <div class="card">
+                <h2>Ab ins Spiel</h2>
+                <p style="margin-bottom: 20px; opacity: 0.9;">Gib den Spieler-Token ein, den du vom Host bekommen hast.</p>
+
+                <input type="text" id="tokenInput" placeholder="Spieler-Token eingeben"
+                    style="text-transform: uppercase; font-family: monospace;">
+
+                <button data-action="joinGame" id="joinButton">Los geht's</button>
+
+                <div id="joinError" class="error-message" style="display: none;"></div>
+
+                <div class="help-text">
+                    Token-Format: player_XXXX
+                </div>
+            </div>
+        </div>
+
+        <!-- Register Name Screen -->
+        <div class="screen" id="registerScreen">
+            <div class="card">
+                <h2>Wähle deinen Namen</h2>
+                <p style="margin-bottom: 20px; opacity: 0.9;">So wirst du auf der Bestenliste angezeigt.</p>
+
+                <input type="text" id="nameInput" placeholder="Deinen Namen eingeben" maxlength="30">
+
+                <button data-action="registerName" id="registerButton">Weiter</button>
+
+                <div id="registerError" class="error-message" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Waiting Screen -->
+        <div class="screen" id="waitingScreen">
+            <div class="card">
+                <div class="waiting-message">
+                    <div class="icon">⏳</div>
+                    <h3>Warte auf Spielstart...</h3>
+                    <p class="mt-10">Der Host startet gleich die nächste Runde.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Writing Screen -->
+        <div class="screen" id="writingScreen">
+            <div class="card">
+                <h2>Deine Antwort</h2>
+
+                <div class="timer-display" id="playerTimerContainer" style="text-align: center; margin-bottom: 15px;">
+                    <span style="font-size: 2em; font-family: monospace; font-weight: bold;" id="playerTimer">--:--</span>
+                </div>
+
+                <div class="prompt-display">
+                    <div class="label">Prompt</div>
+                    <div id="promptImage" class="prompt-image" style="display: none;"></div>
+                    <div id="promptText">Laden...</div>
+                </div>
+
+                <textarea id="answerInput" placeholder="Schreib deine Antwort hier... Mach's überzeugend!"
+                    maxlength="500"></textarea>
+
+                <div class="char-counter" id="charCounter">0 / 500</div>
+
+                <button data-action="submitAnswer" id="submitButton">Absenden</button>
+
+                <div id="submitError" class="error-message" style="display: none;"></div>
+
+                <div class="help-text">
+                    Du kannst deine Antwort ändern, bis die Zeit um ist!
+                </div>
+            </div>
+        </div>
+
+        <!-- Submitted Screen -->
+        <div class="screen" id="submittedScreen">
+            <div class="card">
+                <div class="success-message">
+                    <div class="icon">✅</div>
+                    <h3>Antwort abgeschickt!</h3>
+                    <p>Deine Antwort wurde gespeichert. Du kannst sie noch ändern, wenn du möchtest.</p>
+
+                    <button data-action="editAnswer" style="margin-top: 20px;">Antwort ändern</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Typo Check Screen -->
+        <div class="screen" id="typoCheckScreen">
+            <div class="card">
+                <h2>Korrekturvorschlag</h2>
+                <p class="typo-intro">Wir haben mögliche Verbesserungen gefunden:</p>
+
+                <div class="comparison-container">
+                    <div class="comparison-box original">
+                        <div class="comparison-label">Deine Eingabe</div>
+                        <div class="comparison-text" id="originalText"></div>
+                    </div>
+
+                    <div class="comparison-arrow">→</div>
+
+                    <div class="comparison-box corrected">
+                        <div class="comparison-label">Korrigiert</div>
+                        <div class="comparison-text" id="correctedText"></div>
+                    </div>
+                </div>
+
+                <div id="typoError" class="error-message" style="display: none;"></div>
+
+                <div class="button-group">
+                    <button data-action="acceptCorrection" class="primary">Korrektur übernehmen</button>
+                    <button data-action="rejectCorrection" class="secondary">Original behalten</button>
+                </div>
+
+                <button data-action="editManually" class="text-button">Selbst bearbeiten</button>
+            </div>
+        </div>
+
+        <!-- Locked Screen (after writing phase ends) -->
+        <div class="screen" id="lockedScreen">
+            <div class="card">
+                <div class="waiting-message">
+                    <div class="icon">🔒</div>
+                    <h3>Zeit abgelaufen!</h3>
+                    <p class="mt-10">Schau auf die große Leinwand für die Auflösung!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module" src="/js/player.js"></script>
+</body>
+
+</html>

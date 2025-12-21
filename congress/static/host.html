@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPTDash - Host Control Panel</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/host.css">
+    <script src="/js/qrcode.min.js"></script>
+</head>
+
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>GPTDash Host-Kontrollzentrum</h1>
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot" id="statusDot" role="status" aria-label="Verbindungsstatus"></div>
+                <span id="statusText">Nicht verbunden</span>
+            </div>
+            <div class="status-item">
+                <span id="phaseDisplay">Phase: LOBBY</span>
+            </div>
+            <div class="status-item">
+                <span id="roundDisplay">Runde: 0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar" aria-label="Host-Navigation">
+            <button type="button" class="sidebar-item active" onclick="showPanel('overview')">Übersicht</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('game')">Spiel-Steuerung</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('players')">Spieler</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('prompts')">Prompts</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('trivia')">Trivia</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('submissions')">Antworten</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('scores')">Punkte</button>
+            <button type="button" class="sidebar-item" onclick="showPanel('state')">State-Export</button>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="main">
+            <!-- Overview Panel -->
+            <div class="panel active" id="overview">
+                <h2>Übersicht</h2>
+
+                <div class="overview-grid">
+                    <div class="overview-main">
+                        <div class="card">
+                            <div class="card-header">Spielverlauf</div>
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <div class="label">Aktuelle Phase</div>
+                                    <div class="value" id="overviewPhase">LOBBY</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="label">Runde</div>
+                                    <div class="value" id="overviewRound">0</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="label">Spieler</div>
+                                    <div class="value" id="overviewPlayers">0</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="label">Antworten</div>
+                                    <div class="value" id="overviewSubmissions">0</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="label">Spieler verbunden</div>
+                                    <div class="value" id="connectedPlayers">0</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="label">Publikum verbunden</div>
+                                    <div class="value" id="connectedAudience">0</div>
+                                </div>
+                            </div>
+
+                            <div class="overview-actions">
+                                <button id="overviewPrimaryActionBtn" class="primary" onclick="runOverviewPrimaryAction()">…</button>
+                                <button id="overviewSecondaryActionBtn" class="secondary" onclick="runOverviewSecondaryAction()">…</button>
+                            </div>
+                            <div class="overview-hint" id="overviewFlowHint"></div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">Aktuelle Runde & Timer</div>
+                            <div id="overviewCurrentRoundInfo" class="mb-10">
+                                <p class="text-secondary">Keine aktive Runde. Füge einen Prompt hinzu und starte eine Runde.</p>
+                            </div>
+                            <div class="overview-timer-row">
+                                <span>Verbleibend: <strong id="hostTimer" style="font-size: 1.5em; font-family: monospace;">--:--</strong></span>
+                                <div class="button-group" style="margin: 0;">
+                                    <button onclick="extendTimer(10)" class="secondary">+10 Sekunden</button>
+                                    <button onclick="closeWriting()" class="secondary">Schreib-Phase beenden</button>
+                                </div>
+                            </div>
+                            <p class="overview-muted">Timer gilt für Schreiben/Abstimmen. Abstimmen wechselt automatisch zur Auflösung.</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">Prompts (Normal-Flow)</div>
+                            <textarea id="overviewPromptText" placeholder="Prompt-Text eingeben (oder nur Bild)..." class="mb-10"></textarea>
+                            <details class="my-10">
+                                <summary style="cursor: pointer; opacity: 0.8;">Bild hinzufügen (Multimodal)</summary>
+                                <div class="mt-10">
+                                    <input type="url" id="overviewPromptImageUrl" placeholder="https://example.com/image.png" style="width: 100%; margin-bottom: 10px;">
+                                    <div id="overviewPromptImagePreview" style="margin-bottom: 10px; text-align: center;"></div>
+                                </div>
+                            </details>
+                            <div class="button-group">
+                                <button onclick="addPromptFromOverview(false)" class="secondary">Prompt hinzufügen</button>
+                                <button onclick="addPromptFromOverview(true)" class="primary">+ In Warteschlange</button>
+                            </div>
+
+                            <div class="overview-split">
+                                <div>
+                                    <div class="overview-subtitle">Warteschlange (max. 3)</div>
+                                    <div id="overviewQueuedPromptsList">
+                                        <p class="text-secondary">Keine Prompts in der Warteschlange.</p>
+                                    </div>
+                                    <button id="overviewStartPromptSelectionBtn" onclick="startPromptSelection()" style="display: none; margin-top: 10px;" class="primary">▶ Runde starten</button>
+                                </div>
+                                <div>
+                                    <div class="overview-subtitle">Host-Prompts</div>
+                                    <div class="overview-prompt-search">
+                                        <input type="text" id="overviewPromptSearchInput" placeholder="Prompts durchsuchen..." oninput="filterOverviewPrompts()">
+                                    </div>
+                                    <div id="overviewPromptPoolList">
+                                        <p class="text-secondary">Lade Prompts…</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="overview-side">
+                        <div class="card">
+                            <div class="card-header">Spieler</div>
+                            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                                <input type="number" id="overviewPlayerCount" value="3" min="1" max="10" style="max-width: 100px; margin-bottom: 0;">
+                                <button onclick="hostCreatePlayersFromOverview()">Spieler erstellen</button>
+                            </div>
+                            <div id="overviewPlayerTokensList">
+                                <p class="text-secondary">Noch keine Spieler erstellt</p>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">Spieler beitreten lassen</div>
+                            <div style="text-align: center; padding: 20px;">
+                                <div id="playerQRCode" style="display: inline-block; margin-bottom: 15px;"></div>
+                                <div style="font-size: 18px; font-weight: bold;" id="playerJoinUrl">Laden...</div>
+                                <button onclick="copyPlayerUrl()" class="mt-10">URL kopieren</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="overviewAlert"></div>
+            </div>
+
+            <!-- Game Control Panel -->
+            <div class="panel" id="game">
+                <h2>Spiel-Steuerung</h2>
+
+                <div class="card">
+                    <div class="card-header">Phasen-Übergänge</div>
+                    <div class="phase-selector" id="phaseButtons">
+                        <button data-phase="LOBBY" onclick="transitionPhase('LOBBY')">Lobby</button>
+                        <button data-phase="WRITING" onclick="transitionPhase('WRITING')">Schreiben</button>
+                        <button data-phase="REVEAL" onclick="transitionPhase('REVEAL')">Antworten zeigen</button>
+                        <button data-phase="VOTING" onclick="transitionPhase('VOTING')">Abstimmen</button>
+                        <button data-phase="RESULTS" onclick="transitionPhase('RESULTS')">Auflösung</button>
+                        <button data-phase="PODIUM" onclick="transitionPhase('PODIUM')">Siegerehrung</button>
+                        <button data-phase="INTERMISSION" onclick="transitionPhase('INTERMISSION')">Pause</button>
+                        <button data-phase="ENDED" onclick="transitionPhase('ENDED')" class="danger">Spiel beenden</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Notfall-Steuerung</div>
+                    <div class="button-group">
+                        <button class="secondary" onclick="transitionPhase('INTERMISSION')">Pause</button>
+                        <button class="danger" onclick="resetGame()">Spiel zurücksetzen</button>
+                    </div>
+                    <div class="button-group mt-10">
+                        <button class="secondary" onclick="clearPromptPool()">Prompt-Pool leeren</button>
+                        <button class="secondary" onclick="clearAudienceMembers()">Publikum-Daten leeren</button>
+                    </div>
+                    <p style="opacity: 0.6; font-size: 0.9em; margin-top: 8px;">"Spiel zurücksetzen" behält Prompts und Publikum. "Publikum-Daten leeren" gibt Speicher frei (für Abendende).</p>
+                </div>
+
+                <div class="card" style="border: 2px solid #ff4444;">
+                    <div class="card-header" style="color: #ff4444;">PANIK-MODUS</div>
+                    <p style="opacity: 0.8; margin-bottom: 10px;">
+                        Deaktiviert alle Publikums-Abstimmungen. Das Publikum stimmt dann analog ab (z.B. durch Klatschen),
+                        und du wählst die Gewinner manuell aus.
+                    </p>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                        <span>Status: <strong id="panicStatus">Inaktiv</strong></span>
+                    </div>
+                    <button id="panicModeBtn" class="danger" onclick="togglePanicMode()">PANIK-MODUS aktivieren</button>
+
+                    <div id="manualWinnerSection" style="display: none; margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <h4 class="mb-10">Manuelle Gewinner-Auswahl</h4>
+                        <p style="opacity: 0.8; margin-bottom: 10px;">Wähle die Gewinner basierend auf dem Applaus des Publikums.</p>
+                        <div id="manualWinnerButtons">
+                            <!-- Will be populated with submission buttons when submissions exist -->
+                            <p class="text-secondary">Antworten werden hier angezeigt, sobald verfügbar.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Players Panel -->
+            <div class="panel" id="players">
+                <h2>Spieler-Verwaltung</h2>
+
+                <div class="card">
+                    <div class="card-header">Spieler erstellen</div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                        <input type="number" id="playerCount" value="3" min="1" max="10"
+                            style="max-width: 100px; margin-bottom: 0;">
+                        <button onclick="hostCreatePlayersCustom()">Spieler erstellen</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Spieler-Tokens</div>
+                    <div id="playerTokensList">
+                        <p class="text-secondary">Noch keine Spieler erstellt</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prompts Panel -->
+            <div class="panel" id="prompts">
+                <h2>Prompt-Verwaltung</h2>
+
+                <!-- Stats Dashboard -->
+                <div class="card prompt-stats-card">
+                    <div class="card-header">Pool-Statistiken</div>
+                    <div class="prompt-stats">
+                        <div class="stat-item">
+                            <span class="stat-value" id="promptStatTotal">0</span>
+                            <span class="stat-label">Gesamt</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="promptStatHost">0</span>
+                            <span class="stat-label">Host</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="promptStatAudience">0</span>
+                            <span class="stat-label">Publikum</span>
+                        </div>
+                    </div>
+                    <div id="topSubmittersSection" style="margin-top: 15px; display: none;">
+                        <div style="font-size: 0.85em; opacity: 0.7; margin-bottom: 8px;">Top-Einreicher:</div>
+                        <div id="topSubmittersList" class="top-submitters-list"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Prompt hinzufügen</div>
+                    <textarea id="promptText" placeholder="Gib hier deinen Prompt ein..."></textarea>
+                    <details class="my-10">
+                        <summary style="cursor: pointer; opacity: 0.8;">Bild hinzufügen (Multimodal)</summary>
+                        <div class="mt-10">
+                            <p style="opacity: 0.7; font-size: 0.9em; margin-bottom: 10px;">
+                                Füge eine Bild-URL hinzu für eine multimodale Runde. Das Bild wird auf Beamer und Player-Geräten angezeigt.
+                            </p>
+                            <input type="url" id="promptImageUrl" placeholder="https://example.com/image.png" style="width: 100%; margin-bottom: 10px;">
+                            <div id="promptImagePreview" style="margin-bottom: 10px; text-align: center;"></div>
+                        </div>
+                    </details>
+                    <button onclick="addPrompt()">Prompt hinzufügen</button>
+                </div>
+
+                <div class="card" style="border: 2px solid #51cf66;">
+                    <div class="card-header" style="color: #51cf66;">Warteschlange für nächste Runde (max. 3)</div>
+                    <div id="queuedPromptsList">
+                        <p class="text-secondary">Keine Prompts in der Warteschlange. Wähle Prompts aus dem Pool.</p>
+                    </div>
+                    <button id="startPromptSelectionBtn" onclick="startPromptSelection()" style="display: none; margin-top: 15px; background: #51cf66;" class="primary">▶ Runde starten</button>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="card">
+                    <div class="card-header">Prompt-Pool</div>
+                    <div class="prompt-search-bar">
+                        <input type="text" id="promptSearchInput" placeholder="Prompts durchsuchen..." oninput="filterPrompts()">
+                        <button onclick="pickRandomPrompt()" class="secondary" title="Zufälligen Prompt in Warteschlange">🎲</button>
+                    </div>
+
+                    <!-- Host Prompts Section -->
+                    <div class="prompt-section">
+                        <div class="prompt-section-header" onclick="togglePromptSection('hostPrompts')">
+                            <span>📝 Host-Prompts (<span id="hostPromptsCount">0</span>)</span>
+                            <span class="section-toggle" id="hostPromptsToggle">▼</span>
+                        </div>
+                        <div id="hostPromptsList" class="prompt-section-content">
+                            <p class="no-prompts-hint">Keine Host-Prompts</p>
+                        </div>
+                    </div>
+
+                    <!-- Audience Prompts Section (collapsible) -->
+                    <div class="prompt-section">
+                        <div class="prompt-section-header" onclick="togglePromptSection('audiencePrompts')">
+                            <span>👥 Publikums-Vorschläge (<span id="audiencePromptsCount">0</span>)</span>
+                            <span class="section-toggle" id="audiencePromptsToggle">▼</span>
+                        </div>
+                        <div id="audiencePromptsList" class="prompt-section-content">
+                            <p class="no-prompts-hint">Keine Publikums-Prompts</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trivia Panel -->
+            <div class="panel" id="trivia">
+                <h2>Trivia-Verwaltung</h2>
+
+                <!-- Active Trivia Controls -->
+                <div class="card" id="activeTriviaCard" style="border: 2px solid #ffd43b; display: none;">
+                    <div class="card-header" style="color: #ffd43b;">Aktive Trivia-Frage</div>
+                    <div id="activeTriviaQuestion" class="mb-15">
+                        <p style="font-size: 1.1em; font-weight: bold;" id="activeTriviaText"></p>
+                        <div id="activeTriviaChoices" class="mt-10"></div>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <span>Stimmen: <strong id="activeTriviaVoteCount">0</strong></span>
+                    </div>
+                    <div class="button-group">
+                        <button onclick="resolveTrivia()" class="primary">Aufloesen (Ergebnis zeigen)</button>
+                        <button onclick="clearTrivia()" class="secondary">Ausblenden (ohne Ergebnis)</button>
+                    </div>
+                </div>
+
+                <!-- Trivia Result Controls (after resolving) -->
+                <div class="card" id="triviaResultCard" style="border: 2px solid #40c057; display: none;">
+                    <div class="card-header" style="color: #40c057;">Trivia-Ergebnis wird angezeigt</div>
+                    <p class="mb-15">Das Ergebnis der Trivia-Frage wird gerade auf dem Beamer und bei den Zuschauern angezeigt.</p>
+                    <button onclick="clearTriviaResult()" class="secondary">Ergebnis ausblenden</button>
+                </div>
+
+                <!-- Add Question Form -->
+                <div class="card">
+                    <div class="card-header">Trivia-Frage hinzufuegen</div>
+                    <div class="mb-15">
+                        <label class="form-label-bold">Frage:</label>
+                        <textarea id="triviaQuestionText" placeholder="Gib hier die Trivia-Frage ein..." style="min-height: 60px;"></textarea>
+                    </div>
+
+                    <div class="mb-15">
+                        <label style="display: block; margin-bottom: 10px; font-weight: bold;">Antworten (2-4, markiere die richtige):</label>
+                        <div id="triviaChoicesContainer"></div>
+                        <button type="button" id="addTriviaChoiceBtn" onclick="addTriviaChoice()" style="margin-top: 8px; padding: 5px 10px; font-size: 0.9em;">+ Antwort hinzufuegen</button>
+                    </div>
+
+                    <button onclick="addTriviaQuestion()">Frage hinzufuegen</button>
+                </div>
+
+                <!-- Question List -->
+                <div class="card">
+                    <div class="card-header">Trivia-Fragen (<span id="triviaQuestionCount">0</span>)</div>
+                    <p style="opacity: 0.7; font-size: 0.9em; margin-bottom: 15px;">
+                        Trivia-Fragen koennen waehrend der WRITING-Phase praesentiert werden, um das Publikum zu unterhalten.
+                    </p>
+                    <div id="triviaQuestionsList">
+                        <p class="text-secondary">Noch keine Trivia-Fragen vorhanden. Fuege oben eine hinzu.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submissions Panel -->
+            <div class="panel" id="submissions">
+                <h2>Antworten</h2>
+
+                <div class="card" style="border: 2px solid #4dabf7;">
+                    <div class="card-header" style="color: #4dabf7;">KI-Antwort Verwaltung</div>
+
+                    <!-- Model selector -->
+                    <div class="mb-15">
+                        <label for="modelSelector" class="form-label-bold">KI-Modell:</label>
+                        <select id="modelSelector" onchange="setSelectedModel(this.value)" class="w-full">
+                            <option value="">Alle Provider (Standard)</option>
+                            <!-- Options populated dynamically from /api/models -->
+                        </select>
+                        <p style="opacity: 0.6; font-size: 0.85em; margin-top: 5px;">
+                            Standard: Generiert von allen konfigurierten Providern. Wähle ein spezifisches Modell für gezielte Generierung.
+                        </p>
+                    </div>
+
+                    <div id="aiGenerationStatus" class="mb-15">
+                        <p class="text-secondary">KI-Status: Warte auf Prompt-Auswahl</p>
+                    </div>
+
+                    <div id="aiSubmissionsList" class="mb-15">
+                        <!-- AI submissions will be listed here for selection -->
+                    </div>
+
+                    <div class="button-group" class="mb-15">
+                        <button onclick="regenerateAi()" class="secondary">KI neu generieren</button>
+                    </div>
+
+                    <details class="mt-10">
+                        <summary style="cursor: pointer; opacity: 0.8;">Manuelle KI-Antwort (Notfall-Override)</summary>
+                        <div class="mt-10">
+                            <p style="opacity: 0.7; font-size: 0.9em; margin-bottom: 10px;">
+                                Falls die automatische KI-Generierung fehlschlägt, kannst du hier manuell eine KI-Antwort eingeben.
+                            </p>
+                            <textarea id="manualAiText" placeholder="Manuelle KI-Antwort eingeben..." class="mb-10"></textarea>
+                            <button onclick="writeManualAiSubmission()">Als KI-Antwort speichern</button>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Antworten-Reihenfolge</div>
+                    <div class="reorder-hint">
+                        <span class="icon">↕️</span>
+                        <span>Ziehe die Antworten per Drag &amp; Drop in die gewünschte Reihenfolge</span>
+                    </div>
+                    <div id="submissionsList" class="submissions-list">
+                        <p class="text-secondary">Noch keine Antworten</p>
+                    </div>
+
+                    <details class="mt-15">
+                        <summary style="cursor: pointer; opacity: 0.7; font-size: 13px;">Manuelle ID-Eingabe (Fallback)</summary>
+                        <div class="mt-10">
+                            <textarea id="revealOrderInput" placeholder="sub_123, sub_456, sub_789" class="mb-10"></textarea>
+                            <button onclick="setRevealOrder()" class="secondary">Reihenfolge festlegen</button>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Antworten-Navigation</div>
+                    <p style="opacity: 0.8; margin-bottom: 10px;">Steuere das Anzeigen der Antworten während der REVEAL-Phase.</p>
+                    <div class="button-group">
+                        <button onclick="revealPrev()" class="secondary">← Zurück</button>
+                        <button onclick="revealNext()">Weiter →</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scores Panel -->
+            <div class="panel" id="scores">
+                <h2>Punkte & Bestenlisten</h2>
+
+                <div class="card">
+                    <div class="card-header">Spieler-Punkte</div>
+                    <div id="playerScores">
+                        <p class="text-secondary">Noch keine Punkte</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Top Publikum</div>
+                    <div id="audienceScores">
+                        <p class="text-secondary">Noch keine Publikums-Punkte</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- State Export/Import Panel -->
+            <div class="panel" id="state">
+                <h2>State-Verwaltung</h2>
+
+                <div class="card">
+                    <div class="card-header">Export</div>
+                    <p style="opacity: 0.8; margin-bottom: 15px;">
+                        Exportiere den kompletten Spielzustand als JSON-Datei für Backup oder Debugging.
+                    </p>
+                    <div class="button-group">
+                        <button onclick="refreshStateView()">Aktualisieren</button>
+                        <button onclick="downloadStateExport()">Als Datei herunterladen</button>
+                        <button onclick="copyStateToClipboard()" class="secondary">In Zwischenablage</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Aktueller Zustand</div>
+                    <div style="position: relative;">
+                        <pre id="stateJsonView" class="state-json-view">Klicke "Aktualisieren" um den Zustand zu laden...</pre>
+                    </div>
+                </div>
+
+                <div class="card" style="border: 2px solid #ff9800;">
+                    <div class="card-header" style="color: #ff9800;">⚠️ Import (Vorsicht!)</div>
+                    <p style="opacity: 0.8; margin-bottom: 15px;">
+                        <strong>Warnung:</strong> Der Import ersetzt den gesamten Spielzustand!
+                        Alle verbundenen Clients werden über den neuen Zustand informiert.
+                    </p>
+
+                    <div class="mb-15">
+                        <label class="form-label">JSON-Datei hochladen:</label>
+                        <input type="file" id="stateImportFile" accept=".json" onchange="handleStateFileSelect(event)" class="mb-10">
+                    </div>
+
+                    <div class="mb-15">
+                        <label class="form-label">Oder JSON einfügen:</label>
+                        <textarea id="stateImportText" placeholder='{"schema_version": 1, ...}' style="height: 150px; font-family: monospace; font-size: 12px;"></textarea>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="validateStateImport()" class="secondary">Validieren</button>
+                        <button onclick="executeStateImport()" class="danger">Importieren</button>
+                    </div>
+                    <div id="stateImportStatus" class="mt-10"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <script src="/js/common.js"></script>
+    <script type="module" src="/js/host.js"></script>
+</body>
+
+</html>

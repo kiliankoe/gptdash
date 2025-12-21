@@ -1,0 +1,38 @@
+services:
+  gptdash:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - gptdash-data:/app/data
+    environment:
+      - AUTO_SAVE_PATH=/app/data/state_backup.json
+      - HOST_USERNAME=${HOST_USERNAME}
+      - HOST_PASSWORD=${HOST_PASSWORD}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      - DOMAIN=${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - internal
+    depends_on:
+      - gptdash
+
+volumes:
+  gptdash-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  internal:
