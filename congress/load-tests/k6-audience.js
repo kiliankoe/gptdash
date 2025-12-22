@@ -52,7 +52,7 @@ function randomUserAgent() {
 function biasedIndexByPower(n, alpha = 2) {
   // produce a value in [0,1) biased toward 0 when alpha>1
   const u = Math.random();
-  const v = Math.pow(u, alpha);
+  const v = u ** alpha;
   return Math.floor(v * n);
 }
 
@@ -66,9 +66,9 @@ export default function () {
     Origin: "http://127.0.0.1:6573",
   };
 
-  var nonce;
+  let nonce;
 
-  const res = ws.connect(url, { headers }, function (socket) {
+  const res = ws.connect(url, { headers }, (socket) => {
     socket.on("open", () => {
       log(`VU ${__VU} connected with token ${token}`);
     });
@@ -80,8 +80,8 @@ export default function () {
       let data;
       try {
         data = JSON.parse(msg);
-      } catch (e) {
-        log("Not valid JSON: " + data);
+      } catch {
+        log(`Not valid JSON: ${data}`);
         return;
       }
 
@@ -92,7 +92,7 @@ export default function () {
 
       if (data.t === "vote_challenge") {
         nonce = data.nonce;
-        log("Updated nonce to " + nonce);
+        log(`Updated nonce to ${nonce}`);
       }
 
       if (data.t === "submissions") {
@@ -109,7 +109,7 @@ export default function () {
           voter_token: token,
           ai: data.list[idxA].id,
           funny: data.list[idxB].id,
-          msg_id: "msg_" + randomString(12),
+          msg_id: `msg_${randomString(12)}`,
           challenge_nonce: nonce,
           challenge_response: sha256(nonce + token, "hex").slice(0, 16),
           is_webdriver: false,

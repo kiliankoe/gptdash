@@ -285,9 +285,11 @@ test.describe("Host", () => {
     // Record initial counts (may not be 0 if previous tests left connections)
     const initialPlayers = parseInt(
       (await host.locator("#connectedPlayers").textContent()) || "0",
+      10,
     );
     const initialAudience = parseInt(
       (await host.locator("#connectedAudience").textContent()) || "0",
+      10,
     );
 
     // Create player tokens first

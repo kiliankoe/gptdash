@@ -7,7 +7,14 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!**/qrcode.min.js", "!playwright-report", "!.direnv"]
+    "includes": [
+      "**",
+      "!playwright-report",
+      "!test-results",
+      "!.direnv",
+      "!**/qrcode.min.js",
+      "!**/confetti.min.js"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -17,7 +24,11 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "complexity": {
+        // All !important uses are for accessibility (prefers-reduced-motion) or required display overrides
+        "noImportantStyles": "off"
+      }
     }
   },
   "javascript": {

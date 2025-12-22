@@ -653,7 +653,6 @@ button.secondary:hover {
   box-shadow: 0 10px 40px rgba(0, 255, 0, 0.3);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: Utility class intentionally lower specificity */
 .winner-badge .icon {
   font-size: 56px;
   margin-bottom: 12px;
@@ -813,12 +812,10 @@ button.secondary:hover {
 /* ========================
    UTILITIES
    ======================== */
-/* biome-ignore lint/style/noDescendingSpecificity: Utility classes intentionally lower specificity */
 .text-primary {
   color: var(--color-primary);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: Utility classes intentionally lower specificity */
 .text-secondary {
   color: var(--color-secondary);
 }
@@ -927,7 +924,6 @@ button.secondary:hover {
 }
 
 .winner-fullscreen.active {
-  /* biome-ignore lint/complexity/noImportantStyles: Required to override display:none and ensure winner overlay shows on top */
   display: flex !important;
 }
 

@@ -7,7 +7,6 @@ import {
   closeContexts,
   debugLog,
   setupGameToWriting,
-  getPlayerTokens,
 } from "./test-utils";
 
 /**
@@ -140,6 +139,7 @@ test.describe("Soft Panic Mode", () => {
     debugLog("Soft panic test completed successfully!");
   });
 
+  // biome-ignore lint/correctness/noEmptyPattern: Playwright requires object destructuring for fixtures
   test("soft panic allows regular voting during VOTING phase", async ({}, testInfo) => {
     testInfo.setTimeout(90000);
     const { host, audience, players } = clients;

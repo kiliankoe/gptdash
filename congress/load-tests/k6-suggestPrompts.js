@@ -1,6 +1,5 @@
 import ws from "k6/ws";
 import { check } from "k6";
-import { sha256 } from "k6/crypto";
 import { sleep } from "k6";
 
 // Common browser User-Agents
@@ -16,7 +15,7 @@ const participantCount = 6000;
 const socketTimeout = 60000;
 const globalLogLevel = 1;
 
-var strings = [
+const strings = [
   "",
   "undefined",
   "undef",
@@ -568,13 +567,6 @@ function randomUserAgent() {
   return userAgents[Math.floor(Math.random() * userAgents.length)];
 }
 
-function biasedIndexByPower(n, alpha = 2) {
-  // produce a value in [0,1) biased toward 0 when alpha>1
-  const u = Math.random();
-  const v = Math.pow(u, alpha);
-  return Math.floor(v * n);
-}
-
 export default function () {
   const token = randomAudienceToken();
 
@@ -585,9 +577,7 @@ export default function () {
     Origin: "http://127.0.0.1:6573",
   };
 
-  var nonce;
-
-  const res = ws.connect(url, { headers }, function (socket) {
+  const res = ws.connect(url, { headers }, (socket) => {
     socket.on("open", () => {
       log(`VU ${__VU} connected with token ${token}`);
     });
@@ -599,8 +589,8 @@ export default function () {
       let data;
       try {
         data = JSON.parse(msg);
-      } catch (e) {
-        log("Not valid JSON: " + data);
+      } catch {
+        log(`Not valid JSON: ${data}`);
         return;
       }
 
@@ -610,7 +600,7 @@ export default function () {
       }
 
       //   while (strings.length > 0) {
-      var str = strings[Math.floor(Math.random() * strings.length)];
+      const str = strings[Math.floor(Math.random() * strings.length)];
 
       const submission = {
         t: "submit_prompt",
