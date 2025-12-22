@@ -341,11 +341,11 @@ body {
 }
 
 .lobby-title .power {
-  display: block;
+  display: inline;
 }
 
 .lobby-title .cycles {
-  display: block;
+  display: inline;
 }
 
 .lobby-qr-section {
