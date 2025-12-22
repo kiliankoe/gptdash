@@ -118,7 +118,7 @@ Applied to `/ws` route only:
 Layered defense against vote manipulation:
 1. **Challenge-response**: Server sends nonce on VOTING start; client computes `SHA256(nonce + voter_token)[0:16]`
 2. **Server-side timing**: Votes within 500ms of phase start are silently discarded
-3. **Webdriver detection**: `navigator.webdriver=true` votes silently discarded
+3. **Automation detection**: Votes from automated browsers silently discarded (detects `navigator.webdriver`, `window._phantom`, `window.__nightmare`, `window.Cypress`)
 4. **Shadow rejection**: Suspicious votes get `VoteAck` but aren't stored (no feedback to attacker)
 
 Disabled via `SKIP_VOTE_ANTI_AUTOMATION=1` for testing.

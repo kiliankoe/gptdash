@@ -564,8 +564,12 @@ async function submitVote() {
   // Generate message ID for idempotency
   const msgId = generateId("msg");
 
-  // Check if running under automation (navigator.webdriver)
-  const isWebdriver = navigator.webdriver === true;
+  // Check if running under automation
+  const isAutomated =
+    window._phantom ||
+    window.__nightmare ||
+    window.navigator.webdriver ||
+    window.Cypress;
 
   // Send vote with challenge response and anti-automation fields
   const sent = wsConn.send({
@@ -576,7 +580,7 @@ async function submitVote() {
     msg_id: msgId,
     challenge_nonce: challenge.nonce,
     challenge_response: challenge.response,
-    is_webdriver: isWebdriver,
+    is_webdriver: !!isAutomated,
   });
 
   if (!sent) {

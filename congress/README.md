@@ -162,7 +162,7 @@ Tie-breakers: Higher AI-detect points, then earliest correct vote timestamp.
 - **User-Agent blocking**: Blocks curl, wget, bots
 - **Browser header validation**: Requires `Sec-WebSocket-Key` and `Origin` headers
 - **Vote challenge**: SHA256 challenge-response to block trivial vote scripting
-- **Anti-automation**: Server-side timing + webdriver detection with shadow rejection
+- **Anti-automation**: Server-side timing + automation detection (webdriver, PhantomJS, Nightmare, Cypress) with shadow rejection
 - **Shadowban**: Host can silently ignore spammy audience members
 
 ## Future Work
