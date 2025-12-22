@@ -404,7 +404,29 @@ function showScene(sceneId) {
     updateRevealScene();
   } else if (sceneId === "sceneResults") {
     updateResultReveals();
+  } else if (sceneId === "scenePodium") {
+    triggerPodiumConfetti();
   }
+}
+
+function triggerPodiumConfetti() {
+  if (typeof window.confetti !== "function") return;
+
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  // Fire confetti from multiple positions with staggered timing
+  window.confetti({ position: { x: w * 0.2, y: h * 0.5 }, count: 100, velocity: 250 });
+  window.confetti({ position: { x: w * 0.8, y: h * 0.5 }, count: 100, velocity: 250 });
+
+  setTimeout(() => {
+    window.confetti({ position: { x: w * 0.5, y: h * 0.3 }, count: 150, velocity: 300 });
+  }, 300);
+
+  setTimeout(() => {
+    window.confetti({ position: { x: w * 0.3, y: h * 0.4 }, count: 75, velocity: 200 });
+    window.confetti({ position: { x: w * 0.7, y: h * 0.4 }, count: 75, velocity: 200 });
+  }, 600);
 }
 
 // ========================
