@@ -154,6 +154,15 @@ button.danger:hover {
   background: #dc2626;
 }
 
+button.warning {
+  background: #f59e0b;
+  color: white;
+}
+
+button.warning:hover {
+  background: #d97706;
+}
+
 /* Form Inputs */
 input,
 textarea,

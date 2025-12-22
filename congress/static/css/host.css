@@ -365,6 +365,19 @@ select:focus {
   animation: pulse 2s infinite;
 }
 
+/* Soft Panic Mode (Prompt-Panik) */
+#softPanicModeBtn.active {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #0f172a;
+  animation: pulse 2s infinite;
+}
+
+#softPanicStatus.active {
+  color: #ffa500;
+  animation: pulse 2s infinite;
+}
+
 /* Player Status Cards */
 .player-status-card {
   background: #0f172a;

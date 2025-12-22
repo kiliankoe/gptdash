@@ -138,9 +138,11 @@ function handleMessage(message) {
         gameState.roundNo = message.game.round_no;
         gameState.validTransitions = message.valid_transitions || [];
         gameState.panicMode = message.game.panic_mode || false;
+        gameState.softPanicMode = message.game.soft_panic_mode || false;
         gameState.deadline = message.game.phase_deadline || null;
         updateUI(uiCallbacks);
         updatePanicModeUI();
+        updateSoftPanicModeUI();
         // Start timer if deadline exists
         if (gameState.deadline && message.server_now) {
           hostTimer.start(gameState.deadline, message.server_now);
@@ -249,6 +251,15 @@ function handleMessage(message) {
       showAlert(
         message.enabled ? "PANIK-MODUS AKTIVIERT" : "Panik-Modus deaktiviert",
         message.enabled ? "error" : "success",
+      );
+      break;
+
+    case "soft_panic_mode_update":
+      gameState.softPanicMode = message.enabled;
+      updateSoftPanicModeUI();
+      showAlert(
+        message.enabled ? "Prompt-Panik aktiviert" : "Prompt-Panik deaktiviert",
+        message.enabled ? "warning" : "success",
       );
       break;
 
@@ -593,6 +604,36 @@ function updatePanicModeUI() {
   }
 }
 
+function toggleSoftPanicMode() {
+  const newState = !gameState.softPanicMode;
+  if (
+    newState &&
+    !confirm(
+      "Prompt-Panik aktivieren?\n\nDas Publikum kann dann keine Prompt-Vorschläge mehr einreichen. Normale Abstimmungen funktionieren weiterhin.",
+    )
+  ) {
+    return;
+  }
+  wsConn.send({ t: "host_toggle_soft_panic_mode", enabled: newState });
+}
+
+function updateSoftPanicModeUI() {
+  const softPanicBtn = document.getElementById("softPanicModeBtn");
+  const softPanicStatus = document.getElementById("softPanicStatus");
+
+  if (softPanicBtn) {
+    softPanicBtn.textContent = gameState.softPanicMode
+      ? "Prompt-Panik DEAKTIVIEREN"
+      : "Prompt-Panik aktivieren";
+    softPanicBtn.classList.toggle("active", gameState.softPanicMode);
+  }
+
+  if (softPanicStatus) {
+    softPanicStatus.textContent = gameState.softPanicMode ? "AKTIV" : "Inaktiv";
+    softPanicStatus.classList.toggle("active", gameState.softPanicMode);
+  }
+}
+
 // Trivia Functions - Dynamic choice count (2-4)
 const TRIVIA_CHOICE_LABELS = ["A", "B", "C", "D"];
 let triviaChoiceCount = 2; // Start with 2 choices
@@ -885,6 +926,7 @@ if (typeof window !== "undefined") {
     clearPromptPool,
     clearAudienceMembers,
     togglePanicMode,
+    toggleSoftPanicMode,
     setManualWinner,
     extendTimer,
 

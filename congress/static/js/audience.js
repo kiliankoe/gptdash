@@ -26,6 +26,7 @@ let hasVoted = false;
 let audienceTimer = null;
 let promptSubmissionExpanded = false;
 let challengeSolver = null; // Vote challenge solver (anti-automation)
+let softPanicMode = false; // When true, prompt submissions are disabled
 const STORAGE_KEY = "gptdash_voter_token";
 
 // Prompt voting state
@@ -88,7 +89,9 @@ function handleMessage(message) {
       console.log("Welcome message:", message);
       if (message.game) {
         currentRoundNo = message.game.round_no;
+        softPanicMode = message.game.soft_panic_mode || false;
         updatePhase(message.game.phase);
+        updatePromptSubmissionUI();
         // Start timer if in VOTING phase with deadline
         if (
           message.game.phase === "VOTING" &&
@@ -258,6 +261,11 @@ function handleMessage(message) {
 
     case "trivia_clear":
       handleTriviaClear();
+      break;
+
+    case "soft_panic_mode_update":
+      softPanicMode = message.enabled;
+      updatePromptSubmissionUI();
       break;
 
     case "error":
@@ -637,6 +645,24 @@ function updatePromptCharCount() {
   const counter = document.getElementById("promptCharCount");
   if (input && counter) {
     counter.textContent = input.value.length;
+  }
+}
+
+function updatePromptSubmissionUI() {
+  const input = document.getElementById("promptInput");
+  const submitBtn = document.getElementById("submitPromptButton");
+  const disabledNotice = document.getElementById("promptDisabledNotice");
+
+  if (input) {
+    input.disabled = softPanicMode;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = softPanicMode;
+  }
+
+  if (disabledNotice) {
+    disabledNotice.style.display = softPanicMode ? "block" : "none";
   }
 }
 

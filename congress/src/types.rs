@@ -61,6 +61,7 @@ pub struct Game {
     pub current_round_id: Option<RoundId>,
     pub phase_deadline: Option<String>, // ISO timestamp for phase timer (Writing, Voting, etc.)
     pub panic_mode: bool,               // When true, audience interactions are disabled
+    pub soft_panic_mode: bool,          // When true, prompt submissions are disabled
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

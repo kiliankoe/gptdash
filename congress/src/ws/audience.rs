@@ -177,6 +177,15 @@ pub async fn handle_submit_prompt(
         }
     }
 
+    // Check if soft panic mode is active (blocks prompt submissions)
+    if state.is_soft_panic_mode().await {
+        tracing::info!("Soft panic mode active, rejecting prompt submission");
+        return Some(ServerMessage::Error {
+            code: "SOFT_PANIC_MODE".to_string(),
+            msg: "Prompt-Vorschläge sind momentan deaktiviert".to_string(),
+        });
+    }
+
     // Add prompt directly to the global pool (no round needed)
     match state
         .add_prompt_to_pool(

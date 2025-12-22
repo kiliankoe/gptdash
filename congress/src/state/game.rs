@@ -13,6 +13,7 @@ impl AppState {
             current_round_id: None,
             phase_deadline: None,
             panic_mode: false,
+            soft_panic_mode: false,
         };
 
         *self.game.write().await = Some(game.clone());
@@ -509,12 +510,18 @@ impl AppState {
             g.current_round_id = None;
             g.phase_deadline = None;
             g.panic_mode = false;
+            g.soft_panic_mode = false;
             g.version += 1;
         }
         drop(game);
 
         // Broadcast reset state to all clients
         self.broadcast_phase_change().await;
+
+        // Broadcast soft panic mode reset to all clients
+        self.broadcast_to_all(crate::protocol::ServerMessage::SoftPanicModeUpdate {
+            enabled: false,
+        });
 
         tracing::info!("Game reset to initial state (prompt pool preserved)");
     }
@@ -579,6 +586,31 @@ impl AppState {
             .await
             .as_ref()
             .map(|g| g.panic_mode)
+            .unwrap_or(false)
+    }
+
+    /// Toggle soft panic mode on/off (blocks prompt submissions only)
+    pub async fn set_soft_panic_mode(&self, enabled: bool) {
+        let mut game = self.game.write().await;
+        if let Some(ref mut g) = *game {
+            g.soft_panic_mode = enabled;
+            g.version += 1;
+        }
+        drop(game);
+
+        // Broadcast soft panic mode change to all clients
+        self.broadcast_to_all(crate::protocol::ServerMessage::SoftPanicModeUpdate { enabled });
+
+        tracing::info!("Soft panic mode set to: {}", enabled);
+    }
+
+    /// Check if soft panic mode is active
+    pub async fn is_soft_panic_mode(&self) -> bool {
+        self.game
+            .read()
+            .await
+            .as_ref()
+            .map(|g| g.soft_panic_mode)
             .unwrap_or(false)
     }
 

@@ -163,6 +163,11 @@ pub async fn handle_message(
             host::handle_toggle_panic_mode(state, enabled).await
         }
 
+        ClientMessage::HostToggleSoftPanicMode { enabled } => {
+            check_host!(role, "toggle soft panic mode");
+            host::handle_toggle_soft_panic_mode(state, enabled).await
+        }
+
         ClientMessage::HostSetManualWinner {
             winner_type,
             submission_id,

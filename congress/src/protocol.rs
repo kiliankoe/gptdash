@@ -74,6 +74,9 @@ pub enum ClientMessage {
     HostTogglePanicMode {
         enabled: bool,
     },
+    HostToggleSoftPanicMode {
+        enabled: bool,
+    },
     HostSetManualWinner {
         winner_type: ManualWinnerType,
         submission_id: SubmissionId,
@@ -260,6 +263,10 @@ pub enum ServerMessage {
     },
     /// Broadcast when panic mode is toggled
     PanicModeUpdate {
+        enabled: bool,
+    },
+    /// Broadcast when soft panic mode is toggled (prompt submissions only)
+    SoftPanicModeUpdate {
         enabled: bool,
     },
     /// Sent to a player when their submission is accepted
