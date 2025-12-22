@@ -666,6 +666,9 @@ mod tests {
         let _round = state.start_round().await.unwrap();
         let role = Role::Audience;
 
+        // Register voter as audience member first (required for prompt submission)
+        state.get_or_create_audience_member("voter123").await;
+
         let result = handle_message(
             ClientMessage::SubmitPrompt {
                 voter_token: Some("voter123".to_string()),
@@ -682,7 +685,33 @@ mod tests {
         // Verify prompt was added to the global pool with submitter_ids
         let pool = state.prompt_pool.read().await;
         assert_eq!(pool.len(), 1);
-        assert!(pool[0].submitter_ids.contains(&"voter123".to_string()));
+        let prompt = pool.values().next().unwrap();
+        assert!(prompt.submitter_ids.contains(&"voter123".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_prompt_from_unknown_voter_silently_rejected() {
+        let state = Arc::new(AppState::new());
+        state.create_game().await;
+        let role = Role::Audience;
+
+        // Try to submit a prompt with a fabricated token (not registered as audience member)
+        let result = handle_message(
+            ClientMessage::SubmitPrompt {
+                voter_token: Some("fabricated_token".to_string()),
+                text: "Malicious prompt".to_string(),
+            },
+            &role,
+            &state,
+        )
+        .await;
+
+        // Should return None (silent rejection - don't alert attacker)
+        assert!(result.is_none());
+
+        // Verify prompt was NOT added to the pool
+        let pool = state.prompt_pool.read().await;
+        assert_eq!(pool.len(), 0);
     }
 
     #[tokio::test]
@@ -691,7 +720,10 @@ mod tests {
         state.create_game().await;
         let role = Role::Audience;
 
-        // First, shadowban the voter
+        // Register voter as audience member first
+        state.get_or_create_audience_member("spammer").await;
+
+        // Then shadowban the voter
         state.shadowban_audience("spammer".to_string()).await;
 
         // Try to submit a prompt as shadowbanned user

@@ -188,3 +188,16 @@ pub fn spawn_audience_cleanup_task(state: Arc<AppState>, ttl_minutes: u64) {
         }
     });
 }
+
+/// Spawn background task that broadcasts prompt pool updates to host at a throttled rate
+/// This debounces high-frequency audience prompt submissions (many/sec) to ~2 broadcasts/sec
+pub fn spawn_prompt_broadcast_task(state: Arc<AppState>) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_millis(500));
+
+        loop {
+            interval.tick().await;
+            state.broadcast_prompts_to_host_if_dirty().await;
+        }
+    });
+}

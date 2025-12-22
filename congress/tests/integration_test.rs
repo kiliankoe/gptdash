@@ -1901,7 +1901,7 @@ async fn test_multimodal_prompt_via_handler() {
     // Get the prompt from pool and select it
     let pool = state.prompt_pool.read().await;
     assert_eq!(pool.len(), 1);
-    let prompt_id = pool[0].id.clone();
+    let prompt_id = pool.values().next().unwrap().id.clone();
     drop(pool);
 
     let select_result = handle_message(
@@ -2025,7 +2025,10 @@ async fn test_add_prompt_in_lobby_without_round() {
     // Verify the prompt was added to the global pool
     let pool = state.prompt_pool.read().await;
     assert_eq!(pool.len(), 1, "Prompt should be in the pool");
-    assert_eq!(pool[0].text, Some("Test prompt in lobby".to_string()));
+    assert_eq!(
+        pool.values().next().unwrap().text,
+        Some("Test prompt in lobby".to_string())
+    );
 
     println!("✅ Add prompt in lobby without round test passed!");
 }
@@ -2071,7 +2074,7 @@ async fn test_add_prompt_after_starting_round() {
     // Verify prompt is in the pool
     let pool = state.prompt_pool.read().await;
     assert_eq!(pool.len(), 1);
-    let prompt_id = pool[0].id.clone();
+    let prompt_id = pool.values().next().unwrap().id.clone();
     drop(pool);
 
     // Now select the prompt for the round
@@ -2465,7 +2468,7 @@ async fn test_auto_load_restores_state_from_file() {
     let pool = state2.prompt_pool.read().await;
     assert_eq!(pool.len(), 1, "Should have 1 prompt after restore");
     assert_eq!(
-        pool[0].text,
+        pool.values().next().unwrap().text,
         Some("Unique prompt for restore test".to_string())
     );
     drop(pool);
@@ -2939,11 +2942,11 @@ async fn test_prompt_selection_audience_voting() {
     // Verify losing prompt was returned to pool
     let pool = state.prompt_pool.read().await;
     assert!(
-        pool.iter().any(|p| p.id == prompt1.id),
+        pool.contains_key(&prompt1.id),
         "Losing prompt should be returned to pool"
     );
     assert!(
-        !pool.iter().any(|p| p.id == prompt2.id),
+        !pool.contains_key(&prompt2.id),
         "Winning prompt should not be in pool"
     );
 
@@ -3025,7 +3028,7 @@ async fn test_prompt_selection_tie_resolution() {
     // Verify the other prompt was returned to pool
     let pool = state.prompt_pool.read().await;
     assert!(
-        pool.iter().any(|p| p.id == prompt1.id),
+        pool.contains_key(&prompt1.id),
         "Losing prompt should be returned to pool"
     );
 
@@ -3083,7 +3086,7 @@ async fn test_host_direct_prompt_selection() {
     // Verify prompt was removed from pool
     let pool = state.prompt_pool.read().await;
     assert!(
-        !pool.iter().any(|p| p.id == prompt.id),
+        !pool.contains_key(&prompt.id),
         "Selected prompt should be removed from pool"
     );
 
@@ -3452,19 +3455,21 @@ async fn test_audience_prompt_fuzzy_deduplication() {
         "Similar prompts should be merged into one (fuzzy dedup)"
     );
 
+    let merged_prompt = pool.values().next().unwrap();
+
     // Verify submission_count was incremented
     assert_eq!(
-        pool[0].submission_count, 2,
+        merged_prompt.submission_count, 2,
         "Merged prompt should have submission_count of 2"
     );
 
     // Verify both submitter_ids are recorded
     assert!(
-        pool[0].submitter_ids.contains(&"voter1".to_string()),
+        merged_prompt.submitter_ids.contains(&"voter1".to_string()),
         "First submitter should be recorded"
     );
     assert!(
-        pool[0].submitter_ids.contains(&"voter2".to_string()),
+        merged_prompt.submitter_ids.contains(&"voter2".to_string()),
         "Second submitter should be recorded"
     );
 

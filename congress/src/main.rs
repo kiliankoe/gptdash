@@ -106,6 +106,9 @@ async fn main() {
     // Spawn background task for cleaning up stale audience members (10-min TTL, 0 points)
     broadcast::spawn_audience_cleanup_task(state.clone(), 10);
 
+    // Spawn background task for debounced prompt pool broadcasts to host
+    broadcast::spawn_prompt_broadcast_task(state.clone());
+
     // Note: Voting deadline is a soft/visual timer; the host advances phases manually.
 
     // Protected host/beamer routes (with HTTP Basic Auth)

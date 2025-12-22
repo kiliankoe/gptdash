@@ -206,7 +206,10 @@ impl AppState {
                 // Validate current state
                 if round.state != RoundState::Setup {
                     // Put prompt back in pool since we couldn't use it
-                    self.prompt_pool.write().await.push(prompt);
+                    self.prompt_pool
+                        .write()
+                        .await
+                        .insert(prompt.id.clone(), prompt);
                     return Err(format!(
                         "Can only select prompt in Setup state, currently in {:?}",
                         round.state
@@ -217,7 +220,10 @@ impl AppState {
                 round.state = RoundState::Collecting;
             } else {
                 // Put prompt back in pool since round doesn't exist
-                self.prompt_pool.write().await.push(prompt);
+                self.prompt_pool
+                    .write()
+                    .await
+                    .insert(prompt.id.clone(), prompt);
                 return Err("Round not found".to_string());
             }
         }

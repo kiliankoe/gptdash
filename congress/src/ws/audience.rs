@@ -152,7 +152,20 @@ pub async fn handle_submit_prompt(
 ) -> Option<ServerMessage> {
     tracing::info!("Prompt submitted: {}", text);
 
-    // Check if this voter is shadowbanned first
+    // Require voter to be a known audience member (prevents fabricated tokens)
+    if let Some(ref token) = voter_token {
+        let members = state.audience_members.read().await;
+        if !members.contains_key(token) {
+            tracing::warn!(
+                "Prompt rejected: unknown voter_id {} (fabricated token?)",
+                token
+            );
+            // Shadow reject - don't tell attacker their fabricated token was detected
+            return None;
+        }
+    }
+
+    // Check if this voter is shadowbanned
     if let Some(ref token) = voter_token {
         if state.is_shadowbanned(token).await {
             tracing::info!(
@@ -175,7 +188,8 @@ pub async fn handle_submit_prompt(
         .await
     {
         Ok(prompt) => {
-            state.broadcast_prompts_to_host().await;
+            // Use debounced broadcast for audience submissions (high frequency)
+            state.mark_prompts_dirty();
             tracing::info!("Prompt added to pool: {}", prompt.id);
             None
         }

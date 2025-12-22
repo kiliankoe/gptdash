@@ -12,7 +12,7 @@ use crate::protocol::{PlayerSubmissionStatus, ServerMessage};
 use crate::types::*;
 use export::GameStateExport;
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 
@@ -32,7 +32,9 @@ pub struct AppState {
     /// Shadowbanned audience member IDs (their prompts are silently ignored)
     pub shadowbanned_audience: Arc<RwLock<HashSet<VoterId>>>,
     /// Global prompt pool - persists across rounds and game resets
-    pub prompt_pool: Arc<RwLock<Vec<Prompt>>>,
+    pub prompt_pool: Arc<RwLock<HashMap<PromptId, Prompt>>>,
+    /// Flag to indicate prompt pool has changed (for debounced host broadcasts)
+    pub prompts_dirty: Arc<AtomicBool>,
     /// Queued prompts for the next round (1-3 max, host selects from pool)
     pub queued_prompts: Arc<RwLock<Vec<Prompt>>>,
     /// Audience votes on which queued prompt to use (voter_id -> prompt_id)
@@ -93,7 +95,8 @@ impl AppState {
             processed_vote_msg_ids: Arc::new(RwLock::new(HashMap::new())),
             player_status: Arc::new(RwLock::new(HashMap::new())),
             shadowbanned_audience: Arc::new(RwLock::new(HashSet::new())),
-            prompt_pool: Arc::new(RwLock::new(Vec::new())),
+            prompt_pool: Arc::new(RwLock::new(HashMap::new())),
+            prompts_dirty: Arc::new(AtomicBool::new(false)),
             queued_prompts: Arc::new(RwLock::new(Vec::new())),
             prompt_votes: Arc::new(RwLock::new(HashMap::new())),
             audience_members: Arc::new(RwLock::new(HashMap::new())),
@@ -441,7 +444,7 @@ impl AppState {
 
         // Filter out prompts where ALL submitters are shadowbanned
         let mut prompts: Vec<_> = pool
-            .iter()
+            .values()
             .filter(|p| {
                 // Keep prompts with no submitters (host prompts)
                 if p.submitter_ids.is_empty() {
@@ -478,7 +481,7 @@ impl AppState {
 
         // Filter out fully shadowbanned prompts for counting
         let visible_prompts: Vec<_> = pool
-            .iter()
+            .values()
             .filter(|p| {
                 if p.submitter_ids.is_empty() {
                     return true;
@@ -525,14 +528,36 @@ impl AppState {
     }
 
     /// Broadcast prompt pool to host (filtered by shadowban status)
+    /// Used for immediate broadcasts (host actions)
     pub async fn broadcast_prompts_to_host(&self) {
         let prompts = self.get_prompts_for_host().await;
         let stats = self.compute_prompt_pool_stats().await;
         self.broadcast_to_host(ServerMessage::HostPrompts { prompts, stats });
     }
 
+    /// Mark prompts as dirty for debounced broadcast (audience submissions)
+    pub fn mark_prompts_dirty(&self) {
+        self.prompts_dirty.store(true, Ordering::SeqCst);
+    }
+
+    /// Broadcast prompt pool to host if dirty flag is set
+    /// Called periodically by background task for debounced updates
+    pub async fn broadcast_prompts_to_host_if_dirty(&self) {
+        if self.prompts_dirty.swap(false, Ordering::SeqCst) {
+            let prompts = self.get_prompts_for_host().await;
+            let stats = self.compute_prompt_pool_stats().await;
+            self.broadcast_to_host(ServerMessage::HostPrompts { prompts, stats });
+        }
+    }
+
     /// Maximum number of prompts an audience member can submit before their prompts are used
     const MAX_PROMPTS_PER_USER: usize = 10;
+
+    /// Maximum length of prompt text (chars) to prevent memory abuse
+    const MAX_PROMPT_TEXT_LENGTH: usize = 500;
+
+    /// Maximum size of the global prompt pool to prevent unbounded growth
+    const MAX_PROMPT_POOL_SIZE: usize = 1000;
 
     /// Fuzzy similarity threshold for deduplication (0.0 - 1.0)
     const SIMILARITY_THRESHOLD: f64 = 0.6;
@@ -578,7 +603,7 @@ impl AppState {
     pub async fn find_similar_prompt(&self, text: &str) -> Option<PromptId> {
         let pool = self.prompt_pool.read().await;
 
-        for prompt in pool.iter() {
+        for prompt in pool.values() {
             if let Some(ref existing_text) = prompt.text {
                 let similarity = Self::compute_similarity(text, existing_text);
                 if similarity >= Self::SIMILARITY_THRESHOLD {
@@ -595,7 +620,7 @@ impl AppState {
         self.prompt_pool
             .read()
             .await
-            .iter()
+            .values()
             .filter(|p| p.submitter_ids.contains(&voter_id.to_string()))
             .count()
     }
@@ -603,6 +628,7 @@ impl AppState {
     /// Add a prompt to the global pool
     /// Handles deduplication: if similar prompt exists, adds submitter to existing prompt
     /// Handles throttling: rejects if user has >= 10 pending prompts
+    /// Handles size limits: truncates long text, rejects if pool is full (for audience)
     pub async fn add_prompt_to_pool(
         &self,
         text: Option<String>,
@@ -613,6 +639,26 @@ impl AppState {
         // Validate: must have either text or image_url
         if text.is_none() && image_url.is_none() {
             return Err("Prompt must have either text or image_url".to_string());
+        }
+
+        // Truncate text if too long (prevents memory abuse)
+        let text = text.map(|t| {
+            if t.chars().count() > Self::MAX_PROMPT_TEXT_LENGTH {
+                t.chars().take(Self::MAX_PROMPT_TEXT_LENGTH).collect()
+            } else {
+                t
+            }
+        });
+
+        // Pool size limit (only enforced for audience submissions, not host)
+        if source == PromptSource::Audience {
+            let pool_size = self.prompt_pool.read().await.len();
+            if pool_size >= Self::MAX_PROMPT_POOL_SIZE {
+                return Err(
+                    "POOL_FULL: Der Prompt-Pool ist voll. Bitte warte, bis Prompts verwendet wurden."
+                        .to_string(),
+                );
+            }
         }
 
         // Throttling: check if audience member has too many prompts
@@ -631,7 +677,7 @@ impl AppState {
             if let Some(similar_id) = self.find_similar_prompt(prompt_text).await {
                 // Found similar prompt - add submitter to existing prompt instead
                 let mut pool = self.prompt_pool.write().await;
-                if let Some(existing) = pool.iter_mut().find(|p| p.id == similar_id) {
+                if let Some(existing) = pool.get_mut(&similar_id) {
                     // Add submitter if not already in list
                     if let Some(ref voter_id) = submitter_id {
                         if !existing.submitter_ids.contains(voter_id) {
@@ -658,7 +704,10 @@ impl AppState {
             created_at: Some(now),
         };
 
-        self.prompt_pool.write().await.push(prompt.clone());
+        self.prompt_pool
+            .write()
+            .await
+            .insert(prompt.id.clone(), prompt.clone());
         Ok(prompt)
     }
 
@@ -669,8 +718,7 @@ impl AppState {
     ) -> Result<Vec<VoterId>, String> {
         let pool = self.prompt_pool.read().await;
         let prompt = pool
-            .iter()
-            .find(|p| p.id == prompt_id)
+            .get(prompt_id)
             .ok_or_else(|| "Prompt not found".to_string())?;
 
         let submitter_ids = prompt.submitter_ids.clone();
@@ -689,20 +737,12 @@ impl AppState {
 
     /// Remove a prompt from the pool by ID (used when selecting or deleting)
     pub async fn remove_prompt_from_pool(&self, prompt_id: &str) -> Option<Prompt> {
-        let mut pool = self.prompt_pool.write().await;
-        pool.iter()
-            .position(|p| p.id == prompt_id)
-            .map(|pos| pool.remove(pos))
+        self.prompt_pool.write().await.remove(prompt_id)
     }
 
     /// Get a prompt from the pool by ID (without removing)
     pub async fn get_prompt_from_pool(&self, prompt_id: &str) -> Option<Prompt> {
-        self.prompt_pool
-            .read()
-            .await
-            .iter()
-            .find(|p| p.id == prompt_id)
-            .cloned()
+        self.prompt_pool.read().await.get(prompt_id).cloned()
     }
 
     // =========================================================================
@@ -751,7 +791,10 @@ impl AppState {
         drop(queue);
 
         // Add back to pool
-        self.prompt_pool.write().await.push(prompt.clone());
+        self.prompt_pool
+            .write()
+            .await
+            .insert(prompt.id.clone(), prompt.clone());
         Ok(prompt)
     }
 
@@ -768,15 +811,7 @@ impl AppState {
         }
 
         // Try to remove from pool
-        {
-            let mut pool = self.prompt_pool.write().await;
-            if let Some(pos) = pool.iter().position(|p| p.id == prompt_id) {
-                pool.remove(pos);
-                return true;
-            }
-        }
-
-        false
+        self.prompt_pool.write().await.remove(prompt_id).is_some()
     }
 
     /// Get all queued prompts
@@ -792,7 +827,9 @@ impl AppState {
 
         // Move all back to pool
         let mut pool = self.prompt_pool.write().await;
-        pool.extend(prompts);
+        for prompt in prompts {
+            pool.insert(prompt.id.clone(), prompt);
+        }
     }
 
     /// Select winning prompt from queue based on votes (or the only one if single)
@@ -843,7 +880,10 @@ impl AppState {
         drop(queue);
 
         if !losers.is_empty() {
-            self.prompt_pool.write().await.extend(losers);
+            let mut pool = self.prompt_pool.write().await;
+            for loser in losers {
+                pool.insert(loser.id.clone(), loser);
+            }
         }
 
         // Clear prompt votes for next round
@@ -916,7 +956,8 @@ impl AppState {
         let processed_vote_msg_ids = self.processed_vote_msg_ids.read().await.clone();
         let player_status = self.player_status.read().await.clone();
         let shadowbanned_audience = self.shadowbanned_audience.read().await.clone();
-        let prompt_pool = self.prompt_pool.read().await.clone();
+        // Convert HashMap to Vec for backwards-compatible export format
+        let prompt_pool: Vec<Prompt> = self.prompt_pool.read().await.values().cloned().collect();
         let audience_members = self.audience_members.read().await.clone();
         let trivia_questions = self.trivia_questions.read().await.clone();
 
@@ -954,7 +995,12 @@ impl AppState {
         *self.processed_vote_msg_ids.write().await = export.processed_vote_msg_ids;
         *self.player_status.write().await = export.player_status;
         *self.shadowbanned_audience.write().await = export.shadowbanned_audience;
-        *self.prompt_pool.write().await = export.prompt_pool;
+        // Convert Vec to HashMap for internal storage
+        *self.prompt_pool.write().await = export
+            .prompt_pool
+            .into_iter()
+            .map(|p| (p.id.clone(), p))
+            .collect();
         *self.audience_members.write().await = export.audience_members.clone();
         *self.trivia_questions.write().await = export.trivia_questions;
 
@@ -1818,7 +1864,7 @@ mod tests {
 
         // Verify it's in the prompt pool
         let pool = state.prompt_pool.read().await;
-        let stored_prompt = pool.iter().find(|p| p.id == prompt.id).unwrap();
+        let stored_prompt = pool.get(&prompt.id).unwrap();
         assert!(stored_prompt
             .submitter_ids
             .contains(&"voter123".to_string()));

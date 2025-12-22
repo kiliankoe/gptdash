@@ -172,7 +172,10 @@ impl AppState {
                     drop(queued);
 
                     // Put prompt back in pool so select_prompt can find it
-                    self.prompt_pool.write().await.push(prompt.clone());
+                    self.prompt_pool
+                        .write()
+                        .await
+                        .insert(prompt.id.clone(), prompt.clone());
                     self.queued_prompts.write().await.clear();
                     self.prompt_votes.write().await.clear();
                     self.broadcast_queued_prompts_to_host().await;
@@ -206,7 +209,10 @@ impl AppState {
                     Ok(prompt) => {
                         // Put winning prompt back in pool so select_prompt can find it
                         // (select_winning_prompt removes it from queue but doesn't add to pool)
-                        self.prompt_pool.write().await.push(prompt.clone());
+                        self.prompt_pool
+                            .write()
+                            .await
+                            .insert(prompt.id.clone(), prompt.clone());
 
                         // Clear queue and votes (may already be cleared by select_winning_prompt)
                         self.queued_prompts.write().await.clear();
