@@ -1,6 +1,9 @@
 services:
   gptdash:
-    build: .
+    build:
+      context: .
+      args:
+        GIT_HASH: ${GIT_HASH:-unknown}
     restart: unless-stopped
     volumes:
       - gptdash-data:/app/data
