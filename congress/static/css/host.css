@@ -21,6 +21,12 @@ body {
   color: #fbbf24;
 }
 
+.version-hash {
+  font-size: 0.5em;
+  color: #64748b;
+  font-weight: normal;
+}
+
 .status-bar {
   display: flex;
   gap: 20px;
