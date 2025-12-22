@@ -187,15 +187,6 @@ body {
 .status-badge {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 16px;
-  background: rgba(0, 255, 0, 0.1);
-  border: 1px solid var(--color-primary);
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
 }
 
 .status-dot {
