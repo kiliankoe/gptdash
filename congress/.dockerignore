@@ -1,5 +1,4 @@
 target/
-.git/
 .env
 state_backup.json
 *.md
