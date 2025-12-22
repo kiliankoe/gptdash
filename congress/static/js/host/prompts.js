@@ -172,7 +172,7 @@ function updatePromptStats() {
         <div class="top-submitter-item">
           <span class="submitter-id" title="${escapeHtml(s.voter_id)}">${escapeHtml(shortId)}...</span>
           <span class="submitter-count">${s.count} Prompts</span>
-          <button class="danger small" data-action="shadowban-audience" data-voter-id="${escapeHtml(s.voter_id)}" title="Shadowban"></button>
+          <button class="danger small" data-action="shadowban-audience" data-voter-id="${escapeHtml(s.voter_id)}" title="Shadowban">Bannen</button>
         </div>
       `;
       })
@@ -210,7 +210,7 @@ export function togglePromptSection(sectionKey) {
     list.classList.toggle("collapsed", isExpanded);
   }
   if (toggle) {
-    toggle.textContent = isExpanded ? "" : "";
+    toggle.textContent = isExpanded ? "▶" : "▼";
   }
 }
 
@@ -353,10 +353,10 @@ export function renderPromptRow(promptData, queuedIds, queueFull) {
       }
       ${
         promptData.source === "audience" && promptData.submitter_ids?.length > 0
-          ? `<button class="action-btn ban-btn" data-action="shadowban-submitters" data-id="${escapeHtml(promptData.id)}" title="Einreicher shadowbannen"></button>`
+          ? `<button class="action-btn ban-btn" data-action="shadowban-submitters" data-id="${escapeHtml(promptData.id)}" title="Einreicher shadowbannen">Bannen</button>`
           : ""
       }
-      <button class="action-btn delete-btn" data-action="delete-prompt" data-id="${escapeHtml(promptData.id)}" title="Lschen"></button>
+      <button class="action-btn delete-btn" data-action="delete-prompt" data-id="${escapeHtml(promptData.id)}" title="Löschen">✕</button>
     </div>
     <div class="prompt-tooltip">${tooltipContent}</div>
   `;
@@ -418,11 +418,11 @@ export function updatePromptsList() {
 
   if (!promptSectionState.hostPrompts) {
     hostList.classList.add("collapsed");
-    if (hostToggle) hostToggle.textContent = "";
+    if (hostToggle) hostToggle.textContent = "▶";
   }
   if (!promptSectionState.audiencePrompts) {
     audienceList.classList.add("collapsed");
-    if (audienceToggle) audienceToggle.textContent = "";
+    if (audienceToggle) audienceToggle.textContent = "▶";
   }
 
   // Apply search filter if there's a query
@@ -490,7 +490,7 @@ function updateQueuedPromptsListInto(containerId, startBtnId) {
       ${contentHtml}
       <div class="prompt-actions">
         <button class="secondary small" data-action="unqueue-prompt" data-id="${escapeHtml(promptData.id)}" title="Zurck in den Pool"> Pool</button>
-        <button class="danger small" data-action="delete-prompt" data-id="${escapeHtml(promptData.id)}" title="Prompt lschen"></button>
+        <button class="danger small" data-action="delete-prompt" data-id="${escapeHtml(promptData.id)}" title="Prompt löschen">✕</button>
       </div>
     `;
     container.appendChild(div);

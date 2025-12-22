@@ -81,8 +81,8 @@ function updatePlayersListInto(containerId) {
         </div>
         <div class="player-token">
           <span class="token">${escapeHtml(token)}</span>
-          <button class="copy-btn" data-action="copy-token" data-token="${escapeHtml(token)}" title="Token kopieren"></button>
-          <button class="remove-btn" data-action="remove-player" data-player-id="${escapeHtml(playerId)}" data-player-name="${escapeHtml(name)}" title="Spieler entfernen"></button>
+          <button class="copy-btn" data-action="copy-token" data-token="${escapeHtml(token)}" title="Token kopieren">⧉</button>
+          <button class="remove-btn" data-action="remove-player" data-player-id="${escapeHtml(playerId)}" data-player-name="${escapeHtml(name)}" title="Spieler entfernen">✕</button>
         </div>
       </div>
     `;
