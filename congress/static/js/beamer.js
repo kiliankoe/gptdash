@@ -74,7 +74,7 @@ function generateQRCodes() {
   });
 
   // Set URL text in header and lobby
-  const displayUrl = url.replace(/^https?:\/\//, "");
+  const displayUrl = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const lobbyUrlEl = document.getElementById("lobbyUrl");
   const headerUrlEl = document.getElementById("headerUrl");
   if (lobbyUrlEl) lobbyUrlEl.textContent = displayUrl;
