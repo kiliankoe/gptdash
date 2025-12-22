@@ -535,7 +535,6 @@ var strings = [
   '{{ "".__class__.__mro__[2].__subclasses__()[40]("/etc/passwd").read() }}',
 ];
 
-
 export const options = {
   vus: participantCount, // number of audience members
   duration: "10m",
@@ -610,23 +609,23 @@ export default function () {
         return;
       }
 
-    //   while (strings.length > 0) {
-        var str = strings[Math.floor(Math.random() * strings.length)];
+      //   while (strings.length > 0) {
+      var str = strings[Math.floor(Math.random() * strings.length)];
 
-        const submission = {
-          t: "submit_prompt",
-          voter_token: token,
-          text: str,
-        };
+      const submission = {
+        t: "submit_prompt",
+        voter_token: token,
+        text: str,
+      };
 
-        try {
-          socket.send(JSON.stringify(submission));
-          log(`VU ${__VU} sent submission: ${JSON.stringify(submission)}`, 1);
-        } catch (e) {
-          console.error(`VU ${__VU} failed to send submission:`, e);
-          sleep(1000)
-        }
-    //   }
+      try {
+        socket.send(JSON.stringify(submission));
+        log(`VU ${__VU} sent submission: ${JSON.stringify(submission)}`, 1);
+      } catch (e) {
+        console.error(`VU ${__VU} failed to send submission:`, e);
+        sleep(1000);
+      }
+      //   }
     });
 
     socket.on("error", (e) => {

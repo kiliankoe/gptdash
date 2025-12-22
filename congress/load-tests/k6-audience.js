@@ -149,18 +149,16 @@ export default function () {
         };
 
         const delayMs = Math.floor(500 + Math.random() * 10001); // 0..10000 ms
-        sleep(delayMs / 1000)
-          try {
-            socket.send(JSON.stringify(vote));
-            log(
-              `VU ${__VU} sent vote after ${delayMs}ms: ${JSON.stringify(
-                vote
-              )}`,
-              1
-            );
-          } catch (e) {
-            console.error(`VU ${__VU} failed to send vote:`, e);
-          }
+        sleep(delayMs / 1000);
+        try {
+          socket.send(JSON.stringify(vote));
+          log(
+            `VU ${__VU} sent vote after ${delayMs}ms: ${JSON.stringify(vote)}`,
+            1,
+          );
+        } catch (e) {
+          console.error(`VU ${__VU} failed to send vote:`, e);
+        }
 
         // send vote back; use socket.send or socket.send(JSON.stringify(vote)) depending on server expectations
         // try {
