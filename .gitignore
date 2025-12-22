@@ -57,3 +57,4 @@ congress/test-results
 congress/playwright-report
 congress/.claude
 state_backup.json
+congress/.direnv
