@@ -348,4 +348,124 @@ test.describe("Submissions", () => {
 
     debugLog("Typo correction test completed successfully!");
   });
+
+  test("accepting typo correction does not trigger repeated prompts", async () => {
+    const { host, players } = clients;
+
+    // ============================================
+    // SETUP: Get to writing phase with player
+    // ============================================
+    debugLog("Typo accept test: Setting up game...");
+
+    await Promise.all([host.goto("/host"), players[0].goto("/player")]);
+
+    await waitForConnection(host);
+
+    // Create player token
+    await host.click('.sidebar-item:has-text("Spieler")');
+    await host.waitForSelector("#players.active");
+    await host.fill("#playerCount", "1");
+    await host.click('#players button:has-text("Spieler erstellen")');
+    await host.waitForSelector("#playerTokensList .token");
+    const tokens = await getPlayerTokens(host);
+
+    // Player joins
+    await players[0].fill("#tokenInput", tokens[0]);
+    await players[0].click("#joinButton");
+    await players[0].waitForSelector("#registerScreen.active");
+    await players[0].fill("#nameInput", "TypoAcceptTester");
+    await players[0].click("#registerButton");
+    await players[0].waitForSelector("#waitingScreen.active");
+
+    // Add prompt
+    await host.click('.sidebar-item:has-text("Prompts")');
+    await host.waitForSelector("#prompts.active");
+    await host.fill("#promptText", "Typo accept test question");
+    await host.click('#prompts button:has-text("Prompt hinzufügen")');
+    await host.waitForSelector("#hostPromptsList [data-prompt-id]");
+    await host.locator("#hostPromptsList .queue-btn").first().click();
+
+    await host.waitForSelector("#startPromptSelectionBtn", {
+      state: "visible",
+      timeout: 5000,
+    });
+
+    await host.click("#startPromptSelectionBtn");
+    await host.waitForTimeout(1000);
+    await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
+      timeout: 5000,
+    });
+
+    // ============================================
+    // TEST: Player submits answer with intentional typo
+    // ============================================
+    debugLog("Typo accept test: Player submitting answer with typo...");
+
+    await players[0].waitForSelector("#writingScreen.active", {
+      timeout: 5000,
+    });
+
+    await players[0].fill(
+      "#answerInput",
+      "Das ist ein Test mit einm Tippfehler drin.",
+    );
+    await players[0].click("#submitButton");
+
+    await players[0].waitForSelector("#submittedScreen.active", {
+      timeout: 5000,
+    });
+
+    // Wait for typo check to complete
+    await players[0].waitForTimeout(2500);
+
+    const isOnTypoCheckScreen = await players[0]
+      .locator("#typoCheckScreen.active")
+      .isVisible();
+
+    if (isOnTypoCheckScreen) {
+      debugLog("Typo accept test: LLM suggested changes, accepting...");
+
+      const correctedText = await players[0]
+        .locator("#correctedText")
+        .textContent();
+      debugLog(`Typo accept test: Corrected text: ${correctedText}`);
+
+      // Accept the correction
+      await players[0].click('button:has-text("Korrektur übernehmen")');
+      await players[0].waitForSelector("#submittedScreen.active", {
+        timeout: 5000,
+      });
+
+      // Wait to ensure no repeated prompts appear
+      await players[0].waitForTimeout(3000);
+
+      // Verify we're still on submitted screen (not prompted again)
+      await expect(players[0].locator("#submittedScreen")).toHaveClass(
+        /active/,
+      );
+      const stillOnTypoCheck = await players[0]
+        .locator("#typoCheckScreen.active")
+        .isVisible();
+      expect(stillOnTypoCheck).toBe(false);
+
+      // Verify the corrected answer is on the host panel
+      await host.click('.sidebar-item:has-text("Antworten")');
+      await host.waitForSelector("#submissions.active");
+      await host.waitForSelector(".submission-card", { timeout: 5000 });
+
+      const submissionText = await host
+        .locator(".submission-card .submission-text")
+        .first()
+        .textContent();
+      expect(submissionText).toContain(correctedText || "");
+
+      debugLog("Typo accept test: Verified no repeated prompts!");
+    } else {
+      debugLog(
+        "Typo accept test: No LLM configured or no changes suggested, skipping accept flow test",
+      );
+    }
+
+    debugLog("Typo accept test completed successfully!");
+  });
 });

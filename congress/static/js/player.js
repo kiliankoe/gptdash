@@ -21,7 +21,8 @@ let currentPrompt = null;
 let currentRoundNo = null;
 let hasSubmitted = false;
 let playerTimer = null;
-let pendingTypoCheck = null; // Track pending typo check data
+let pendingTypoCheck = null;
+let awaitingCorrectionConfirmation = false;
 const MAX_CHARS = 500;
 const WARN_THRESHOLD = 450;
 const STORAGE_KEY = "gptdash_player_token";
@@ -175,36 +176,33 @@ function handleMessage(message) {
       break;
 
     case "round_started":
-      // Reset submission state for new round
       if (typeof message.round?.number === "number") {
         currentRoundNo = message.round.number;
       }
       hasSubmitted = false;
       pendingTypoCheck = null;
+      awaitingCorrectionConfirmation = false;
       currentPrompt = message.round?.selected_prompt || null;
       resetAnswerInput();
       break;
 
     case "submission_confirmed":
       hasSubmitted = true;
-      // If we were showing the typo correction screen, stay there
-      // Otherwise show submitted screen
       if (
         document.getElementById("typoCheckScreen")?.classList.contains("active")
       ) {
-        // We just accepted a correction, go to submitted screen
         showScreen("submittedScreen");
         pendingTypoCheck = null;
-      } else if (!pendingTypoCheck) {
-        // Normal submission confirmed, now request typo check
+      } else if (awaitingCorrectionConfirmation) {
+        awaitingCorrectionConfirmation = false;
         showScreen("submittedScreen");
-        // Request typo check in background
+      } else if (!pendingTypoCheck) {
+        showScreen("submittedScreen");
         const answerInput = document.getElementById("answerInput");
         if (answerInput?.value.trim()) {
           requestTypoCheck(answerInput.value.trim());
         }
       } else {
-        // Submission confirmed while typo check is pending - show submitted
         showScreen("submittedScreen");
       }
       break;
@@ -283,6 +281,7 @@ function resetAnswerInput() {
 function resetRoundUiState() {
   hasSubmitted = false;
   pendingTypoCheck = null;
+  awaitingCorrectionConfirmation = false;
   currentPrompt = null;
   resetAnswerInput();
 }
@@ -516,16 +515,13 @@ function acceptCorrection() {
     return;
   }
 
-  // We need to get the submission ID from the server
-  // Since we already submitted, we send an update
-  // The server will find our submission by player token
+  awaitingCorrectionConfirmation = true;
   wsConn.send({
     t: "submit_answer",
     player_token: playerToken,
     text: pendingTypoCheck.corrected,
   });
 
-  // Show submitting state
   showScreen("submittedScreen");
   pendingTypoCheck = null;
 }
