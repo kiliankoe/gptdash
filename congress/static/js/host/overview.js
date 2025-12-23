@@ -80,6 +80,12 @@ export function updateOverviewFlow() {
   const queuedCount = gameState.queuedPrompts.length;
   const playerCount = getPlayerCount();
 
+  // Show/hide voting controls card based on phase
+  const votingCard = document.getElementById("votingControlsCard");
+  if (votingCard) {
+    votingCard.style.display = phase === "VOTING" ? "block" : "none";
+  }
+
   const canTransitionTo = (target) => validTargets.includes(target);
   const canStartPromptSelection =
     queuedCount > 0 && canTransitionTo("PROMPT_SELECTION");

@@ -266,6 +266,11 @@ pub async fn handle_message(
             voter_token,
             choice_index,
         } => audience::handle_submit_trivia_vote(state, voter_token, choice_index).await,
+
+        ClientMessage::HostRevealVoteLabels => {
+            check_host!(role, "reveal vote labels");
+            host::handle_reveal_vote_labels(state).await
+        }
     }
 }
 

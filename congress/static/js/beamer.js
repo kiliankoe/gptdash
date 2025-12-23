@@ -143,6 +143,10 @@ function handleMessage(msg) {
     case "manual_winners":
       handleManualWinners(msg);
       break;
+    // Vote label reveal (host action)
+    case "vote_labels_revealed":
+      handleVoteLabelsRevealed();
+      break;
     case "error":
       console.error("[Beamer] Error:", msg.code, msg.msg);
       break;
@@ -324,6 +328,12 @@ function handleVoteCounts(msg) {
     funny: msg.funny || {},
   };
   updateVoteBarsAnimated();
+}
+
+function handleVoteLabelsRevealed() {
+  document.querySelectorAll(".vote-bar-label").forEach((label) => {
+    label.classList.remove("hidden");
+  });
 }
 
 function handlePromptCandidates(msg) {
@@ -515,7 +525,10 @@ function initVotingBars() {
   aiContainer.innerHTML = "";
   funnyContainer.innerHTML = "";
 
-  submissions.forEach((sub) => {
+  // Shuffle submissions for anonymous display (same order for both categories)
+  const shuffled = [...submissions].sort(() => Math.random() - 0.5);
+
+  shuffled.forEach((sub) => {
     // AI vote bar
     aiContainer.appendChild(createVoteBar(sub.id, sub.display_text, "ai"));
     // Funny vote bar
@@ -530,7 +543,7 @@ function createVoteBar(id, text, type) {
   bar.className = "vote-bar";
   bar.dataset.submissionId = id;
   bar.innerHTML = `
-        <marquee scrollamount="3" class="vote-bar-marquee">${escapeHtml(text)}</marquee>
+        <div class="vote-bar-label hidden">${escapeHtml(text)}</div>
         <div class="vote-bar-track">
             <div class="vote-bar-fill ${type}" style="width: 0%"></div>
             <div class="vote-bar-count">0</div>

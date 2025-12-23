@@ -813,3 +813,12 @@ pub async fn handle_clear_trivia(state: &Arc<AppState>) -> Option<ServerMessage>
 
     None
 }
+
+pub async fn handle_reveal_vote_labels(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host revealing vote labels on beamer");
+
+    // Broadcast to beamer to reveal the vote labels
+    state.broadcast_to_beamer(ServerMessage::VoteLabelsRevealed);
+
+    None
+}

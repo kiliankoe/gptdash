@@ -615,6 +615,7 @@ body {
    ======================== */
 .scene-voting {
   gap: 40px;
+  overflow: hidden;
 }
 
 .voting-header {
@@ -626,12 +627,16 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 60px;
   flex: 1;
+  width: 100%;
+  min-width: 0;
 }
 
 .voting-category {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .category-title {
@@ -639,10 +644,7 @@ body {
   align-items: center;
   gap: 15px;
   margin-bottom: 10px;
-}
-
-.category-icon {
-  font-size: 36px;
+  min-width: 0;
 }
 
 .vote-bars {
@@ -658,13 +660,18 @@ body {
   gap: 4px;
 }
 
-.vote-bar-marquee {
+.vote-bar-label {
   font-family: var(--font-body);
   font-size: 18px;
   color: var(--color-neutral);
   opacity: 0.9;
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vote-bar-label.hidden {
+  visibility: hidden;
 }
 
 .vote-bar-track {

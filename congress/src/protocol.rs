@@ -165,6 +165,8 @@ pub enum ClientMessage {
         voter_token: String,
         choice_index: usize,
     },
+    /// Reveal vote labels on beamer during VOTING phase (host only)
+    HostRevealVoteLabels,
 }
 
 /// Input for creating a trivia question choice (from client)
@@ -380,6 +382,8 @@ pub enum ServerMessage {
         ai_winner_id: Option<SubmissionId>,
         funny_winner_id: Option<SubmissionId>,
     },
+    /// Broadcast to beamer to reveal vote labels during VOTING phase
+    VoteLabelsRevealed,
     Error {
         code: String,
         msg: String,

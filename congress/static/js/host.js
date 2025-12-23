@@ -435,6 +435,11 @@ function setupEventDelegation() {
       case "set-manual-winner":
         setManualWinner(btn.dataset.winnerType, btn.dataset.submissionId);
         break;
+
+      // Voting controls
+      case "reveal-vote-labels":
+        revealVoteLabels();
+        break;
     }
   });
 }
@@ -477,6 +482,11 @@ function revealNext() {
 function revealPrev() {
   wsConn.send({ t: "host_reveal_prev" });
   log("Zur vorherigen Antwort gewechselt", "info");
+}
+
+function revealVoteLabels() {
+  wsConn.send({ t: "host_reveal_vote_labels" });
+  log("Antworten auf Beamer aufgedeckt", "info");
 }
 
 function resetGame() {
