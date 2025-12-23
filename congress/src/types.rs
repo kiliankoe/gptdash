@@ -163,6 +163,8 @@ pub struct Score {
     pub ai_detect_points: u32,
     pub funny_points: u32,
     pub total: u32,
+    #[serde(default)]
+    pub earliest_correct_ts: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

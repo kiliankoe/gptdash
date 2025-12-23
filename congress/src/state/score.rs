@@ -54,6 +54,7 @@ impl AppState {
                         ai_detect_points: ai_votes,
                         funny_points: funny_votes,
                         total: ai_votes + funny_votes,
+                        earliest_correct_ts: None,
                     };
                     player_scores.push(score);
                 }
@@ -83,12 +84,14 @@ impl AppState {
                         ai_detect_points: 0,
                         funny_points: 0,
                         total: 0,
+                        earliest_correct_ts: None,
                     });
 
                 // +1 if they correctly identified the AI
                 if vote.ai_pick_submission_id == *ai_submission_id {
                     score.ai_detect_points += 1;
                     score.total += 1;
+                    score.earliest_correct_ts = Some(vote.ts.clone());
                 }
             }
         }
@@ -124,6 +127,7 @@ impl AppState {
                             ai_detect_points: 0,
                             funny_points: 0,
                             total: 0,
+                            earliest_correct_ts: None,
                         });
                     // Update display_name if we get a newer one (in case player changed name)
                     if score.display_name.is_some() {
@@ -144,6 +148,7 @@ impl AppState {
                             ai_detect_points: 0,
                             funny_points: 0,
                             total: 0,
+                            earliest_correct_ts: None,
                         });
                     // Update display_name if we get a newer one (in case name was added later)
                     if score.display_name.is_some() && entry.display_name.is_none() {
@@ -152,6 +157,15 @@ impl AppState {
                     entry.ai_detect_points += score.ai_detect_points;
                     entry.funny_points += score.funny_points;
                     entry.total += score.total;
+                    if let Some(new_ts) = &score.earliest_correct_ts {
+                        match &entry.earliest_correct_ts {
+                            None => entry.earliest_correct_ts = Some(new_ts.clone()),
+                            Some(existing_ts) if new_ts < existing_ts => {
+                                entry.earliest_correct_ts = Some(new_ts.clone());
+                            }
+                            _ => {}
+                        }
+                    }
                 }
             }
         }
@@ -159,9 +173,29 @@ impl AppState {
         let mut player_scores: Vec<Score> = player_totals.into_values().collect();
         let mut audience_scores: Vec<Score> = audience_totals.into_values().collect();
 
-        // Sort by total descending
+        // Sort player scores by total descending
         player_scores.sort_by(|a, b| b.total.cmp(&a.total));
-        audience_scores.sort_by(|a, b| b.total.cmp(&a.total));
+
+        // Sort audience scores with tie-breakers:
+        // 1. Total score (descending)
+        // 2. AI detect points (descending)
+        // 3. Earliest correct vote timestamp (ascending - earlier wins, None goes last)
+        audience_scores.sort_by(|a, b| {
+            match b.total.cmp(&a.total) {
+                std::cmp::Ordering::Equal => {}
+                ord => return ord,
+            }
+            match b.ai_detect_points.cmp(&a.ai_detect_points) {
+                std::cmp::Ordering::Equal => {}
+                ord => return ord,
+            }
+            match (&a.earliest_correct_ts, &b.earliest_correct_ts) {
+                (Some(a_ts), Some(b_ts)) => a_ts.cmp(b_ts),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
+        });
 
         (player_scores, audience_scores)
     }
@@ -433,5 +467,84 @@ mod tests {
 
         assert_eq!(player_scores.len(), 1);
         assert_eq!(player_scores[0].total, 3); // 2 from round1 + 1 from round2
+    }
+
+    #[tokio::test]
+    async fn test_audience_tiebreaker_earliest_correct_vote() {
+        let state = AppState::new();
+        state.create_game().await;
+        let round = state.start_round().await.unwrap();
+
+        // Add AI and player submissions
+        let ai_sub = state
+            .submit_answer(&round.id, None, "AI answer".to_string())
+            .await
+            .unwrap();
+        let player = state.create_player().await;
+        let player_sub = state
+            .submit_answer(
+                &round.id,
+                Some(player.id.clone()),
+                "Player answer".to_string(),
+            )
+            .await
+            .unwrap();
+
+        state
+            .rounds
+            .write()
+            .await
+            .get_mut(&round.id)
+            .unwrap()
+            .ai_submission_id = Some(ai_sub.id.clone());
+
+        // voter1 votes first, correctly identifies AI
+        let vote1 = Vote {
+            id: ulid::Ulid::new().to_string(),
+            round_id: round.id.clone(),
+            voter_id: "voter1".to_string(),
+            ai_pick_submission_id: ai_sub.id.clone(),
+            funny_pick_submission_id: player_sub.id.clone(),
+            ts: "2024-01-01T10:00:00Z".to_string(),
+        };
+        // voter2 votes later, also correctly identifies AI
+        let vote2 = Vote {
+            id: ulid::Ulid::new().to_string(),
+            round_id: round.id.clone(),
+            voter_id: "voter2".to_string(),
+            ai_pick_submission_id: ai_sub.id.clone(),
+            funny_pick_submission_id: player_sub.id.clone(),
+            ts: "2024-01-01T10:01:00Z".to_string(),
+        };
+        // voter3 votes even later, also correctly identifies AI
+        let vote3 = Vote {
+            id: ulid::Ulid::new().to_string(),
+            round_id: round.id.clone(),
+            voter_id: "voter3".to_string(),
+            ai_pick_submission_id: ai_sub.id.clone(),
+            funny_pick_submission_id: player_sub.id.clone(),
+            ts: "2024-01-01T10:02:00Z".to_string(),
+        };
+
+        state.votes.write().await.insert(vote1.id.clone(), vote1);
+        state.votes.write().await.insert(vote2.id.clone(), vote2);
+        state.votes.write().await.insert(vote3.id.clone(), vote3);
+
+        let (_player_scores, audience_scores) = state.compute_scores(&round.id).await.unwrap();
+
+        // All three have same total (1 point each)
+        assert_eq!(audience_scores.len(), 3);
+        for score in &audience_scores {
+            assert_eq!(score.total, 1);
+            assert_eq!(score.ai_detect_points, 1);
+        }
+
+        let (_, leaderboard) = state.get_leaderboards().await;
+
+        // Should be sorted by earliest timestamp: voter1 first, voter2 second, voter3 third
+        assert_eq!(leaderboard.len(), 3);
+        assert_eq!(leaderboard[0].ref_id, "voter1");
+        assert_eq!(leaderboard[1].ref_id, "voter2");
+        assert_eq!(leaderboard[2].ref_id, "voter3");
     }
 }
