@@ -1212,7 +1212,7 @@ mod tests {
 
         // Lobby -> PromptSelection (with 2 prompts, stays in PromptSelection)
         assert!(state
-            .transition_phase(GamePhase::PromptSelection)
+            .transition_phase(GamePhase::PromptSelection, None)
             .await
             .is_ok());
 
@@ -1222,15 +1222,15 @@ mod tests {
 
         // Test panic mode: any phase -> Intermission
         assert!(state
-            .transition_phase(GamePhase::Intermission)
+            .transition_phase(GamePhase::Intermission, None)
             .await
             .is_ok());
 
         // Intermission -> any phase
-        assert!(state.transition_phase(GamePhase::Lobby).await.is_ok());
+        assert!(state.transition_phase(GamePhase::Lobby, None).await.is_ok());
 
         // Test hard stop: any phase -> Ended
-        assert!(state.transition_phase(GamePhase::Ended).await.is_ok());
+        assert!(state.transition_phase(GamePhase::Ended, None).await.is_ok());
     }
 
     #[tokio::test]
@@ -1239,17 +1239,17 @@ mod tests {
         state.create_game().await;
 
         // Lobby -> Writing is now valid (with preconditions), but fails without round/prompt
-        let result = state.transition_phase(GamePhase::Writing).await;
+        let result = state.transition_phase(GamePhase::Writing, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Writing phase requires"));
 
         // Can't go from Lobby to Voting (invalid transition)
-        let result = state.transition_phase(GamePhase::Voting).await;
+        let result = state.transition_phase(GamePhase::Voting, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid phase transition"));
 
         // Can't go from Lobby to Reveal (invalid transition)
-        let result = state.transition_phase(GamePhase::Reveal).await;
+        let result = state.transition_phase(GamePhase::Reveal, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid phase transition"));
     }
@@ -1284,7 +1284,7 @@ mod tests {
 
         // Transition to PromptSelection
         state
-            .transition_phase(GamePhase::PromptSelection)
+            .transition_phase(GamePhase::PromptSelection, None)
             .await
             .unwrap();
 
@@ -1292,7 +1292,9 @@ mod tests {
         // So the test needs to verify something different - let's verify PromptSelection requires queued prompts
         let state2 = AppState::new();
         state2.create_game().await;
-        let result = state2.transition_phase(GamePhase::PromptSelection).await;
+        let result = state2
+            .transition_phase(GamePhase::PromptSelection, None)
+            .await;
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -1306,13 +1308,13 @@ mod tests {
 
         // Test direct Lobby -> Writing requires round with prompt
         // First, trying without a round should fail
-        let result = state.transition_phase(GamePhase::Writing).await;
+        let result = state.transition_phase(GamePhase::Writing, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Writing phase requires"));
 
         // Create a round but don't select a prompt
         let round = state.start_round().await.unwrap();
-        let result = state.transition_phase(GamePhase::Writing).await;
+        let result = state.transition_phase(GamePhase::Writing, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("selected prompt"));
 
@@ -1332,7 +1334,10 @@ mod tests {
             .unwrap();
 
         // Now transition should work
-        assert!(state.transition_phase(GamePhase::Writing).await.is_ok());
+        assert!(state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .is_ok());
     }
 
     #[tokio::test]
@@ -1355,10 +1360,13 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
 
         // Try to go to Reveal without submissions
-        let result = state.transition_phase(GamePhase::Reveal).await;
+        let result = state.transition_phase(GamePhase::Reveal, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("at least one submission"));
     }
@@ -1383,7 +1391,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
 
         // Add a submission
         let player = state.create_player().await;
@@ -1397,7 +1408,10 @@ mod tests {
             .unwrap();
 
         // Transition to Reveal should auto-populate reveal_order
-        state.transition_phase(GamePhase::Reveal).await.unwrap();
+        state
+            .transition_phase(GamePhase::Reveal, None)
+            .await
+            .unwrap();
 
         // Check reveal_order was auto-populated
         let current_round = state.get_current_round().await.unwrap();
@@ -1547,7 +1561,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
 
         // Should not be able to start round in Writing phase
         let result = state.start_round().await;
@@ -1676,12 +1693,21 @@ mod tests {
             .unwrap();
 
         // Progress through phases
-        state.transition_phase(GamePhase::Writing).await.unwrap();
-        state.transition_phase(GamePhase::Reveal).await.unwrap();
-        state.transition_phase(GamePhase::Voting).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
+        state
+            .transition_phase(GamePhase::Reveal, None)
+            .await
+            .unwrap();
+        state
+            .transition_phase(GamePhase::Voting, None)
+            .await
+            .unwrap();
 
         // Try to go to RESULTS without setting AI submission
-        let result = state.transition_phase(GamePhase::Results).await;
+        let result = state.transition_phase(GamePhase::Results, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("AI submission to be set"));
     }
@@ -1733,10 +1759,22 @@ mod tests {
         state.votes.write().await.insert(vote.id.clone(), vote);
 
         // Progress to RESULTS (first time)
-        state.transition_phase(GamePhase::Writing).await.unwrap();
-        state.transition_phase(GamePhase::Reveal).await.unwrap();
-        state.transition_phase(GamePhase::Voting).await.unwrap();
-        state.transition_phase(GamePhase::Results).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
+        state
+            .transition_phase(GamePhase::Reveal, None)
+            .await
+            .unwrap();
+        state
+            .transition_phase(GamePhase::Voting, None)
+            .await
+            .unwrap();
+        state
+            .transition_phase(GamePhase::Results, None)
+            .await
+            .unwrap();
 
         let (scores1, _) = state.get_leaderboards().await;
         assert_eq!(scores1.len(), 1);
@@ -1744,10 +1782,13 @@ mod tests {
 
         // Re-enter RESULTS (should not duplicate scores)
         state
-            .transition_phase(GamePhase::Intermission)
+            .transition_phase(GamePhase::Intermission, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Results).await.unwrap();
+        state
+            .transition_phase(GamePhase::Results, None)
+            .await
+            .unwrap();
 
         let (scores2, _) = state.get_leaderboards().await;
         assert_eq!(scores2.len(), 1);

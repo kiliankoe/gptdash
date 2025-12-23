@@ -142,7 +142,13 @@ impl AppState {
     }
 
     /// Transition game phase with validation
-    pub async fn transition_phase(&self, new_phase: GamePhase) -> Result<(), String> {
+    /// `model` specifies which AI model to use when auto-selecting prompts.
+    /// Format: "provider:model" (e.g., "openai:gpt-4o-mini"). If None, uses all providers.
+    pub async fn transition_phase(
+        &self,
+        new_phase: GamePhase,
+        model: Option<String>,
+    ) -> Result<(), String> {
         let mut game = self.game.write().await;
         if let Some(ref mut g) = *game {
             let current_phase = &g.phase;
@@ -185,8 +191,10 @@ impl AppState {
                     match self.start_round().await {
                         Ok(round) => {
                             // Select the prompt (removes from pool, starts LLM)
-                            // Use None for model to generate from all providers (auto-transition)
-                            if let Err(e) = self.select_prompt(&round.id, &prompt.id, None).await {
+                            if let Err(e) = self
+                                .select_prompt(&round.id, &prompt.id, model.clone())
+                                .await
+                            {
                                 tracing::error!("Failed to select prompt: {}", e);
                             }
                         }
@@ -224,9 +232,9 @@ impl AppState {
                         match self.start_round().await {
                             Ok(round) => {
                                 // Select the prompt (removes from pool, starts LLM)
-                                // Use None for model to generate from all providers (auto-transition)
-                                if let Err(e) =
-                                    self.select_prompt(&round.id, &prompt.id, None).await
+                                if let Err(e) = self
+                                    .select_prompt(&round.id, &prompt.id, model.clone())
+                                    .await
                                 {
                                     tracing::error!("Failed to select winning prompt: {}", e);
                                 }

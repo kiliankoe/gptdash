@@ -95,9 +95,9 @@ pub async fn handle_message(
             host::handle_create_players(state, count).await
         }
 
-        ClientMessage::HostTransitionPhase { phase } => {
+        ClientMessage::HostTransitionPhase { phase, model } => {
             check_host!(role, "transition phases");
-            host::handle_transition_phase(state, phase).await
+            host::handle_transition_phase(state, phase, model).await
         }
 
         ClientMessage::HostStartRound => {
@@ -342,6 +342,7 @@ mod tests {
         let result = handle_message(
             ClientMessage::HostTransitionPhase {
                 phase: GamePhase::PromptSelection,
+                model: None,
             },
             &role,
             &state,
@@ -391,7 +392,7 @@ mod tests {
 
         // Transition to a different phase
         state
-            .transition_phase(GamePhase::PromptSelection)
+            .transition_phase(GamePhase::PromptSelection, None)
             .await
             .ok();
 

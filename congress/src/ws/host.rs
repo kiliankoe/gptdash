@@ -31,9 +31,14 @@ pub async fn handle_create_players(state: &Arc<AppState>, count: u32) -> Option<
 pub async fn handle_transition_phase(
     state: &Arc<AppState>,
     phase: crate::types::GamePhase,
+    model: Option<String>,
 ) -> Option<ServerMessage> {
-    tracing::info!("Host transitioning to phase: {:?}", phase);
-    match state.transition_phase(phase.clone()).await {
+    tracing::info!(
+        "Host transitioning to phase: {:?} with model: {:?}",
+        phase,
+        model
+    );
+    match state.transition_phase(phase.clone(), model).await {
         Ok(_) => {
             let game = state.get_game().await?;
             let valid_transitions = AppState::get_valid_transitions(&game.phase);

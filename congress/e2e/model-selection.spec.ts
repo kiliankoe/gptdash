@@ -252,7 +252,14 @@ test.describe("Model Selection", () => {
         timeout: 5000,
       });
 
-      // Start with default (all providers)
+      // Start with gpt-3.5-turbo first
+      await host.click('.sidebar-item:has-text("Antworten")');
+      await host.waitForSelector("#submissions.active");
+      await host.selectOption("#modelSelector", "openai:gpt-3.5-turbo");
+
+      // Go back and start the round
+      await host.click('.sidebar-item:has-text("Prompts")');
+      await host.waitForSelector("#prompts.active");
       await host.click("#startPromptSelectionBtn");
       await expect(host.locator("#overviewPhase")).toHaveText("WRITING", {
         timeout: 10000,
@@ -262,31 +269,28 @@ test.describe("Model Selection", () => {
       await host.click('.sidebar-item:has-text("Antworten")');
       await host.waitForSelector("#submissions.active");
 
-      // Wait for initial AI submission
+      // Wait for initial AI submission from gpt-3.5-turbo
       await host.waitForSelector(".ai-submission-card", { timeout: 30000 });
+      const initialCard = host.locator(".ai-submission-card").first();
+      await expect(initialCard.locator(".model-name")).toHaveText(
+        "gpt-3.5-turbo",
+        { timeout: 10000 },
+      );
 
-      // Count initial AI submissions
-      const initialCount = await host.locator(".ai-submission-card").count();
-
-      // Now select a specific model and regenerate
+      // Now select gpt-4o-mini and regenerate
       await host.selectOption("#modelSelector", "openai:gpt-4o-mini");
-
-      // Click regenerate button
       await host.click('button:has-text("KI neu generieren")');
 
-      // Wait for new submission to appear
-      await host.waitForTimeout(5000);
-
-      // Should have at least one more AI submission
-      const newCount = await host.locator(".ai-submission-card").count();
-      expect(newCount).toBeGreaterThan(initialCount);
-
-      // The newest submission should be from gpt-4o-mini
-      // (submissions are displayed newest first or we can check any has the model)
-      const gpt4oMiniCard = host.locator(
-        '.ai-submission-card:has(.model-name:text("gpt-4o-mini"))',
+      // Wait for regeneration to complete - model should now be gpt-4o-mini
+      // (regeneration from same provider replaces the submission)
+      await expect(host.locator(".ai-submission-card .model-name")).toHaveText(
+        "gpt-4o-mini",
+        { timeout: 30000 },
       );
-      await expect(gpt4oMiniCard).toBeVisible();
+
+      // Verify we still have exactly one AI submission (replacement, not addition)
+      const count = await host.locator(".ai-submission-card").count();
+      expect(count).toBe(1);
     });
   });
 });

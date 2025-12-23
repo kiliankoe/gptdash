@@ -41,6 +41,11 @@ pub enum ClientMessage {
     },
     HostTransitionPhase {
         phase: GamePhase,
+        /// Optional model to use for AI generation when auto-selecting prompts.
+        /// Format: "provider:model" (e.g., "openai:gpt-4o-mini")
+        /// Only used when transitioning to PromptSelection/Writing with auto-prompt selection.
+        #[serde(default)]
+        model: Option<String>,
     },
     HostStartRound,
     HostSelectPrompt {

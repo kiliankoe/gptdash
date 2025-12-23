@@ -497,7 +497,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
 
         // Now should succeed
         let result = state.present_trivia(&question.id).await;
@@ -533,7 +536,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
 
         // Present q1
         state.present_trivia(&q1.id).await.unwrap();
@@ -569,7 +575,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
         state.present_trivia(&question.id).await.unwrap();
 
         // Vote
@@ -616,7 +625,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
         state.present_trivia(&question.id).await.unwrap();
 
         // Initial vote for choice 0
@@ -666,7 +678,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
         state.present_trivia(&question.id).await.unwrap();
 
         // Add votes
@@ -721,7 +736,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
         state.present_trivia(&question.id).await.unwrap();
 
         // Verify active
@@ -759,7 +777,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
         state.present_trivia(&question.id).await.unwrap();
 
         // Invalid choice index (3 is out of bounds)
@@ -804,7 +825,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
         state.present_trivia(&question.id).await.unwrap();
 
         // No vote yet
@@ -853,7 +877,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
         state.present_trivia(&question.id).await.unwrap();
 
         // Vote
@@ -906,7 +933,10 @@ mod tests {
             .select_prompt(&round.id, &prompt.id, None)
             .await
             .unwrap();
-        state.transition_phase(GamePhase::Writing).await.unwrap();
+        state
+            .transition_phase(GamePhase::Writing, None)
+            .await
+            .unwrap();
         state.present_trivia(&question.id).await.unwrap();
 
         // Vote for all 4 choices

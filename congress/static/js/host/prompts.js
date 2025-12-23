@@ -535,8 +535,10 @@ export function startPromptSelection(wsConn) {
     showAlert("Keine Prompts in der Warteschlange", "warning");
     return;
   }
+  const model = getSelectedModel();
   wsConn.send({
     t: "host_transition_phase",
     phase: "PROMPT_SELECTION",
+    model: model,
   });
 }

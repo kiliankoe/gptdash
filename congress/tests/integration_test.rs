@@ -135,6 +135,7 @@ async fn test_full_game_flow() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -198,6 +199,7 @@ async fn test_full_game_flow() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Reveal,
+            model: None,
         },
         &host_role,
         &state,
@@ -240,6 +242,7 @@ async fn test_full_game_flow() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Voting,
+            model: None,
         },
         &host_role,
         &state,
@@ -331,6 +334,7 @@ async fn test_full_game_flow() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Results,
+            model: None,
         },
         &host_role,
         &state,
@@ -408,6 +412,7 @@ async fn test_full_game_flow() {
     let intermission_result = handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Intermission,
+            model: None,
         },
         &host_role,
         &state,
@@ -429,6 +434,7 @@ async fn test_full_game_flow() {
     let results_again_result = handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Results,
+            model: None,
         },
         &host_role,
         &state,
@@ -467,6 +473,7 @@ async fn test_invalid_phase_transitions() {
     let result = handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Voting,
+            model: None,
         },
         &host_role,
         &state,
@@ -494,6 +501,7 @@ async fn test_phase_preconditions() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -507,6 +515,7 @@ async fn test_phase_preconditions() {
     let result = handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -549,6 +558,7 @@ async fn test_unauthorized_host_commands() {
     let result = handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &audience_role,
         &state,
@@ -688,6 +698,7 @@ async fn test_player_status_tracking() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -714,6 +725,7 @@ async fn test_player_status_tracking() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -776,6 +788,7 @@ async fn test_submission_update() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -802,6 +815,7 @@ async fn test_submission_update() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -892,6 +906,7 @@ async fn test_submission_update_unauthorized() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -918,6 +933,7 @@ async fn test_submission_update_unauthorized() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -992,6 +1008,7 @@ async fn test_host_write_ai_submission() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -1168,6 +1185,7 @@ async fn test_host_regenerate_ai_no_prompt() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -1206,6 +1224,7 @@ async fn test_select_ai_submission() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -1294,6 +1313,7 @@ async fn test_create_manual_ai_submission_method() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -1401,6 +1421,7 @@ async fn test_remove_player_mid_round() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -1427,6 +1448,7 @@ async fn test_remove_player_mid_round() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -1479,6 +1501,7 @@ async fn test_remove_player_mid_round() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Reveal,
+            model: None,
         },
         &host_role,
         &state,
@@ -1488,6 +1511,7 @@ async fn test_remove_player_mid_round() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Voting,
+            model: None,
         },
         &host_role,
         &state,
@@ -1574,6 +1598,7 @@ async fn test_remove_player_mid_round() {
     let result = handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Results,
+            model: None,
         },
         &host_role,
         &state,
@@ -1616,6 +1641,7 @@ async fn test_add_player_mid_round() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -1642,6 +1668,7 @@ async fn test_add_player_mid_round() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -1745,6 +1772,7 @@ async fn test_multimodal_prompt_image_only() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -1796,6 +1824,7 @@ async fn test_multimodal_prompt_text_and_image() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -1837,6 +1866,7 @@ async fn test_multimodal_prompt_requires_content() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -1871,6 +1901,7 @@ async fn test_multimodal_prompt_via_handler() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -1936,6 +1967,7 @@ async fn test_multimodal_prompt_selected_includes_image() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -2045,6 +2077,7 @@ async fn test_add_prompt_after_starting_round() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -2115,6 +2148,7 @@ async fn test_host_prompts_broadcast_after_add() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -2200,6 +2234,7 @@ async fn test_submit_answer_invalid_token() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -2226,6 +2261,7 @@ async fn test_submit_answer_invalid_token() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -2314,6 +2350,7 @@ async fn test_valid_player_token_flow() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -2340,6 +2377,7 @@ async fn test_valid_player_token_flow() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -2645,6 +2683,7 @@ async fn test_manual_winners_broadcast() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -2671,6 +2710,7 @@ async fn test_manual_winners_broadcast() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -2725,6 +2765,7 @@ async fn test_manual_winners_broadcast() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Reveal,
+            model: None,
         },
         &host_role,
         &state,
@@ -2734,6 +2775,7 @@ async fn test_manual_winners_broadcast() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Voting,
+            model: None,
         },
         &host_role,
         &state,
@@ -2784,6 +2826,7 @@ async fn test_manual_winners_broadcast() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Results,
+            model: None,
         },
         &host_role,
         &state,
@@ -2887,7 +2930,7 @@ async fn test_prompt_selection_audience_voting() {
 
     // Transition to PROMPT_SELECTION - should NOT auto-advance with 2 prompts
     state
-        .transition_phase(GamePhase::PromptSelection)
+        .transition_phase(GamePhase::PromptSelection, None)
         .await
         .unwrap();
 
@@ -2925,6 +2968,7 @@ async fn test_prompt_selection_audience_voting() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -2993,7 +3037,7 @@ async fn test_prompt_selection_tie_resolution() {
 
     // Transition to PROMPT_SELECTION
     state
-        .transition_phase(GamePhase::PromptSelection)
+        .transition_phase(GamePhase::PromptSelection, None)
         .await
         .unwrap();
 
@@ -3011,6 +3055,7 @@ async fn test_prompt_selection_tie_resolution() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -3126,6 +3171,7 @@ async fn test_vote_timing_early_rejection() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -3152,6 +3198,7 @@ async fn test_vote_timing_early_rejection() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -3189,6 +3236,7 @@ async fn test_vote_timing_early_rejection() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Reveal,
+            model: None,
         },
         &host_role,
         &state,
@@ -3285,6 +3333,7 @@ async fn test_vote_timing_after_window() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::PromptSelection,
+            model: None,
         },
         &host_role,
         &state,
@@ -3311,6 +3360,7 @@ async fn test_vote_timing_after_window() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Writing,
+            model: None,
         },
         &host_role,
         &state,
@@ -3348,6 +3398,7 @@ async fn test_vote_timing_after_window() {
     handle_message(
         ClientMessage::HostTransitionPhase {
             phase: GamePhase::Reveal,
+            model: None,
         },
         &host_role,
         &state,
