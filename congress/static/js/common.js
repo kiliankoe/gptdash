@@ -39,7 +39,6 @@ class WSConnection {
     if (this.token) {
       wsUrl += `&token=${encodeURIComponent(this.token)}`;
     }
-    console.log("Connecting to:", wsUrl);
 
     this.ws = new WebSocket(wsUrl);
 
@@ -52,7 +51,6 @@ class WSConnection {
 
     this.ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      console.log("Received:", message);
       if (this.onMessage) {
         this.onMessage(message);
       }
@@ -78,10 +76,8 @@ class WSConnection {
   send(message) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
-      console.log("Sent:", message);
       return true;
     } else {
-      console.error("WebSocket not connected");
       return false;
     }
   }
@@ -244,11 +240,9 @@ function copyToClipboard(text) {
     navigator.clipboard
       .writeText(text)
       .then(() => {
-        console.log("Copied to clipboard:", text);
         return true;
       })
-      .catch((err) => {
-        console.error("Failed to copy:", err);
+      .catch(() => {
         return false;
       });
   } else {
@@ -261,10 +255,8 @@ function copyToClipboard(text) {
     textarea.select();
     try {
       document.execCommand("copy");
-      console.log("Copied to clipboard:", text);
       return true;
-    } catch (err) {
-      console.error("Failed to copy:", err);
+    } catch {
       return false;
     } finally {
       document.body.removeChild(textarea);
@@ -514,11 +506,6 @@ class TTSManager {
       // Listen for async voice loading (Chrome/Edge)
       this.synthesis.addEventListener("voiceschanged", () => {
         this.voicesLoaded = true;
-        console.log(
-          "[TTS] Voices loaded:",
-          this.synthesis.getVoices().length,
-          "voices available",
-        );
       });
     }
   }
@@ -530,12 +517,10 @@ class TTSManager {
    */
   speak(text, options = {}) {
     if (!this.synthesis) {
-      console.warn("[TTS] Speech synthesis not supported in this browser");
       return;
     }
 
     if (!text || text.trim().length === 0) {
-      console.warn("[TTS] Empty text, skipping");
       return;
     }
 
@@ -557,19 +542,12 @@ class TTSManager {
       }
     }
 
-    // Add event handlers for debugging and error detection
-    utterance.onstart = () => {
-      console.log("[TTS] Speech started");
-    };
-
     utterance.onend = () => {
-      console.log("[TTS] Speech ended");
       this._stopResumeWorkaround();
       if (options.onEnd) options.onEnd();
     };
 
     utterance.onerror = (event) => {
-      console.error("[TTS] Speech error:", event.error);
       this._stopResumeWorkaround();
       if (options.onError) options.onError(event.error);
     };
@@ -645,10 +623,6 @@ class ChallengeSolver {
   setChallenge(nonce, roundId) {
     this.currentNonce = nonce;
     this.currentRoundId = roundId;
-    console.log("Challenge received:", {
-      nonce: `${nonce?.slice(0, 8)}...`,
-      roundId,
-    });
   }
 
   /**
@@ -786,8 +760,6 @@ class MessageDispatcher {
     const handler = this.handlers.get(msg.t);
     if (handler) {
       handler(msg);
-    } else {
-      console.warn(`[${this.role}] Unhandled message type: ${msg.t}`);
     }
   }
 }

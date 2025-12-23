@@ -401,8 +401,6 @@ function editAnswer() {
 }
 
 function updateScreen(phase) {
-  console.log("Phase update:", phase);
-
   switch (phase) {
     case "LOBBY":
     case "PROMPT_SELECTION":
@@ -452,7 +450,6 @@ function updateCharCounter() {
 }
 
 function handleError(message) {
-  console.error("Server error:", message);
   // Show error in current screen context
   const currentScreen = document.querySelector(".screen.active");
   if (currentScreen) {
@@ -465,7 +462,6 @@ function handleError(message) {
 
 function requestTypoCheck(text) {
   if (!wsConn || !wsConn.isConnected()) {
-    console.warn("Cannot request typo check: not connected");
     return;
   }
 
@@ -476,13 +472,9 @@ function requestTypoCheck(text) {
     player_token: playerToken,
     text: text,
   });
-
-  console.log("Requested typo check for submission");
 }
 
 function handleTypoCheckResult(message) {
-  console.log("Typo check result:", message.has_changes);
-
   if (!message.has_changes) {
     // No changes needed, stay on submitted screen
     pendingTypoCheck = null;
@@ -516,7 +508,6 @@ function showTypoCheckScreen(original, corrected) {
 
 function acceptCorrection() {
   if (!pendingTypoCheck || !pendingTypoCheck.corrected) {
-    console.error("No pending correction to accept");
     return;
   }
 

@@ -86,7 +86,6 @@ function requireConnection(errorElementId) {
 function handleMessage(message) {
   switch (message.t) {
     case "welcome":
-      console.log("Welcome message:", message);
       if (message.game) {
         currentRoundNo = message.game.round_no;
         softPanicMode = message.game.soft_panic_mode || false;
@@ -104,9 +103,6 @@ function handleMessage(message) {
       break;
 
     case "audience_state":
-      // State recovery on reconnect
-      console.log("Audience state recovery:", message);
-
       // Store and display the friendly name
       if (message.display_name) {
         displayName = message.display_name;
@@ -177,7 +173,6 @@ function handleMessage(message) {
       break;
 
     case "vote_ack":
-      console.log("Vote acknowledged");
       hasVoted = true;
       showScreen("confirmedScreen");
       updateVoteSummary();
@@ -185,24 +180,19 @@ function handleMessage(message) {
       break;
 
     case "prompt_candidates":
-      // Received prompt options for voting
       promptCandidates = message.prompts || [];
-      console.log("Prompt candidates received:", promptCandidates);
       if (currentPhase === "PROMPT_SELECTION" && promptCandidates.length > 1) {
         showPromptVotingScreen();
       }
       break;
 
     case "prompt_vote_ack":
-      console.log("Prompt vote acknowledged");
       hasPromptVoted = true;
       showScreen("promptVoteConfirmedScreen");
       updatePromptVoteSummary();
       break;
 
     case "audience_prompt_vote_state":
-      // State recovery for prompt voting on reconnect
-      console.log("Audience prompt vote state recovery:", message);
       if (message.has_voted && message.voted_prompt_id) {
         hasPromptVoted = true;
         selectedPrompt = message.voted_prompt_id;
@@ -215,16 +205,12 @@ function handleMessage(message) {
       break;
 
     case "vote_challenge":
-      // Store vote challenge for anti-automation
-      console.log("Vote challenge received:", message);
       if (challengeSolver && message.nonce) {
         challengeSolver.setChallenge(message.nonce, message.round_id);
       }
       break;
 
     case "scores":
-      // Store leaderboard for winner detection in PODIUM phase
-      console.log("Scores received:", message);
       audienceLeaderboard = message.audience_top || [];
       checkWinnerStatus();
       break;
@@ -235,15 +221,12 @@ function handleMessage(message) {
       break;
 
     case "trivia_vote_ack":
-      console.log("Trivia vote acknowledged:", message);
       hasTriviaVoted = true;
       showScreen("triviaConfirmedScreen");
       updateTriviaVoteSummary();
       break;
 
     case "trivia_vote_state":
-      // State recovery for trivia voting on reconnect
-      console.log("Trivia vote state recovery:", message);
       if (message.has_voted && message.choice_index !== null) {
         hasTriviaVoted = true;
         selectedTriviaChoice = message.choice_index;
@@ -332,7 +315,6 @@ function joinAudience() {
 }
 
 function updatePhase(phase) {
-  console.log("Phase update:", phase);
   currentPhase = phase;
 
   switch (phase) {
@@ -506,8 +488,6 @@ function createAnswerOption(category, sub, index) {
 }
 
 function selectAnswer(category, answerId) {
-  console.log(`Selected ${category}:`, answerId);
-
   if (category === "ai") {
     selectedAiAnswer = answerId;
     document
@@ -555,8 +535,7 @@ async function submitVote() {
       return;
     }
     challenge = await challengeSolver.solve(voterToken);
-  } catch (e) {
-    console.error("Challenge solve failed:", e);
+  } catch {
     showError("voteError", "Technischer Fehler. Bitte Seite neu laden.");
     return;
   }
@@ -604,9 +583,7 @@ function updateVoteSummary() {
   document.getElementById("summaryFunnyPick").textContent = funnyLabel;
 }
 
-function handleError(code, message) {
-  console.error("Server error:", code, message);
-
+function handleError(_code, message) {
   if (document.getElementById("welcomeScreen").classList.contains("active")) {
     showError("welcomeError", message);
   } else {
@@ -774,7 +751,6 @@ function renderPromptOptions() {
 }
 
 function selectPromptOption(promptId) {
-  console.log("Selected prompt:", promptId);
   selectedPrompt = promptId;
 
   // Update UI
@@ -853,7 +829,6 @@ function updatePromptVoteSummary() {
 // ========================
 
 function handleTriviaQuestion(message) {
-  console.log("Trivia question received:", message);
   triviaQuestion = {
     question_id: message.question_id,
     question: message.question,
@@ -870,7 +845,6 @@ function handleTriviaQuestion(message) {
 }
 
 function handleTriviaResult(message) {
-  console.log("Trivia result received:", message);
   triviaResult = {
     question_id: message.question_id,
     question: message.question,
@@ -886,7 +860,6 @@ function handleTriviaResult(message) {
 }
 
 function handleTriviaClear() {
-  console.log("Trivia cleared");
   triviaQuestion = null;
   triviaResult = null;
   hasTriviaVoted = false;
@@ -941,7 +914,6 @@ function renderTriviaOptions() {
 }
 
 function selectTriviaChoice(choiceIndex) {
-  console.log("Selected trivia choice:", choiceIndex);
   selectedTriviaChoice = choiceIndex;
 
   // Update UI
@@ -958,21 +930,13 @@ function selectTriviaChoice(choiceIndex) {
 
 function submitTriviaVote() {
   if (selectedTriviaChoice === null) {
-    console.log("submitTriviaVote: No choice selected, returning");
     return;
   }
 
   if (!requireConnection("triviaError")) {
-    console.log("submitTriviaVote: Not connected, returning");
     return;
   }
 
-  console.log("submitTriviaVote: Sending vote", {
-    voter_token: voterToken,
-    choice_index: selectedTriviaChoice,
-  });
-
-  // Send trivia vote
   const sent = wsConn.send({
     t: "submit_trivia_vote",
     voter_token: voterToken,
