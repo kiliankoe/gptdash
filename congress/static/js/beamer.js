@@ -6,7 +6,6 @@
 import {
   WSConnection,
   CountdownTimer,
-  TTSManager,
   QRCodeManager,
   escapeHtml,
   updateConnectionStatus,
@@ -37,8 +36,6 @@ const gameState = {
 // Connections and utilities
 let ws = null;
 let timer = null;
-let tts = null;
-let lastSpokenSubmissionId = null;
 
 const MAX_PLAYER_LEADERBOARD_ROWS = 6;
 const MAX_AUDIENCE_LEADERBOARD_ROWS = 6;
@@ -49,9 +46,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initializeBeamer() {
-  // Initialize TTS
-  tts = new TTSManager();
-
   // Initialize timer (using phase-specific timers, no footer timer)
   timer = new CountdownTimer("writingTimer", onTimerComplete);
 
@@ -209,7 +203,6 @@ function handlePhaseChange(msg) {
   // Clear reveal state when leaving REVEAL phase
   if (previousPhase === "REVEAL" && msg.phase !== "REVEAL") {
     gameState.currentRevealSubmission = null;
-    lastSpokenSubmissionId = null;
   }
 
   // Clear trivia when leaving WRITING phase
@@ -245,7 +238,6 @@ function resetRoundUiState() {
   gameState.promptVoteCounts = {};
   gameState.manualAiWinner = null;
   gameState.manualFunnyWinner = null;
-  lastSpokenSubmissionId = null;
   updateSubmissionCounter();
   updateRevealIndicator();
   clearPromptDisplay();
@@ -713,17 +705,6 @@ function showRevealCard(submission, index) {
     card.style.animation = "none";
     card.offsetHeight; // Trigger reflow
     card.style.animation = "slideUp 0.6s ease-out";
-  }
-
-  // Speak the answer with TTS (only if we haven't spoken this one yet)
-  if (submission.id !== lastSpokenSubmissionId) {
-    lastSpokenSubmissionId = submission.id;
-    setTimeout(() => {
-      tts.speak(submission.display_text, {
-        rate: 0.9,
-        pitch: 1.0,
-      });
-    }, 600);
   }
 
   updateRevealIndicator();

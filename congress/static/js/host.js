@@ -10,6 +10,7 @@ import {
   escapeHtml,
   restorePanelFromUrl,
   showPanel,
+  TTSManager,
   WSConnection,
 } from "./common.js";
 
@@ -87,6 +88,7 @@ import {
 // Module-level variables
 let wsConn = null;
 let hostTimer = null;
+let tts = null;
 
 // Initialize
 function init() {
@@ -110,6 +112,11 @@ function init() {
 
   // Initialize timer
   hostTimer = new CountdownTimer("hostTimer");
+
+  // Initialize TTS and check audio access
+  tts = new TTSManager();
+  checkAudioAccess();
+  setupAudioUnlockButton();
 
   // Generate QR codes for joining
   generateJoinQRCodes();
@@ -182,6 +189,15 @@ function handleMessage(message) {
         gameState.currentRound.reveal_index = message.reveal_index;
       }
       updateOverviewRevealStatus();
+
+      // Play TTS for the revealed submission
+      if (message.submission && tts) {
+        tts.speak(message.submission.display_text, {
+          rate: 0.9,
+          pitch: 1.0,
+          onError: (err) => console.warn("[TTS] Speech error:", err),
+        });
+      }
       break;
 
     case "deadline_update":
@@ -875,6 +891,48 @@ function updateTriviaUI() {
 function clearTriviaResult() {
   wsConn.send({
     t: "host_clear_trivia",
+  });
+}
+
+/**
+ * Check if audio/TTS is available without user interaction
+ */
+function checkAudioAccess() {
+  if (!window.speechSynthesis) {
+    showAudioUnlockButton();
+    return;
+  }
+
+  const testUtterance = new SpeechSynthesisUtterance("");
+  testUtterance.volume = 0;
+
+  testUtterance.onerror = (event) => {
+    if (event.error === "not-allowed") {
+      showAudioUnlockButton();
+    }
+  };
+
+  window.speechSynthesis.speak(testUtterance);
+}
+
+function showAudioUnlockButton() {
+  const container = document.getElementById("audioUnlockContainer");
+  if (container) container.style.display = "block";
+}
+
+function hideAudioUnlockButton() {
+  const container = document.getElementById("audioUnlockContainer");
+  if (container) container.style.display = "none";
+}
+
+function setupAudioUnlockButton() {
+  const btn = document.getElementById("unlockAudioBtn");
+  if (!btn) return;
+
+  btn.addEventListener("click", () => {
+    const utterance = new SpeechSynthesisUtterance("");
+    window.speechSynthesis.speak(utterance);
+    hideAudioUnlockButton();
   });
 }
 
