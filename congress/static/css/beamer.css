@@ -618,8 +618,22 @@ body {
   overflow: hidden;
 }
 
-.voting-header {
+.voting-prompt {
   text-align: center;
+}
+
+.voting-prompt-text {
+  color: var(--color-neutral);
+}
+
+.voting-prompt-image {
+  margin-bottom: 15px;
+}
+
+.voting-prompt-image img {
+  max-height: 15vh;
+  max-width: 50vw;
+  border-radius: var(--radius-md, 8px);
 }
 
 .voting-categories {

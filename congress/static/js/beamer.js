@@ -514,6 +514,17 @@ function updateSubmissionCounter() {
 }
 
 function initVotingBars() {
+  // Display the current prompt at the top of the voting scene
+  const votingPromptText = document.getElementById("votingPromptText");
+  const votingPromptImage = document.getElementById("votingPromptImage");
+  if (gameState.currentRound?.selected_prompt) {
+    renderPromptDisplay(
+      gameState.currentRound.selected_prompt,
+      votingPromptText,
+      votingPromptImage,
+    );
+  }
+
   const submissions = gameState.submissions;
   if (submissions.length === 0) return;
 
