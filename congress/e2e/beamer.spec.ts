@@ -112,10 +112,14 @@ test.describe("Beamer", () => {
     // Player joins with token
     await players[0].fill("#tokenInput", tokens[0]);
     await players[0].click("#joinButton");
-    await players[0].waitForSelector("#registerScreen.active", { timeout: 5000 });
+    await players[0].waitForSelector("#registerScreen.active", {
+      timeout: 5000,
+    });
     await players[0].fill("#nameInput", "TestPlayer");
     await players[0].click("#registerButton");
-    await players[0].waitForSelector("#waitingScreen.active", { timeout: 5000 });
+    await players[0].waitForSelector("#waitingScreen.active", {
+      timeout: 5000,
+    });
 
     // Add and queue prompt
     await host.click('.sidebar-item:has-text("Prompts")');
@@ -137,7 +141,9 @@ test.describe("Beamer", () => {
     await players[0].waitForSelector("#answerInput", { timeout: 10000 });
     await players[0].fill("#answerInput", "Test answer for voting");
     await players[0].click("#submitButton");
-    await players[0].waitForSelector("#submittedScreen.active", { timeout: 5000 });
+    await players[0].waitForSelector("#submittedScreen.active", {
+      timeout: 5000,
+    });
 
     // Navigate to REVEAL and reveal answers
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
