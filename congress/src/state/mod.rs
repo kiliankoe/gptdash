@@ -14,7 +14,49 @@ use export::GameStateExport;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::{broadcast, RwLock};
+
+/// Token bucket for per-token WebSocket message rate limiting
+#[derive(Debug)]
+struct WsTokenBucket {
+    rate_per_sec: f64,
+    burst: f64,
+    allowance: f64,
+    last_check: Instant,
+    last_used: Instant,
+}
+
+impl WsTokenBucket {
+    fn new(rate_per_sec: f64, burst: f64) -> Self {
+        let now = Instant::now();
+        Self {
+            rate_per_sec,
+            burst,
+            allowance: burst,
+            last_check: now,
+            last_used: now,
+        }
+    }
+
+    fn allow(&mut self) -> bool {
+        let now = Instant::now();
+        let elapsed = (now - self.last_check).as_secs_f64();
+        self.last_check = now;
+        self.last_used = now;
+
+        self.allowance = (self.allowance + elapsed * self.rate_per_sec).min(self.burst);
+        if self.allowance < 1.0 {
+            return false;
+        }
+        self.allowance -= 1.0;
+        true
+    }
+
+    fn is_stale(&self, max_idle_secs: u64) -> bool {
+        self.last_used.elapsed().as_secs() > max_idle_secs
+    }
+}
 
 /// Shared application state
 #[derive(Clone)]
@@ -22,6 +64,8 @@ pub struct AppState {
     pub game: Arc<RwLock<Option<Game>>>,
     pub rounds: Arc<RwLock<HashMap<RoundId, Round>>>,
     pub submissions: Arc<RwLock<HashMap<SubmissionId, Submission>>>,
+    /// Secondary index: submissions by round for O(1) lookup
+    pub submissions_by_round: Arc<RwLock<HashMap<RoundId, HashSet<SubmissionId>>>>,
     pub votes: Arc<RwLock<HashMap<VoteId, Vote>>>,
     pub players: Arc<RwLock<HashMap<PlayerId, Player>>>,
     pub scores: Arc<RwLock<Vec<Score>>>,
@@ -73,6 +117,8 @@ pub struct AppState {
     pub connected_hosts: Arc<AtomicU32>,
     /// Signal to disconnect all audience connections (for panic mode)
     pub audience_disconnect: broadcast::Sender<()>,
+    /// Per-token rate limiters for WebSocket message rate limiting
+    rate_limiters: Arc<RwLock<HashMap<String, WsTokenBucket>>>,
 }
 
 impl AppState {
@@ -89,6 +135,7 @@ impl AppState {
             game: Arc::new(RwLock::new(None)),
             rounds: Arc::new(RwLock::new(HashMap::new())),
             submissions: Arc::new(RwLock::new(HashMap::new())),
+            submissions_by_round: Arc::new(RwLock::new(HashMap::new())),
             votes: Arc::new(RwLock::new(HashMap::new())),
             players: Arc::new(RwLock::new(HashMap::new())),
             scores: Arc::new(RwLock::new(Vec::new())),
@@ -116,6 +163,7 @@ impl AppState {
             connected_beamers: Arc::new(AtomicU32::new(0)),
             connected_hosts: Arc::new(AtomicU32::new(0)),
             audience_disconnect: audience_disconnect_tx,
+            rate_limiters: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -138,6 +186,32 @@ impl AppState {
     pub fn disconnect_all_audience(&self) {
         let _ = self.audience_disconnect.send(());
         tracing::info!("Sent disconnect signal to all audience connections");
+    }
+
+    // =========================================================================
+    // Rate Limiting
+    // =========================================================================
+
+    /// Check if a token is allowed to send a message (per-token rate limiting).
+    /// Returns true if allowed, false if rate limited.
+    pub async fn check_rate_limit(&self, token: &str) -> bool {
+        let mut limiters = self.rate_limiters.write().await;
+        let limiter = limiters
+            .entry(token.to_string())
+            .or_insert_with(|| WsTokenBucket::new(20.0, 40.0));
+        limiter.allow()
+    }
+
+    /// Clean up stale rate limiters that haven't been used recently
+    pub async fn cleanup_stale_rate_limiters(&self) {
+        const MAX_IDLE_SECS: u64 = 300; // 5 minutes
+        let mut limiters = self.rate_limiters.write().await;
+        let before_count = limiters.len();
+        limiters.retain(|_, limiter| !limiter.is_stale(MAX_IDLE_SECS));
+        let removed = before_count - limiters.len();
+        if removed > 0 {
+            tracing::debug!("Cleaned up {} stale rate limiters", removed);
+        }
     }
 
     // =========================================================================
@@ -310,20 +384,20 @@ impl AppState {
     /// Returns the member (newly created or existing)
     /// Also updates last_seen timestamp for existing members
     pub async fn get_or_create_audience_member(&self, voter_id: &str) -> AudienceMember {
-        // Check if member already exists - if so, update last_seen
-        {
-            let mut members = self.audience_members.write().await;
-            if let Some(member) = members.get_mut(voter_id) {
-                member.last_seen = Some(chrono::Utc::now().to_rfc3339());
-                return member.clone();
-            }
+        // Acquire write locks upfront to prevent race conditions.
+        // Two concurrent requests for the same voter_id could otherwise both generate names
+        // before either inserts, leading to duplicate names or wasted work.
+        let mut members = self.audience_members.write().await;
+        let mut used_names = self.used_display_names.write().await;
+
+        // Check if member already exists - if so, update last_seen and return
+        if let Some(member) = members.get_mut(voter_id) {
+            member.last_seen = Some(chrono::Utc::now().to_rfc3339());
+            return member.clone();
         }
 
-        // Generate a unique name using the cached set (O(1) lookup instead of O(n) clone)
-        let display_name = {
-            let used_names = self.used_display_names.read().await;
-            Self::generate_unique_name(&used_names)
-        };
+        // Generate a unique name while holding the lock
+        let display_name = Self::generate_unique_name(&used_names);
 
         // Create and store the new member
         let member = AudienceMember {
@@ -333,11 +407,8 @@ impl AppState {
         };
 
         // Insert into both the members map and the used names set
-        self.audience_members
-            .write()
-            .await
-            .insert(voter_id.to_string(), member.clone());
-        self.used_display_names.write().await.insert(display_name);
+        members.insert(voter_id.to_string(), member.clone());
+        used_names.insert(display_name);
 
         tracing::info!(
             "Created new audience member: {} -> {}",
@@ -639,6 +710,16 @@ impl AppState {
         // Validate: must have either text or image_url
         if text.is_none() && image_url.is_none() {
             return Err("Prompt must have either text or image_url".to_string());
+        }
+
+        // Validate image URL if provided - block dangerous schemes but allow relative URLs
+        if let Some(ref url) = image_url {
+            // Only validate absolute URLs (relative URLs fail to parse and are fine)
+            if let Ok(parsed) = reqwest::Url::parse(url) {
+                if !["http", "https"].contains(&parsed.scheme()) {
+                    return Err("Image URL must use http or https".to_string());
+                }
+            }
         }
 
         // Truncate text if too long (prevents memory abuse)
@@ -988,7 +1069,22 @@ impl AppState {
         // Acquire all write locks and replace state
         *self.game.write().await = export.game.clone();
         *self.rounds.write().await = export.rounds;
-        *self.submissions.write().await = export.submissions;
+
+        // Rebuild submissions and secondary index
+        {
+            let mut submissions = self.submissions.write().await;
+            let mut by_round = self.submissions_by_round.write().await;
+            *submissions = export.submissions;
+            // Rebuild index from submissions
+            by_round.clear();
+            for (id, sub) in submissions.iter() {
+                by_round
+                    .entry(sub.round_id.clone())
+                    .or_default()
+                    .insert(id.clone());
+            }
+        }
+
         *self.votes.write().await = export.votes;
         *self.players.write().await = export.players;
         *self.scores.write().await = export.scores;

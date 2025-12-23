@@ -2,6 +2,8 @@ use super::*;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
+const MAX_IMAGE_SIZE: u64 = 10 * 1024 * 1024; // 10 MB
+
 /// Ollama provider implementation
 pub struct OllamaProvider {
     base_url: String,
@@ -58,10 +60,27 @@ impl OllamaProvider {
             )));
         }
 
+        if let Some(content_length) = response.content_length() {
+            if content_length > MAX_IMAGE_SIZE {
+                return Err(LlmError::ApiError(format!(
+                    "Image too large: {} bytes (max {} bytes)",
+                    content_length, MAX_IMAGE_SIZE
+                )));
+            }
+        }
+
         let bytes = response
             .bytes()
             .await
             .map_err(|e| LlmError::ApiError(format!("Failed to read image bytes: {}", e)))?;
+
+        if bytes.len() as u64 > MAX_IMAGE_SIZE {
+            return Err(LlmError::ApiError(format!(
+                "Image too large: {} bytes (max {} bytes)",
+                bytes.len(),
+                MAX_IMAGE_SIZE
+            )));
+        }
 
         use base64::{engine::general_purpose::STANDARD, Engine as _};
         Ok(STANDARD.encode(&bytes))

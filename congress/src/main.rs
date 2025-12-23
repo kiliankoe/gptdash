@@ -109,6 +109,9 @@ async fn main() {
     // Spawn background task for debounced prompt pool broadcasts to host
     broadcast::spawn_prompt_broadcast_task(state.clone());
 
+    // Spawn background task for cleaning up stale WebSocket rate limiters
+    broadcast::spawn_ws_rate_limiter_cleanup_task(state.clone());
+
     // Note: Voting deadline is a soft/visual timer; the host advances phases manually.
 
     // Protected host/beamer routes (with HTTP Basic Auth)

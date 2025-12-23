@@ -25,6 +25,9 @@ pub struct TriviaResultData {
     pub total_votes: u32,
 }
 
+const MAX_TRIVIA_QUESTION_LENGTH: usize = 500;
+const MAX_TRIVIA_CHOICE_LENGTH: usize = 200;
+
 impl AppState {
     // =========================================================================
     // Trivia Question CRUD
@@ -35,7 +38,39 @@ impl AppState {
         &self,
         question: String,
         choices: Vec<TriviaChoiceInput>,
-    ) -> TriviaQuestion {
+    ) -> Result<TriviaQuestion, String> {
+        // Validate question length
+        if question.len() > MAX_TRIVIA_QUESTION_LENGTH {
+            return Err(format!(
+                "Question too long ({} chars, max {})",
+                question.len(),
+                MAX_TRIVIA_QUESTION_LENGTH
+            ));
+        }
+
+        // Validate number of choices
+        if choices.len() < 2 || choices.len() > 4 {
+            return Err("Trivia question must have 2-4 choices".to_string());
+        }
+
+        // Validate choice lengths
+        for (i, choice) in choices.iter().enumerate() {
+            if choice.text.len() > MAX_TRIVIA_CHOICE_LENGTH {
+                return Err(format!(
+                    "Choice {} too long ({} chars, max {})",
+                    i + 1,
+                    choice.text.len(),
+                    MAX_TRIVIA_CHOICE_LENGTH
+                ));
+            }
+        }
+
+        // Validate exactly one correct answer
+        let correct_count = choices.iter().filter(|c| c.is_correct).count();
+        if correct_count != 1 {
+            return Err("Trivia question must have exactly one correct answer".to_string());
+        }
+
         let now = chrono::Utc::now().to_rfc3339();
 
         let trivia_choices: Vec<TriviaChoice> = choices
@@ -59,7 +94,7 @@ impl AppState {
             .push(trivia_question.clone());
 
         tracing::info!("Added trivia question: {}", trivia_question.id);
-        trivia_question
+        Ok(trivia_question)
     }
 
     /// Remove a trivia question from the pool by ID
@@ -387,7 +422,8 @@ mod tests {
 
         let question = state
             .add_trivia_question("What is 2+2?".to_string(), make_choices(1))
-            .await;
+            .await
+            .unwrap();
 
         assert_eq!(question.question, "What is 2+2?");
         assert!(!question.id.is_empty());
@@ -406,10 +442,12 @@ mod tests {
 
         let q1 = state
             .add_trivia_question("Q1".to_string(), make_choices(0))
-            .await;
+            .await
+            .unwrap();
         let _q2 = state
             .add_trivia_question("Q2".to_string(), make_choices(1))
-            .await;
+            .await
+            .unwrap();
 
         assert_eq!(state.get_trivia_questions().await.len(), 2);
 
@@ -434,7 +472,8 @@ mod tests {
 
         let question = state
             .add_trivia_question("Test?".to_string(), make_choices(0))
-            .await;
+            .await
+            .unwrap();
 
         // In LOBBY phase - should fail
         let result = state.present_trivia(&question.id).await;
@@ -472,10 +511,12 @@ mod tests {
 
         let q1 = state
             .add_trivia_question("Q1?".to_string(), make_choices(0))
-            .await;
+            .await
+            .unwrap();
         let q2 = state
             .add_trivia_question("Q2?".to_string(), make_choices(1))
-            .await;
+            .await
+            .unwrap();
 
         // Set up WRITING phase
         let round = state.start_round().await.unwrap();
@@ -510,7 +551,8 @@ mod tests {
 
         let question = state
             .add_trivia_question("Test?".to_string(), make_choices(1))
-            .await;
+            .await
+            .unwrap();
 
         // Set up WRITING phase and present trivia
         let round = state.start_round().await.unwrap();
@@ -556,7 +598,8 @@ mod tests {
 
         let question = state
             .add_trivia_question("Test?".to_string(), make_choices(0))
-            .await;
+            .await
+            .unwrap();
 
         // Set up WRITING phase and present trivia
         let round = state.start_round().await.unwrap();
@@ -605,7 +648,8 @@ mod tests {
         // Correct answer is choice 1 (B)
         let question = state
             .add_trivia_question("Test?".to_string(), make_choices(1))
-            .await;
+            .await
+            .unwrap();
 
         // Set up WRITING phase and present trivia
         let round = state.start_round().await.unwrap();
@@ -659,7 +703,8 @@ mod tests {
 
         let question = state
             .add_trivia_question("Test?".to_string(), make_choices(0))
-            .await;
+            .await
+            .unwrap();
 
         // Set up WRITING phase and present trivia
         let round = state.start_round().await.unwrap();
@@ -696,7 +741,8 @@ mod tests {
 
         let question = state
             .add_trivia_question("Test?".to_string(), make_choices(0))
-            .await;
+            .await
+            .unwrap();
 
         // Set up WRITING phase and present trivia
         let round = state.start_round().await.unwrap();
@@ -740,7 +786,8 @@ mod tests {
 
         let question = state
             .add_trivia_question("Test?".to_string(), make_choices(0))
-            .await;
+            .await
+            .unwrap();
 
         // Set up WRITING phase and present trivia
         let round = state.start_round().await.unwrap();
@@ -782,7 +829,8 @@ mod tests {
 
         let question = state
             .add_trivia_question("True or False?".to_string(), make_choices_2(1))
-            .await;
+            .await
+            .unwrap();
 
         // Verify 2 choices stored
         assert_eq!(question.choices.len(), 2);
@@ -835,7 +883,8 @@ mod tests {
 
         let question = state
             .add_trivia_question("Pick a letter?".to_string(), make_choices_4(3))
-            .await;
+            .await
+            .unwrap();
 
         // Verify 4 choices stored
         assert_eq!(question.choices.len(), 4);

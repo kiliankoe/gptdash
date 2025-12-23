@@ -79,6 +79,30 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     result == 0
 }
 
+/// Extract and validate Basic Auth credentials from request headers.
+/// Returns true if credentials are valid, false otherwise.
+fn validate_basic_auth(request: &Request<Body>, auth_config: &AuthConfig) -> bool {
+    let Some(auth_header) = request.headers().get(header::AUTHORIZATION) else {
+        return false;
+    };
+    let Ok(auth_str) = auth_header.to_str() else {
+        return false;
+    };
+    let Some(credentials) = auth_str.strip_prefix("Basic ") else {
+        return false;
+    };
+    let Ok(decoded) = base64_decode(credentials) else {
+        return false;
+    };
+    let Ok(decoded_str) = String::from_utf8(decoded) else {
+        return false;
+    };
+    let Some((username, password)) = decoded_str.split_once(':') else {
+        return false;
+    };
+    auth_config.validate(username, password)
+}
+
 /// Middleware for HTTP Basic Authentication on host routes
 pub async fn host_auth_middleware(
     State(auth_config): State<Arc<AuthConfig>>,
@@ -90,21 +114,8 @@ pub async fn host_auth_middleware(
         return next.run(request).await;
     }
 
-    // Check Authorization header
-    if let Some(auth_header) = request.headers().get(header::AUTHORIZATION) {
-        if let Ok(auth_str) = auth_header.to_str() {
-            if let Some(credentials) = auth_str.strip_prefix("Basic ") {
-                if let Ok(decoded) = base64_decode(credentials) {
-                    if let Ok(decoded_str) = String::from_utf8(decoded) {
-                        if let Some((username, password)) = decoded_str.split_once(':') {
-                            if auth_config.validate(username, password) {
-                                return next.run(request).await;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    if validate_basic_auth(&request, &auth_config) {
+        return next.run(request).await;
     }
 
     // Return 401 Unauthorized with WWW-Authenticate header
@@ -192,21 +203,8 @@ pub async fn host_ws_auth_middleware(
         return next.run(request).await;
     }
 
-    // Check Authorization header
-    if let Some(auth_header) = request.headers().get(header::AUTHORIZATION) {
-        if let Ok(auth_str) = auth_header.to_str() {
-            if let Some(credentials) = auth_str.strip_prefix("Basic ") {
-                if let Ok(decoded) = base64_decode(credentials) {
-                    if let Ok(decoded_str) = String::from_utf8(decoded) {
-                        if let Some((username, password)) = decoded_str.split_once(':') {
-                            if auth_config.validate(username, password) {
-                                return next.run(request).await;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    if validate_basic_auth(&request, &auth_config) {
+        return next.run(request).await;
     }
 
     Response::builder()

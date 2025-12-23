@@ -18,6 +18,8 @@ fn clamp_reveal_index(round: &mut Round) {
     }
 }
 
+const MAX_SUBMISSION_LENGTH: usize = 2000;
+
 impl AppState {
     /// Submit an answer with automatic exact duplicate detection
     /// If the player already has a submission for this round, it will be replaced
@@ -27,6 +29,15 @@ impl AppState {
         player_id: Option<String>,
         text: String,
     ) -> Result<Submission, String> {
+        // Validate submission length
+        if text.len() > MAX_SUBMISSION_LENGTH {
+            return Err(format!(
+                "Submission too long ({} chars, max {})",
+                text.len(),
+                MAX_SUBMISSION_LENGTH
+            ));
+        }
+
         // Check for exact duplicates (excluding this player's own submission)
         let normalized_new = normalize(&text);
         let existing = self.get_submissions(round_id).await;
@@ -45,6 +56,7 @@ impl AppState {
         // Remove any existing submission from this player for this round
         if let Some(ref pid) = player_id {
             let mut submissions = self.submissions.write().await;
+            let mut by_round = self.submissions_by_round.write().await;
             let to_remove: Vec<String> = submissions
                 .values()
                 .filter(|s| {
@@ -54,8 +66,11 @@ impl AppState {
                 })
                 .map(|s| s.id.clone())
                 .collect();
-            for id in to_remove {
-                submissions.remove(&id);
+            for id in &to_remove {
+                submissions.remove(id);
+                if let Some(round_subs) = by_round.get_mut(round_id) {
+                    round_subs.remove(id);
+                }
             }
         }
 
@@ -74,10 +89,16 @@ impl AppState {
             tts_asset_url: None,
         };
 
-        self.submissions
-            .write()
-            .await
-            .insert(submission.id.clone(), submission.clone());
+        // Insert into primary store and secondary index
+        {
+            let mut submissions = self.submissions.write().await;
+            let mut by_round = self.submissions_by_round.write().await;
+            submissions.insert(submission.id.clone(), submission.clone());
+            by_round
+                .entry(round_id.to_string())
+                .or_default()
+                .insert(submission.id.clone());
+        }
 
         // Broadcast updated submissions list
         self.broadcast_submissions(round_id).await;
@@ -154,15 +175,19 @@ impl AppState {
         });
     }
 
-    /// Get submissions for a round
+    /// Get submissions for a round (O(k) where k = submissions in round, not O(n) total)
     pub async fn get_submissions(&self, round_id: &str) -> Vec<Submission> {
-        self.submissions
-            .read()
-            .await
-            .values()
-            .filter(|s| s.round_id == round_id)
-            .cloned()
-            .collect()
+        let by_round = self.submissions_by_round.read().await;
+        let submissions = self.submissions.read().await;
+
+        by_round
+            .get(round_id)
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| submissions.get(id).cloned())
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Mark a submission as duplicate and remove it (host only)
@@ -173,7 +198,12 @@ impl AppState {
     ) -> Result<Option<String>, String> {
         let (round_id, player_id) = {
             let mut submissions = self.submissions.write().await;
+            let mut by_round = self.submissions_by_round.write().await;
             if let Some(submission) = submissions.remove(submission_id) {
+                // Remove from secondary index
+                if let Some(round_subs) = by_round.get_mut(&submission.round_id) {
+                    round_subs.remove(submission_id);
+                }
                 let player_id = if submission.author_kind == AuthorKind::Player {
                     submission.author_ref.clone()
                 } else {
@@ -254,9 +284,15 @@ impl AppState {
 
         let (round_id, player_id) = {
             let mut submissions = self.submissions.write().await;
+            let mut by_round = self.submissions_by_round.write().await;
             let submission = submissions
                 .remove(submission_id)
                 .ok_or_else(|| "Submission not found".to_string())?;
+
+            // Remove from secondary index
+            if let Some(round_subs) = by_round.get_mut(&submission.round_id) {
+                round_subs.remove(submission_id);
+            }
 
             let player_id = if submission.author_kind == AuthorKind::Player {
                 submission.author_ref.clone()
@@ -337,10 +373,16 @@ impl AppState {
             tts_asset_url: None,
         };
 
-        self.submissions
-            .write()
-            .await
-            .insert(submission.id.clone(), submission.clone());
+        // Insert into primary store and secondary index
+        {
+            let mut submissions = self.submissions.write().await;
+            let mut by_round = self.submissions_by_round.write().await;
+            submissions.insert(submission.id.clone(), submission.clone());
+            by_round
+                .entry(round_id.to_string())
+                .or_default()
+                .insert(submission.id.clone());
+        }
 
         Ok(submission)
     }

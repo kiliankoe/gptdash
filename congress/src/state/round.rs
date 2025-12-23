@@ -248,6 +248,13 @@ impl AppState {
                     .await
                 {
                     tracing::error!("Failed to generate AI submissions: {}", e);
+                    // Notify host about the failure
+                    let _ = state
+                        .host_broadcast
+                        .send(crate::protocol::ServerMessage::Error {
+                            code: "LLM_GENERATION_FAILED".to_string(),
+                            msg: format!("AI generation failed: {}", e),
+                        });
                 }
             });
         }
@@ -362,9 +369,14 @@ impl AppState {
 
             if !removed_ids.is_empty() {
                 let mut submissions = self.submissions.write().await;
+                let mut by_round = self.submissions_by_round.write().await;
                 for id in &removed_ids {
                     submissions.remove(id);
+                    if let Some(round_subs) = by_round.get_mut(round_id) {
+                        round_subs.remove(id);
+                    }
                 }
+                drop(by_round);
                 drop(submissions);
                 self.cleanup_round_after_submission_removals(round_id, &removed_ids)
                     .await;
@@ -390,10 +402,16 @@ impl AppState {
                 tts_asset_url: None,
             };
 
-            self.submissions
-                .write()
-                .await
-                .insert(submission_id.clone(), submission.clone());
+            // Insert into primary store and secondary index
+            {
+                let mut submissions = self.submissions.write().await;
+                let mut by_round = self.submissions_by_round.write().await;
+                submissions.insert(submission_id.clone(), submission.clone());
+                by_round
+                    .entry(round_id.to_string())
+                    .or_default()
+                    .insert(submission_id.clone());
+            }
 
             generated_submission_ids.push(submission_id.clone());
 

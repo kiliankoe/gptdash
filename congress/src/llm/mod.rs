@@ -22,10 +22,6 @@ pub enum LlmError {
     #[error("Invalid configuration: {0}")]
     ConfigError(String),
 
-    #[error("Rate limit exceeded")]
-    #[allow(dead_code)] // Reserved for future rate limit handling
-    RateLimit,
-
     #[error("Response parsing failed: {0}")]
     ParseError(String),
 }

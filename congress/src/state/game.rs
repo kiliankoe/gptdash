@@ -492,6 +492,7 @@ impl AppState {
         self.players.write().await.clear();
         self.rounds.write().await.clear();
         self.submissions.write().await.clear();
+        self.submissions_by_round.write().await.clear();
         self.votes.write().await.clear();
         self.scores.write().await.clear();
         self.player_status.write().await.clear();

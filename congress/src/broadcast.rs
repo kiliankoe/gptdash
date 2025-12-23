@@ -201,3 +201,17 @@ pub fn spawn_prompt_broadcast_task(state: Arc<AppState>) {
         }
     });
 }
+
+/// Spawn background task to clean up stale per-token rate limiters
+pub fn spawn_ws_rate_limiter_cleanup_task(state: Arc<AppState>) {
+    tracing::info!("WebSocket rate limiter cleanup task started (check every 1 min)");
+
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+
+        loop {
+            interval.tick().await;
+            state.cleanup_stale_rate_limiters().await;
+        }
+    });
+}

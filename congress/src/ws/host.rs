@@ -717,12 +717,17 @@ pub async fn handle_add_trivia_question(
         })
         .collect();
 
-    let _trivia = state.add_trivia_question(question, state_choices).await;
-
-    // Broadcast updated trivia list to host
-    broadcast_trivia_to_host(state).await;
-
-    None
+    match state.add_trivia_question(question, state_choices).await {
+        Ok(_trivia) => {
+            // Broadcast updated trivia list to host
+            broadcast_trivia_to_host(state).await;
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "ADD_TRIVIA_FAILED".to_string(),
+            msg: e,
+        }),
+    }
 }
 
 pub async fn handle_remove_trivia_question(

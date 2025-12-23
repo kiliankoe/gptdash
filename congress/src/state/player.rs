@@ -180,6 +180,7 @@ impl AppState {
             // 3. Find and remove player's submissions for this round
             let removed_submission_ids: Vec<String> = {
                 let mut submissions = self.submissions.write().await;
+                let mut by_round = self.submissions_by_round.write().await;
                 let to_remove: Vec<_> = submissions
                     .iter()
                     .filter(|(_, s)| {
@@ -192,6 +193,9 @@ impl AppState {
 
                 for id in &to_remove {
                     submissions.remove(id);
+                    if let Some(round_subs) = by_round.get_mut(&round.id) {
+                        round_subs.remove(id);
+                    }
                 }
                 to_remove
             };

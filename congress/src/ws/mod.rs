@@ -14,52 +14,42 @@ use axum::{
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
 use std::sync::Arc;
-use std::time::Instant;
 
 use crate::protocol::{
     AudienceVoteInfo, ClientMessage, HostSubmissionInfo, ServerMessage, SubmissionInfo,
 };
 use crate::state::AppState;
 use crate::types::{GamePhase, Role};
+use futures::stream::SplitSink;
+use serde::Serialize;
 
 const MAX_WS_MESSAGE_BYTES: usize = 32 * 1024;
+
+/// Helper to serialize and send a message over WebSocket.
+/// Returns Ok(true) if sent successfully, Ok(false) if serialization failed (logged), Err if send failed.
+async fn send_json<T: Serialize>(
+    sender: &mut SplitSink<WebSocket, Message>,
+    msg: &T,
+) -> Result<bool, ()> {
+    match serde_json::to_string(msg) {
+        Ok(json) => {
+            if sender.send(Message::Text(json.into())).await.is_err() {
+                Err(())
+            } else {
+                Ok(true)
+            }
+        }
+        Err(e) => {
+            tracing::error!("Failed to serialize message: {}", e);
+            Ok(false)
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct WsQuery {
     pub role: Option<String>,
     pub token: Option<String>,
-}
-
-#[derive(Debug)]
-struct TokenBucket {
-    rate_per_sec: f64,
-    burst: f64,
-    allowance: f64,
-    last_check: Instant,
-}
-
-impl TokenBucket {
-    fn new(rate_per_sec: f64, burst: f64) -> Self {
-        Self {
-            rate_per_sec,
-            burst,
-            allowance: burst,
-            last_check: Instant::now(),
-        }
-    }
-
-    fn allow(&mut self) -> bool {
-        let now = Instant::now();
-        let elapsed = (now - self.last_check).as_secs_f64();
-        self.last_check = now;
-
-        self.allowance = (self.allowance + elapsed * self.rate_per_sec).min(self.burst);
-        if self.allowance < 1.0 {
-            return false;
-        }
-        self.allowance -= 1.0;
-        true
-    }
 }
 
 fn token_required_for_role(role: &Role) -> bool {
@@ -629,7 +619,8 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
     };
 
     // Handle incoming messages and broadcasts
-    let mut msg_rate_limiter = TokenBucket::new(20.0, 40.0);
+    // Use connection token for rate limiting, or fallback for anonymous connections
+    let rate_limit_key = connection_token.unwrap_or("anonymous").to_string();
     loop {
         tokio::select! {
             // Handle audience disconnect signal (panic mode)
@@ -654,10 +645,8 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
             // Handle general broadcasts (all clients)
             broadcast_msg = broadcast_rx.recv() => {
                 if let Ok(msg) = broadcast_msg {
-                    if let Ok(json) = serde_json::to_string(&msg) {
-                        if sender.send(Message::Text(json.into())).await.is_err() {
-                            break;
-                        }
+                    if send_json(&mut sender, &msg).await.is_err() {
+                        break;
                     }
                 }
             }
@@ -673,10 +662,8 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                 }
             } => {
                 if let Some(msg) = host_msg {
-                    if let Ok(json) = serde_json::to_string(&msg) {
-                        if sender.send(Message::Text(json.into())).await.is_err() {
-                            break;
-                        }
+                    if send_json(&mut sender, &msg).await.is_err() {
+                        break;
                     }
                 }
             }
@@ -692,10 +679,8 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                 }
             } => {
                 if let Some(msg) = beamer_msg {
-                    if let Ok(json) = serde_json::to_string(&msg) {
-                        if sender.send(Message::Text(json.into())).await.is_err() {
-                            break;
-                        }
+                    if send_json(&mut sender, &msg).await.is_err() {
+                        break;
                     }
                 }
             }
@@ -715,7 +700,11 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                             break;
                         }
 
-                        if !msg_rate_limiter.allow() {
+                        // Rate limit non-trusted roles (skip for host/beamer)
+                        if role != Role::Host
+                            && role != Role::Beamer
+                            && !state.check_rate_limit(&rate_limit_key).await
+                        {
                             let error = ServerMessage::Error {
                                 code: "RATE_LIMITED".to_string(),
                                 msg: "Too many messages. Please slow down.".to_string(),

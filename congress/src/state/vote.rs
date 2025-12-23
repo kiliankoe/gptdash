@@ -95,21 +95,40 @@ impl AppState {
             }
         }
 
-        // Check if voter has already voted this round (only one vote allowed)
-        {
-            let votes = self.votes.read().await;
-            let already_voted = votes
-                .iter()
-                .any(|(_, v)| v.voter_id == voter_id && v.round_id == round.id);
+        // Acquire locks for atomic check-and-store to prevent TOCTOU race conditions.
+        // We need to hold both submissions (read) and votes (write) locks together
+        // to ensure submissions aren't removed between validation and vote storage.
+        let submissions = self.submissions.read().await;
+        let mut votes = self.votes.write().await;
 
-            if already_voted {
-                tracing::info!(
-                    "Vote rejected: voter {} already voted in round {}",
-                    voter_id,
-                    round.id
-                );
-                return VoteResult::AlreadyVoted;
-            }
+        // Re-validate submissions still exist (they could have been removed since initial check)
+        let ai_ok = submissions
+            .get(&ai_pick)
+            .is_some_and(|s| s.round_id == round.id);
+        let funny_ok = submissions
+            .get(&funny_pick)
+            .is_some_and(|s| s.round_id == round.id);
+        if !ai_ok || !funny_ok {
+            tracing::warn!(
+                "Vote rejected: pick(s) no longer valid (ai_ok={}, funny_ok={})",
+                ai_ok,
+                funny_ok
+            );
+            return VoteResult::InvalidPick;
+        }
+
+        // Check if voter has already voted this round (only one vote allowed)
+        let already_voted = votes
+            .iter()
+            .any(|(_, v)| v.voter_id == voter_id && v.round_id == round.id);
+
+        if already_voted {
+            tracing::info!(
+                "Vote rejected: voter {} already voted in round {}",
+                voter_id,
+                round.id
+            );
+            return VoteResult::AlreadyVoted;
         }
 
         // Create and store new vote
@@ -122,7 +141,11 @@ impl AppState {
             ts: chrono::Utc::now().to_rfc3339(),
         };
 
-        self.votes.write().await.insert(vote.id.clone(), vote);
+        votes.insert(vote.id.clone(), vote);
+
+        // Drop locks before acquiring new ones
+        drop(votes);
+        drop(submissions);
 
         // Record the msg_id as processed
         self.processed_vote_msg_ids
