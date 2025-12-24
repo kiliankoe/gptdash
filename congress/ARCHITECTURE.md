@@ -103,6 +103,18 @@ Two design systems coexist:
 
 View-specific files handle UI logic. Host panel is further modularized into `js/host/` with separate modules for each panel (overview, players, prompts, submissions, AI manager, state export).
 
+### Build Process
+
+Frontend JS is bundled and obfuscated during `cargo build` via `build.rs`:
+
+1. **esbuild** bundles each entry point (audience, beamer, player, host) with all dependencies
+2. **javascript-obfuscator** applies medium obfuscation (control flow flattening, string encoding)
+3. Output goes to `static/js/dist/` (gitignored)
+
+Build runs automatically on every `cargo build`. HTML files reference the bundled files (`/js/dist/*.min.js`).
+
+To build frontend manually: `npm run build:frontend`
+
 ## Security
 
 ### Authentication

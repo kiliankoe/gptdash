@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "End-to-end tests for GPTDash",
   "scripts": {
+    "build:frontend": "node scripts/build-frontend.mjs",
     "lint": "biome check . && biome lint .",
     "format": "biome format --write .",
     "test:e2e": "playwright test --project=chromium",
@@ -19,6 +20,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "esbuild": "^0.27.2",
+    "javascript-obfuscator": "^5.1.0"
   }
 }
