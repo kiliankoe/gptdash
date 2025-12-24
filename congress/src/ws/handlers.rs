@@ -237,9 +237,13 @@ pub async fn handle_message(
         } => audience::handle_prompt_vote(state, voter_token, prompt_id).await,
 
         // ========== Trivia System ==========
-        ClientMessage::HostAddTriviaQuestion { question, choices } => {
+        ClientMessage::HostAddTriviaQuestion {
+            question,
+            image_url,
+            choices,
+        } => {
             check_host!(role, "add trivia questions");
-            host::handle_add_trivia_question(state, question, choices).await
+            host::handle_add_trivia_question(state, question, image_url, choices).await
         }
 
         ClientMessage::HostRemoveTriviaQuestion { question_id } => {

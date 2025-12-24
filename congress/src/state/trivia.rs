@@ -8,10 +8,19 @@ use crate::types::{TriviaChoice, TriviaQuestion, TriviaQuestionId, TriviaVote, V
 use super::AppState;
 
 /// Input for creating a new trivia question choice
+/// Either text or image_url should be set, not both
 #[derive(Debug, Clone)]
 pub struct TriviaChoiceInput {
     pub text: String,
+    pub image_url: Option<String>,
     pub is_correct: bool,
+}
+
+/// Output format for a trivia choice in results
+#[derive(Debug, Clone)]
+pub struct TriviaChoiceData {
+    pub text: String,
+    pub image_url: Option<String>,
 }
 
 /// Result data returned when resolving a trivia question
@@ -19,7 +28,8 @@ pub struct TriviaChoiceInput {
 pub struct TriviaResultData {
     pub question_id: TriviaQuestionId,
     pub question: String,
-    pub choices: Vec<String>,
+    pub image_url: Option<String>,
+    pub choices: Vec<TriviaChoiceData>,
     pub correct_index: usize,
     pub vote_counts: Vec<u32>,
     pub total_votes: u32,
@@ -37,6 +47,7 @@ impl AppState {
     pub async fn add_trivia_question(
         &self,
         question: String,
+        image_url: Option<String>,
         choices: Vec<TriviaChoiceInput>,
     ) -> Result<TriviaQuestion, String> {
         // Validate question length
@@ -53,9 +64,29 @@ impl AppState {
             return Err("Trivia question must have 2-4 choices".to_string());
         }
 
-        // Validate choice lengths
+        // Validate each choice has exactly one of text or image_url (XOR)
         for (i, choice) in choices.iter().enumerate() {
-            if choice.text.len() > MAX_TRIVIA_CHOICE_LENGTH {
+            let has_text = !choice.text.trim().is_empty();
+            let has_image = choice
+                .image_url
+                .as_ref()
+                .is_some_and(|u| !u.trim().is_empty());
+
+            if has_text && has_image {
+                return Err(format!(
+                    "Choice {} cannot have both text and image URL",
+                    i + 1
+                ));
+            }
+            if !has_text && !has_image {
+                return Err(format!(
+                    "Choice {} must have either text or image URL",
+                    i + 1
+                ));
+            }
+
+            // Validate text length if present
+            if has_text && choice.text.len() > MAX_TRIVIA_CHOICE_LENGTH {
                 return Err(format!(
                     "Choice {} too long ({} chars, max {})",
                     i + 1,
@@ -77,6 +108,7 @@ impl AppState {
             .into_iter()
             .map(|c| TriviaChoice {
                 text: c.text,
+                image_url: c.image_url.filter(|u| !u.trim().is_empty()),
                 is_correct: c.is_correct,
             })
             .collect();
@@ -84,6 +116,7 @@ impl AppState {
         let trivia_question = TriviaQuestion {
             id: ulid::Ulid::new().to_string(),
             question,
+            image_url: image_url.filter(|u| !u.trim().is_empty()),
             choices: trivia_choices,
             created_at: now,
         };
@@ -207,8 +240,15 @@ impl AppState {
             .await;
         let total_votes: u32 = vote_counts.iter().sum();
 
-        // Extract choice texts
-        let choices: Vec<String> = question.choices.iter().map(|c| c.text.clone()).collect();
+        // Extract choice data
+        let choices: Vec<TriviaChoiceData> = question
+            .choices
+            .iter()
+            .map(|c| TriviaChoiceData {
+                text: c.text.clone(),
+                image_url: c.image_url.clone(),
+            })
+            .collect();
 
         // Clear active trivia (but keep votes for potential re-display)
         *self.active_trivia.write().await = None;
@@ -223,6 +263,7 @@ impl AppState {
         Some(TriviaResultData {
             question_id: active_id,
             question: question.question,
+            image_url: question.image_url.clone(),
             choices,
             correct_index,
             vote_counts,
@@ -369,14 +410,17 @@ mod tests {
         vec![
             TriviaChoiceInput {
                 text: "Choice A".to_string(),
+                image_url: None,
                 is_correct: correct_index == 0,
             },
             TriviaChoiceInput {
                 text: "Choice B".to_string(),
+                image_url: None,
                 is_correct: correct_index == 1,
             },
             TriviaChoiceInput {
                 text: "Choice C".to_string(),
+                image_url: None,
                 is_correct: correct_index == 2,
             },
         ]
@@ -386,10 +430,12 @@ mod tests {
         vec![
             TriviaChoiceInput {
                 text: "Choice A".to_string(),
+                image_url: None,
                 is_correct: correct_index == 0,
             },
             TriviaChoiceInput {
                 text: "Choice B".to_string(),
+                image_url: None,
                 is_correct: correct_index == 1,
             },
         ]
@@ -399,18 +445,22 @@ mod tests {
         vec![
             TriviaChoiceInput {
                 text: "Choice A".to_string(),
+                image_url: None,
                 is_correct: correct_index == 0,
             },
             TriviaChoiceInput {
                 text: "Choice B".to_string(),
+                image_url: None,
                 is_correct: correct_index == 1,
             },
             TriviaChoiceInput {
                 text: "Choice C".to_string(),
+                image_url: None,
                 is_correct: correct_index == 2,
             },
             TriviaChoiceInput {
                 text: "Choice D".to_string(),
+                image_url: None,
                 is_correct: correct_index == 3,
             },
         ]
@@ -421,7 +471,7 @@ mod tests {
         let state = AppState::new();
 
         let question = state
-            .add_trivia_question("What is 2+2?".to_string(), make_choices(1))
+            .add_trivia_question("What is 2+2?".to_string(), None, make_choices(1))
             .await
             .unwrap();
 
@@ -441,11 +491,11 @@ mod tests {
         let state = AppState::new();
 
         let q1 = state
-            .add_trivia_question("Q1".to_string(), make_choices(0))
+            .add_trivia_question("Q1".to_string(), None, make_choices(0))
             .await
             .unwrap();
         let _q2 = state
-            .add_trivia_question("Q2".to_string(), make_choices(1))
+            .add_trivia_question("Q2".to_string(), None, make_choices(1))
             .await
             .unwrap();
 
@@ -471,7 +521,7 @@ mod tests {
         state.create_game().await;
 
         let question = state
-            .add_trivia_question("Test?".to_string(), make_choices(0))
+            .add_trivia_question("Test?".to_string(), None, make_choices(0))
             .await
             .unwrap();
 
@@ -513,11 +563,11 @@ mod tests {
         state.create_game().await;
 
         let q1 = state
-            .add_trivia_question("Q1?".to_string(), make_choices(0))
+            .add_trivia_question("Q1?".to_string(), None, make_choices(0))
             .await
             .unwrap();
         let q2 = state
-            .add_trivia_question("Q2?".to_string(), make_choices(1))
+            .add_trivia_question("Q2?".to_string(), None, make_choices(1))
             .await
             .unwrap();
 
@@ -556,7 +606,7 @@ mod tests {
         state.create_game().await;
 
         let question = state
-            .add_trivia_question("Test?".to_string(), make_choices(1))
+            .add_trivia_question("Test?".to_string(), None, make_choices(1))
             .await
             .unwrap();
 
@@ -606,7 +656,7 @@ mod tests {
         state.create_game().await;
 
         let question = state
-            .add_trivia_question("Test?".to_string(), make_choices(0))
+            .add_trivia_question("Test?".to_string(), None, make_choices(0))
             .await
             .unwrap();
 
@@ -659,7 +709,7 @@ mod tests {
 
         // Correct answer is choice 1 (B)
         let question = state
-            .add_trivia_question("Test?".to_string(), make_choices(1))
+            .add_trivia_question("Test?".to_string(), None, make_choices(1))
             .await
             .unwrap();
 
@@ -717,7 +767,7 @@ mod tests {
         state.create_game().await;
 
         let question = state
-            .add_trivia_question("Test?".to_string(), make_choices(0))
+            .add_trivia_question("Test?".to_string(), None, make_choices(0))
             .await
             .unwrap();
 
@@ -758,7 +808,7 @@ mod tests {
         state.create_game().await;
 
         let question = state
-            .add_trivia_question("Test?".to_string(), make_choices(0))
+            .add_trivia_question("Test?".to_string(), None, make_choices(0))
             .await
             .unwrap();
 
@@ -806,7 +856,7 @@ mod tests {
         state.create_game().await;
 
         let question = state
-            .add_trivia_question("Test?".to_string(), make_choices(0))
+            .add_trivia_question("Test?".to_string(), None, make_choices(0))
             .await
             .unwrap();
 
@@ -852,7 +902,7 @@ mod tests {
         state.create_game().await;
 
         let question = state
-            .add_trivia_question("True or False?".to_string(), make_choices_2(1))
+            .add_trivia_question("True or False?".to_string(), None, make_choices_2(1))
             .await
             .unwrap();
 
@@ -909,7 +959,7 @@ mod tests {
         state.create_game().await;
 
         let question = state
-            .add_trivia_question("Pick a letter?".to_string(), make_choices_4(3))
+            .add_trivia_question("Pick a letter?".to_string(), None, make_choices_4(3))
             .await
             .unwrap();
 

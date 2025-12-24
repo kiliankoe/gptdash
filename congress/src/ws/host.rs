@@ -678,6 +678,7 @@ pub async fn broadcast_trivia_to_host(state: &Arc<AppState>) {
 pub async fn handle_add_trivia_question(
     state: &Arc<AppState>,
     question: String,
+    image_url: Option<String>,
     choices: Vec<crate::protocol::TriviaChoiceInput>,
 ) -> Option<ServerMessage> {
     tracing::info!("Host adding trivia question: {:?}", question);
@@ -705,24 +706,20 @@ pub async fn handle_add_trivia_question(
         });
     }
 
-    // Validate all choices have non-empty text
-    if choices.iter().any(|c| c.text.trim().is_empty()) {
-        return Some(ServerMessage::Error {
-            code: "INVALID_TRIVIA_QUESTION".to_string(),
-            msg: "All choices must have non-empty text".to_string(),
-        });
-    }
-
     // Convert protocol choices to state choices
     let state_choices: Vec<crate::state::trivia::TriviaChoiceInput> = choices
         .into_iter()
         .map(|c| crate::state::trivia::TriviaChoiceInput {
             text: c.text,
+            image_url: c.image_url,
             is_correct: c.is_correct,
         })
         .collect();
 
-    match state.add_trivia_question(question, state_choices).await {
+    match state
+        .add_trivia_question(question, image_url, state_choices)
+        .await
+    {
         Ok(_trivia) => {
             // Broadcast updated trivia list to host
             broadcast_trivia_to_host(state).await;
@@ -762,10 +759,18 @@ pub async fn handle_present_trivia(
     match state.present_trivia(&question_id).await {
         Ok(question) => {
             // Broadcast trivia question to all clients (beamer + audience)
-            let choices: Vec<String> = question.choices.iter().map(|c| c.text.clone()).collect();
+            let choices: Vec<crate::protocol::TriviaChoiceOutput> = question
+                .choices
+                .iter()
+                .map(|c| crate::protocol::TriviaChoiceOutput {
+                    text: c.text.clone(),
+                    image_url: c.image_url.clone(),
+                })
+                .collect();
             let msg = ServerMessage::TriviaQuestion {
                 question_id: question.id.clone(),
                 question: question.question.clone(),
+                image_url: question.image_url.clone(),
                 choices,
             };
             state.broadcast_to_all(msg);
@@ -787,11 +792,22 @@ pub async fn handle_resolve_trivia(state: &Arc<AppState>) -> Option<ServerMessag
 
     match state.resolve_trivia().await {
         Some(result) => {
+            // Convert choice data to protocol output format
+            let choices: Vec<crate::protocol::TriviaChoiceOutput> = result
+                .choices
+                .into_iter()
+                .map(|c| crate::protocol::TriviaChoiceOutput {
+                    text: c.text,
+                    image_url: c.image_url,
+                })
+                .collect();
+
             // Broadcast results to all clients (beamer + audience)
             let msg = ServerMessage::TriviaResult {
                 question_id: result.question_id,
                 question: result.question,
-                choices: result.choices,
+                image_url: result.image_url,
+                choices,
                 correct_index: result.correct_index,
                 vote_counts: result.vote_counts,
                 total_votes: result.total_votes,

@@ -206,10 +206,12 @@ pub struct ConnectionCounts {
 
 pub type TriviaQuestionId = String;
 
-/// A single choice in a trivia question
+/// A single choice in a trivia question (either text OR image_url, not both)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TriviaChoice {
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
     pub is_correct: bool,
 }
 
@@ -218,6 +220,8 @@ pub struct TriviaChoice {
 pub struct TriviaQuestion {
     pub id: TriviaQuestionId,
     pub question: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
     pub choices: Vec<TriviaChoice>,
     pub created_at: String,
 }

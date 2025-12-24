@@ -9,28 +9,57 @@ import {
   setupGameToWriting,
 } from "./test-utils";
 
+const TEST_IMAGE_URL =
+  "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Cccamp2015-fairydust.jpg/2560px-Cccamp2015-fairydust.jpg";
+
+interface TriviaChoice {
+  text?: string;
+  imageUrl?: string;
+}
+
 /**
  * Helper function to add a trivia question with any number of choices (2-4)
+ * Supports both text and image choices
  */
 async function addTriviaQuestion(
   host: Page,
   question: string,
-  choices: string[],
+  choices: (string | TriviaChoice)[],
   correctIndex: number,
+  questionImageUrl?: string,
 ): Promise<void> {
   await host.fill("#triviaQuestionText", question);
+
+  // Add question image if provided
+  if (questionImageUrl) {
+    await host.fill("#triviaQuestionImageUrl", questionImageUrl);
+  }
 
   // Add extra choice buttons if needed (UI starts with 2 choices)
   const extraChoices = choices.length - 2;
   for (let i = 0; i < extraChoices; i++) {
     await host.click("#addTriviaChoiceBtn");
     // Wait for the new choice field to appear
-    await host.waitForSelector(`#triviaChoice${2 + i}`, { timeout: 5000 });
+    await host.waitForSelector(`#triviaChoiceText${2 + i}`, { timeout: 5000 });
   }
 
   // Fill in choices
   for (let i = 0; i < choices.length; i++) {
-    await host.fill(`#triviaChoice${i}`, choices[i]);
+    const choice = choices[i];
+    if (typeof choice === "string") {
+      // Text choice (default mode)
+      await host.fill(`#triviaChoiceText${i}`, choice);
+    } else if (choice.imageUrl) {
+      // Image choice - call the toggle function to switch to image mode
+      await host.evaluate((index) => {
+        // biome-ignore lint/suspicious/noExplicitAny: accessing global function
+        (window as any).toggleTriviaChoiceMode(index);
+      }, i);
+      await host.waitForSelector(`#triviaChoiceImage${i}`, { timeout: 5000 });
+      await host.fill(`#triviaChoiceImage${i}`, choice.imageUrl);
+    } else if (choice.text) {
+      await host.fill(`#triviaChoiceText${i}`, choice.text);
+    }
   }
 
   // Mark correct answer
@@ -493,5 +522,231 @@ test.describe("Trivia", () => {
     expect(stateText).toContain("Export A");
     expect(stateText).toContain("Export B");
     expect(stateText).toContain("Export C");
+  });
+
+  test("trivia with question image displays on beamer", async () => {
+    const { host, beamer, players } = clients;
+
+    await host.goto("/host");
+    await beamer.goto("/beamer");
+    await waitForConnection(host);
+
+    // Setup game to WRITING phase
+    await setupGameToWriting(host, players);
+
+    // Add trivia with question image
+    await host.click('.sidebar-item:has-text("Trivia")');
+    await host.waitForSelector("#trivia.active");
+    await addTriviaQuestion(
+      host,
+      "What event is shown in this image?",
+      ["CCCamp 2015", "36C3", "rC3"],
+      0,
+      TEST_IMAGE_URL,
+    );
+    await host.waitForSelector(".trivia-question-card");
+
+    // Verify question image thumbnail shows in host panel
+    await expect(
+      host.locator('.trivia-question-card img[alt="Fragen-Bild"]'),
+    ).toBeVisible();
+
+    // Present trivia
+    await host.click('.trivia-question-card button:has-text("Praesentieren")');
+    await expect(host.locator("#activeTriviaCard")).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Verify beamer shows trivia with image
+    await expect(beamer.locator("#triviaOverlay")).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(beamer.locator("#triviaQuestion")).toHaveText(
+      "What event is shown in this image?",
+    );
+
+    // Verify question image is displayed on beamer
+    const beamerImage = beamer.locator("#triviaQuestionImage");
+    await expect(beamerImage).toBeVisible({ timeout: 5000 });
+    await expect(beamerImage).toHaveAttribute("src", TEST_IMAGE_URL);
+  });
+
+  test("trivia with image choices displays on beamer, audience sees labels only", async () => {
+    const { host, beamer, audience, players } = clients;
+
+    await host.goto("/host");
+    await beamer.goto("/beamer");
+    await waitForConnection(host);
+
+    // Setup game to WRITING phase
+    await setupGameToWriting(host, players);
+
+    // Add trivia with image choices
+    await host.click('.sidebar-item:has-text("Trivia")');
+    await host.waitForSelector("#trivia.active");
+    await addTriviaQuestion(
+      host,
+      "Which is the correct image?",
+      [{ imageUrl: TEST_IMAGE_URL }, "Wrong text answer"],
+      0,
+    );
+    await host.waitForSelector(".trivia-question-card");
+
+    // Verify image indicator shows in host panel for choice
+    await expect(
+      host.locator(".trivia-question-card:has-text('[Bild]')"),
+    ).toBeVisible();
+
+    // Present trivia
+    await host.click('.trivia-question-card button:has-text("Praesentieren")');
+    await expect(host.locator("#activeTriviaCard")).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Verify beamer shows trivia overlay with image choice
+    await expect(beamer.locator("#triviaOverlay")).toBeVisible({
+      timeout: 5000,
+    });
+    const beamerChoiceImage = beamer.locator(
+      "#triviaChoices .trivia-choice-image",
+    );
+    await expect(beamerChoiceImage).toBeVisible({ timeout: 5000 });
+    await expect(beamerChoiceImage).toHaveAttribute("src", TEST_IMAGE_URL);
+
+    // Verify text choice is also visible on beamer
+    await expect(
+      beamer.locator('#triviaChoices:has-text("Wrong text answer")'),
+    ).toBeVisible();
+
+    // Audience joins and sees trivia
+    await audience[0].goto("/");
+    await waitForConnection(audience[0]);
+
+    const triviaAlreadyShowing = await audience[0]
+      .locator("#triviaScreen.active")
+      .isVisible()
+      .catch(() => false);
+
+    if (!triviaAlreadyShowing) {
+      const joinButtonVisible = await audience[0]
+        .locator("#joinButton")
+        .isVisible()
+        .catch(() => false);
+      if (joinButtonVisible) {
+        await audience[0].click("#joinButton");
+      }
+    }
+
+    await audience[0].waitForSelector("#triviaScreen.active", {
+      timeout: 5000,
+    });
+
+    // Audience sees just labels for image choices (no images on mobile)
+    // First choice (image) should show label A but no text/image content
+    const firstOption = audience[0].locator(".trivia-option").first();
+    await expect(firstOption.locator(".trivia-label")).toHaveText("A");
+    // Should NOT have trivia-text (image choice has no text)
+    await expect(firstOption.locator(".trivia-text")).toBeHidden();
+
+    // Second choice (text) should show label B and text content
+    const secondOption = audience[0].locator(".trivia-option").nth(1);
+    await expect(secondOption.locator(".trivia-label")).toHaveText("B");
+    await expect(secondOption.locator(".trivia-text")).toHaveText(
+      "Wrong text answer",
+    );
+
+    // Vote on image choice (first option with label A)
+    await firstOption.click();
+    await audience[0].waitForSelector("#triviaConfirmedScreen.active", {
+      timeout: 5000,
+    });
+
+    // Summary should show "Antwort A" for image choice
+    await expect(audience[0].locator("#triviaVoteSummary")).toContainText(
+      "Antwort A",
+    );
+  });
+
+  test("trivia result shows images on beamer, labels on audience", async () => {
+    const { host, beamer, audience, players } = clients;
+
+    await host.goto("/host");
+    await beamer.goto("/beamer");
+    await waitForConnection(host);
+
+    // Setup game to WRITING phase
+    await setupGameToWriting(host, players);
+
+    // Add trivia with question image and mixed choices
+    await host.click('.sidebar-item:has-text("Trivia")');
+    await host.waitForSelector("#trivia.active");
+    await addTriviaQuestion(
+      host,
+      "Image result test",
+      [{ imageUrl: TEST_IMAGE_URL }, "Text choice"],
+      0,
+      TEST_IMAGE_URL,
+    );
+    await host.waitForSelector(".trivia-question-card");
+
+    // Present trivia
+    await host.click('.trivia-question-card button:has-text("Praesentieren")');
+    await expect(host.locator("#activeTriviaCard")).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Audience votes
+    await audience[0].goto("/");
+    await waitForConnection(audience[0]);
+
+    const triviaAlreadyShowing = await audience[0]
+      .locator("#triviaScreen.active")
+      .isVisible()
+      .catch(() => false);
+
+    if (!triviaAlreadyShowing) {
+      const joinButtonVisible = await audience[0]
+        .locator("#joinButton")
+        .isVisible()
+        .catch(() => false);
+      if (joinButtonVisible) {
+        await audience[0].click("#joinButton");
+      }
+    }
+
+    await audience[0].waitForSelector("#triviaScreen.active", {
+      timeout: 5000,
+    });
+    // Click first option (image choice, shows as label A)
+    await audience[0].click(".trivia-option:first-child");
+    await audience[0].waitForSelector("#triviaConfirmedScreen.active");
+
+    // Host resolves trivia
+    await host.click('button:has-text("Aufloesen")');
+
+    // Beamer should show result with images
+    await expect(beamer.locator("#triviaResultOverlay")).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Result should show question image on beamer
+    const resultQuestionImage = beamer.locator("#triviaResultQuestionImage");
+    await expect(resultQuestionImage).toBeVisible({ timeout: 5000 });
+    await expect(resultQuestionImage).toHaveAttribute("src", TEST_IMAGE_URL);
+
+    // Result should show correct image choice on beamer
+    const resultChoiceImage = beamer.locator(
+      ".trivia-result-choice.correct .trivia-result-image",
+    );
+    await expect(resultChoiceImage).toBeVisible({ timeout: 5000 });
+
+    // Audience should see result screen with text only (no images)
+    await expect(audience[0].locator("#triviaResultScreen.active")).toBeVisible(
+      { timeout: 5000 },
+    );
+    // Audience shows just label A for image choice, not the image
+    await expect(
+      audience[0].locator(".trivia-result-option.correct .trivia-label"),
+    ).toHaveText("A");
   });
 });

@@ -832,6 +832,7 @@ function handleTriviaQuestion(message) {
   triviaQuestion = {
     question_id: message.question_id,
     question: message.question,
+    image_url: message.image_url,
     choices: message.choices,
   };
   triviaResult = null;
@@ -848,6 +849,7 @@ function handleTriviaResult(message) {
   triviaResult = {
     question_id: message.question_id,
     question: message.question,
+    image_url: message.image_url,
     choices: message.choices,
     correct_index: message.correct_index,
     vote_counts: message.vote_counts,
@@ -888,20 +890,28 @@ function renderTriviaOptions() {
 
   if (!questionEl || !container || !triviaQuestion) return;
 
-  // Update question text
+  // Update question text (images only shown on beamer)
   questionEl.textContent = triviaQuestion.question;
 
   // Render choices (dynamic count 2-4)
+  // For image choices, just show the letter label (images displayed on beamer)
   container.innerHTML = "";
 
   triviaQuestion.choices.forEach((choice, idx) => {
     const option = document.createElement("div");
     option.className = "trivia-option";
     option.dataset.choiceIndex = idx;
+
+    // For image choices, show only the label; for text choices, show the text
+    const isImageChoice = choice.image_url && !choice.text;
+    const content = isImageChoice
+      ? ""
+      : `<span class="trivia-text">${escapeHtml(choice.text)}</span>`;
+
     option.innerHTML = `
       <span class="checkmark">✓</span>
       <span class="trivia-label">${TRIVIA_LABELS[idx]}</span>
-      <span class="trivia-text">${escapeHtml(choice)}</span>
+      ${content}
     `;
 
     if (selectedTriviaChoice === idx) {
@@ -964,10 +974,18 @@ function updateTriviaVoteSummary() {
     selectedTriviaChoice !== null &&
     triviaQuestion.choices[selectedTriviaChoice]
   ) {
-    const choiceText = triviaQuestion.choices[selectedTriviaChoice];
-    const shortText =
-      choiceText.length > 40 ? `${choiceText.substring(0, 40)}...` : choiceText;
-    summaryEl.textContent = `${TRIVIA_LABELS[selectedTriviaChoice]}: "${shortText}"`;
+    const choice = triviaQuestion.choices[selectedTriviaChoice];
+    const isImageChoice = choice.image_url && !choice.text;
+    if (isImageChoice) {
+      // For image choices, just show the label
+      summaryEl.textContent = `Antwort ${TRIVIA_LABELS[selectedTriviaChoice]}`;
+    } else {
+      const shortText =
+        choice.text.length > 40
+          ? `${choice.text.substring(0, 40)}...`
+          : choice.text;
+      summaryEl.textContent = `${TRIVIA_LABELS[selectedTriviaChoice]}: "${shortText}"`;
+    }
   } else {
     summaryEl.textContent = "";
   }
@@ -980,21 +998,27 @@ function showTriviaResultScreen() {
 
   if (!questionEl || !container || !triviaResult) return;
 
-  // Update question text
+  // Update question text (images only shown on beamer)
   questionEl.textContent = triviaResult.question;
 
   // Render result choices (dynamic count)
+  // For image choices, just show the letter label (images displayed on beamer)
   container.innerHTML = "";
 
   triviaResult.choices.forEach((choice, idx) => {
     const isCorrect = idx === triviaResult.correct_index;
     const voteCount = triviaResult.vote_counts[idx] || 0;
 
+    // For image choices, show only the label; for text choices, show the text
+    const isImageChoice = choice.image_url && !choice.text;
+    const displayText = isImageChoice ? "" : escapeHtml(choice.text);
+    const content = `${displayText}${isCorrect ? " ✓" : ""}`;
+
     const option = document.createElement("div");
     option.className = `trivia-result-option ${isCorrect ? "correct" : ""}`;
     option.innerHTML = `
       <span class="trivia-label">${TRIVIA_LABELS[idx]}</span>
-      <span class="trivia-text">${escapeHtml(choice)}${isCorrect ? " ✓" : ""}</span>
+      <span class="trivia-text">${content}</span>
       <span class="trivia-count">${voteCount}</span>
     `;
     container.appendChild(option);

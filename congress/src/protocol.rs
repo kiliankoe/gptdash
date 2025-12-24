@@ -151,6 +151,8 @@ pub enum ClientMessage {
     /// Add a new trivia question (host only, 2-4 choices)
     HostAddTriviaQuestion {
         question: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        image_url: Option<String>,
         choices: Vec<TriviaChoiceInput>,
     },
     /// Remove a trivia question from the pool (host only)
@@ -175,10 +177,21 @@ pub enum ClientMessage {
 }
 
 /// Input for creating a trivia question choice (from client)
+/// Either text or image_url should be set, not both
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TriviaChoiceInput {
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
     pub is_correct: bool,
+}
+
+/// Output format for trivia choices sent to beamer/audience (no is_correct flag)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriviaChoiceOutput {
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -359,7 +372,9 @@ pub enum ServerMessage {
     TriviaQuestion {
         question_id: TriviaQuestionId,
         question: String,
-        choices: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        image_url: Option<String>,
+        choices: Vec<TriviaChoiceOutput>,
     },
     /// Acknowledge a trivia vote
     TriviaVoteAck {
@@ -369,7 +384,9 @@ pub enum ServerMessage {
     TriviaResult {
         question_id: TriviaQuestionId,
         question: String,
-        choices: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        image_url: Option<String>,
+        choices: Vec<TriviaChoiceOutput>,
         correct_index: usize,
         vote_counts: Vec<u32>,
         total_votes: u32,

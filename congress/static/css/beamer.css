@@ -1188,6 +1188,21 @@ body {
   flex: 1;
 }
 
+.trivia-choice-image {
+  max-width: 200px;
+  max-height: 150px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.trivia-question-image {
+  max-width: 400px;
+  max-height: 250px;
+  border-radius: 12px;
+  object-fit: contain;
+  margin-bottom: 30px;
+}
+
 /* Trivia Result Styles */
 .trivia-result-choices {
   display: flex;
@@ -1229,6 +1244,14 @@ body {
   flex: 1;
   font-size: 22px;
   text-align: left;
+}
+
+.trivia-result-image {
+  max-width: 100px;
+  max-height: 60px;
+  border-radius: 6px;
+  object-fit: contain;
+  vertical-align: middle;
 }
 
 .trivia-result-bar-container {

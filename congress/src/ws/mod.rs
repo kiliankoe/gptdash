@@ -348,11 +348,18 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                     GamePhase::Writing => {
                         // Send active trivia question if any
                         if let Some(trivia) = state.get_active_trivia().await {
-                            let choices: Vec<String> =
-                                trivia.choices.iter().map(|c| c.text.clone()).collect();
+                            let choices: Vec<crate::protocol::TriviaChoiceOutput> = trivia
+                                .choices
+                                .iter()
+                                .map(|c| crate::protocol::TriviaChoiceOutput {
+                                    text: c.text.clone(),
+                                    image_url: c.image_url.clone(),
+                                })
+                                .collect();
                             let trivia_msg = ServerMessage::TriviaQuestion {
                                 question_id: trivia.id.clone(),
                                 question: trivia.question.clone(),
+                                image_url: trivia.image_url.clone(),
                                 choices,
                             };
                             if let Ok(msg) = serde_json::to_string(&trivia_msg) {
@@ -462,11 +469,18 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
 
                 // Send active trivia question if any
                 if let Some(trivia) = state.get_active_trivia().await {
-                    let choices: Vec<String> =
-                        trivia.choices.iter().map(|c| c.text.clone()).collect();
+                    let choices: Vec<crate::protocol::TriviaChoiceOutput> = trivia
+                        .choices
+                        .iter()
+                        .map(|c| crate::protocol::TriviaChoiceOutput {
+                            text: c.text.clone(),
+                            image_url: c.image_url.clone(),
+                        })
+                        .collect();
                     let trivia_msg = ServerMessage::TriviaQuestion {
                         question_id: trivia.id.clone(),
                         question: trivia.question.clone(),
+                        image_url: trivia.image_url.clone(),
                         choices,
                     };
                     if let Ok(msg) = serde_json::to_string(&trivia_msg) {

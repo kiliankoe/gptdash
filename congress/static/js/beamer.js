@@ -1001,6 +1001,7 @@ function handleTriviaQuestion(msg) {
   gameState.activeTrivia = {
     question_id: msg.question_id,
     question: msg.question,
+    image_url: msg.image_url,
     choices: msg.choices,
   };
   gameState.triviaResult = null; // Clear any previous result
@@ -1012,6 +1013,7 @@ function handleTriviaResult(msg) {
   gameState.triviaResult = {
     question_id: msg.question_id,
     question: msg.question,
+    image_url: msg.image_url,
     choices: msg.choices,
     correct_index: msg.correct_index,
     vote_counts: msg.vote_counts,
@@ -1035,6 +1037,7 @@ function showTriviaOverlay() {
   const overlay = document.getElementById("triviaOverlay");
   const resultOverlay = document.getElementById("triviaResultOverlay");
   const questionEl = document.getElementById("triviaQuestion");
+  const questionImageEl = document.getElementById("triviaQuestionImage");
   const choicesEl = document.getElementById("triviaChoices");
 
   if (!overlay || !questionEl || !choicesEl) return;
@@ -1045,16 +1048,29 @@ function showTriviaOverlay() {
   // Update question
   questionEl.textContent = gameState.activeTrivia.question;
 
+  // Update question image
+  if (questionImageEl) {
+    if (gameState.activeTrivia.image_url) {
+      questionImageEl.src = gameState.activeTrivia.image_url;
+      questionImageEl.style.display = "block";
+    } else {
+      questionImageEl.style.display = "none";
+    }
+  }
+
   // Update choices (dynamic count)
   choicesEl.innerHTML = gameState.activeTrivia.choices
-    .map(
-      (choice, idx) => `
+    .map((choice, idx) => {
+      const content = choice.image_url
+        ? `<img src="${escapeHtml(choice.image_url)}" class="trivia-choice-image" alt="Choice ${TRIVIA_LABELS[idx]}">`
+        : `<span class="trivia-choice-text">${escapeHtml(choice.text)}</span>`;
+      return `
       <div class="trivia-choice">
         <span class="trivia-choice-label">${TRIVIA_LABELS[idx]}</span>
-        <span class="trivia-choice-text">${escapeHtml(choice)}</span>
+        ${content}
       </div>
-    `,
-    )
+    `;
+    })
     .join("");
 
   // Show overlay
@@ -1065,6 +1081,7 @@ function showTriviaResult() {
   const overlay = document.getElementById("triviaOverlay");
   const resultOverlay = document.getElementById("triviaResultOverlay");
   const questionEl = document.getElementById("triviaResultQuestion");
+  const questionImageEl = document.getElementById("triviaResultQuestionImage");
   const choicesEl = document.getElementById("triviaResultChoices");
   const totalVotesEl = document.getElementById("triviaTotalVotes");
 
@@ -1078,6 +1095,16 @@ function showTriviaResult() {
   // Update question
   questionEl.textContent = result.question;
 
+  // Update question image
+  if (questionImageEl) {
+    if (result.image_url) {
+      questionImageEl.src = result.image_url;
+      questionImageEl.style.display = "block";
+    } else {
+      questionImageEl.style.display = "none";
+    }
+  }
+
   // Calculate max votes for bar width
   const maxVotes = Math.max(...result.vote_counts, 1);
 
@@ -1087,11 +1114,14 @@ function showTriviaResult() {
       const isCorrect = idx === result.correct_index;
       const voteCount = result.vote_counts[idx] || 0;
       const percent = (voteCount / maxVotes) * 100;
+      const content = choice.image_url
+        ? `<img src="${escapeHtml(choice.image_url)}" class="trivia-result-image" alt="Choice ${TRIVIA_LABELS[idx]}">${isCorrect ? " ✓" : ""}`
+        : `${escapeHtml(choice.text)}${isCorrect ? " ✓" : ""}`;
 
       return `
         <div class="trivia-result-choice ${isCorrect ? "correct" : ""}">
           <span class="trivia-result-label">${TRIVIA_LABELS[idx]}</span>
-          <span class="trivia-result-text">${escapeHtml(choice)}${isCorrect ? " ✓" : ""}</span>
+          <span class="trivia-result-text">${content}</span>
           <div class="trivia-result-bar-container">
             <div class="trivia-result-bar" style="width: ${percent}%"></div>
           </div>

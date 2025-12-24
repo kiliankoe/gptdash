@@ -663,6 +663,13 @@ function updateSoftPanicModeUI() {
 // Trivia Functions - Dynamic choice count (2-4)
 const TRIVIA_CHOICE_LABELS = ["A", "B", "C", "D"];
 let triviaChoiceCount = 2; // Start with 2 choices
+const triviaChoiceModes = ["text", "text", "text", "text"]; // Track mode per choice
+
+function toggleTriviaChoiceMode(index) {
+  triviaChoiceModes[index] =
+    triviaChoiceModes[index] === "text" ? "image" : "text";
+  renderTriviaChoices();
+}
 
 function renderTriviaChoices() {
   const container = document.getElementById("triviaChoicesContainer");
@@ -670,14 +677,23 @@ function renderTriviaChoices() {
 
   let html = "";
   for (let i = 0; i < triviaChoiceCount; i++) {
-    const existingValue =
-      document.getElementById(`triviaChoice${i}`)?.value || "";
+    const mode = triviaChoiceModes[i] || "text";
+    const existingText =
+      document.getElementById(`triviaChoiceText${i}`)?.value || "";
+    const existingImage =
+      document.getElementById(`triviaChoiceImage${i}`)?.value || "";
+
     html += `
-      <div style="display: grid; grid-template-columns: auto auto 1fr auto; gap: 10px; align-items: center; margin-bottom: 8px;" data-choice-index="${i}">
-        <input type="radio" name="triviaCorrect" value="${i}" id="triviaCorrect${i}" ${i === 0 ? "checked" : ""} style="width: 18px; height: 18px;">
-        <label for="triviaCorrect${i}" style="font-weight: bold;">${TRIVIA_CHOICE_LABELS[i]}:</label>
-        <input type="text" id="triviaChoice${i}" placeholder="Antwort ${TRIVIA_CHOICE_LABELS[i]}" value="${escapeHtml(existingValue)}" style="margin-bottom: 0;">
-        ${triviaChoiceCount > 2 ? `<button type="button" onclick="removeTriviaChoice(${i})" style="padding: 5px 10px; background: #e03131;">X</button>` : '<span style="width: 40px;"></span>'}
+      <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 6px;" data-choice-index="${i}">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="radio" name="triviaCorrect" value="${i}" id="triviaCorrect${i}" ${i === 0 ? "checked" : ""} style="width: 18px; height: 18px;">
+          <label for="triviaCorrect${i}" style="font-weight: bold; min-width: 20px;">${TRIVIA_CHOICE_LABELS[i]}:</label>
+          <button type="button" onclick="toggleTriviaChoiceMode(${i})" style="padding: 4px 8px; font-size: 0.85em; background: ${mode === "text" ? "#228be6" : "#40c057"};">
+            ${mode === "text" ? "Text" : "Bild"}
+          </button>
+          ${triviaChoiceCount > 2 ? `<button type="button" onclick="removeTriviaChoice(${i})" style="padding: 4px 8px; background: #e03131; margin-left: auto;">X</button>` : ""}
+        </div>
+        ${mode === "text" ? `<input type="text" id="triviaChoiceText${i}" placeholder="Antwort ${TRIVIA_CHOICE_LABELS[i]}" value="${escapeHtml(existingText)}" style="margin: 0;">` : `<input type="text" id="triviaChoiceImage${i}" placeholder="https://example.com/image.jpg" value="${escapeHtml(existingImage)}" style="margin: 0;">`}
       </div>
     `;
   }
@@ -699,21 +715,33 @@ function addTriviaChoice() {
 function removeTriviaChoice(index) {
   if (triviaChoiceCount <= 2) return;
 
-  // Save current values before re-rendering
-  const values = [];
+  // Save current values and modes before re-rendering
+  const savedChoices = [];
   for (let i = 0; i < triviaChoiceCount; i++) {
     if (i !== index) {
-      values.push(document.getElementById(`triviaChoice${i}`)?.value || "");
+      savedChoices.push({
+        mode: triviaChoiceModes[i],
+        text: document.getElementById(`triviaChoiceText${i}`)?.value || "",
+        image: document.getElementById(`triviaChoiceImage${i}`)?.value || "",
+      });
     }
   }
 
   triviaChoiceCount--;
+
+  // Restore modes
+  for (let i = 0; i < savedChoices.length; i++) {
+    triviaChoiceModes[i] = savedChoices[i].mode;
+  }
+
   renderTriviaChoices();
 
   // Restore values
-  for (let i = 0; i < values.length; i++) {
-    const input = document.getElementById(`triviaChoice${i}`);
-    if (input) input.value = values[i];
+  for (let i = 0; i < savedChoices.length; i++) {
+    const textInput = document.getElementById(`triviaChoiceText${i}`);
+    const imageInput = document.getElementById(`triviaChoiceImage${i}`);
+    if (textInput) textInput.value = savedChoices[i].text;
+    if (imageInput) imageInput.value = savedChoices[i].image;
   }
 }
 
@@ -726,30 +754,62 @@ function addTriviaQuestion() {
     return;
   }
 
+  const questionImageUrl =
+    document.getElementById("triviaQuestionImageUrl")?.value?.trim() || null;
+
   const choices = [];
   for (let i = 0; i < triviaChoiceCount; i++) {
-    const choiceText = document
-      .getElementById(`triviaChoice${i}`)
-      ?.value?.trim();
-    if (!choiceText) {
-      showAlert(`Bitte fülle Antwort ${TRIVIA_CHOICE_LABELS[i]} aus`, "error");
-      return;
-    }
+    const mode = triviaChoiceModes[i] || "text";
     const isCorrect =
       document.querySelector(`input[name="triviaCorrect"]:checked`)?.value ===
       String(i);
-    choices.push({ text: choiceText, is_correct: isCorrect });
+
+    if (mode === "text") {
+      const choiceText = document
+        .getElementById(`triviaChoiceText${i}`)
+        ?.value?.trim();
+      if (!choiceText) {
+        showAlert(
+          `Bitte fülle Antwort ${TRIVIA_CHOICE_LABELS[i]} aus`,
+          "error",
+        );
+        return;
+      }
+      choices.push({
+        text: choiceText,
+        image_url: null,
+        is_correct: isCorrect,
+      });
+    } else {
+      const imageUrl = document
+        .getElementById(`triviaChoiceImage${i}`)
+        ?.value?.trim();
+      if (!imageUrl) {
+        showAlert(
+          `Bitte gib eine Bild-URL für Antwort ${TRIVIA_CHOICE_LABELS[i]} ein`,
+          "error",
+        );
+        return;
+      }
+      choices.push({ text: "", image_url: imageUrl, is_correct: isCorrect });
+    }
   }
 
   wsConn.send({
     t: "host_add_trivia_question",
     question: questionText,
+    image_url: questionImageUrl,
     choices: choices,
   });
 
   // Clear form and reset to 2 choices
   document.getElementById("triviaQuestionText").value = "";
+  document.getElementById("triviaQuestionImageUrl").value = "";
   triviaChoiceCount = 2;
+  triviaChoiceModes[0] = "text";
+  triviaChoiceModes[1] = "text";
+  triviaChoiceModes[2] = "text";
+  triviaChoiceModes[3] = "text";
   renderTriviaChoices();
   document.getElementById("triviaCorrect0").checked = true;
 
@@ -835,7 +895,10 @@ function updateTriviaUI() {
           const correctClass = choice.is_correct
             ? 'style="color: #51cf66; font-weight: bold;"'
             : "";
-          html += `<div ${correctClass}>${TRIVIA_CHOICE_LABELS[idx]}: ${escapeHtml(choice.text)}${choice.is_correct ? " ✓" : ""}</div>`;
+          const displayText = choice.image_url
+            ? "[Bild]"
+            : escapeHtml(choice.text);
+          html += `<div ${correctClass}>${TRIVIA_CHOICE_LABELS[idx]}: ${displayText}${choice.is_correct ? " ✓" : ""}</div>`;
         });
         activeTriviaChoices.innerHTML = html;
       }
@@ -867,11 +930,21 @@ function updateTriviaUI() {
           gameState.phase === "WRITING" &&
           !gameState.activeTrivia &&
           !gameState.triviaResultShowing;
+        const questionImageHtml = q.image_url
+          ? `<img src="${escapeHtml(q.image_url)}" style="max-width: 100px; max-height: 60px; border-radius: 4px; margin-bottom: 8px;" alt="Fragen-Bild">`
+          : "";
+        const choicesHtml = q.choices
+          .map((c, i) => {
+            const displayText = c.image_url ? "[Bild]" : escapeHtml(c.text);
+            return `<div ${c.is_correct ? 'style="color: #51cf66;"' : ""}>${TRIVIA_CHOICE_LABELS[i]}: ${displayText}${c.is_correct ? " ✓" : ""}</div>`;
+          })
+          .join("");
         html += `
           <div class="trivia-question-card" style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 15px; margin-bottom: 10px; ${isActive ? "border: 2px solid #ffd43b;" : ""}">
             <div style="font-weight: bold; margin-bottom: 10px;">${escapeHtml(q.question)}</div>
+            ${questionImageHtml}
             <div style="margin-bottom: 10px; font-size: 0.9em;">
-              ${q.choices.map((c, i) => `<div ${c.is_correct ? 'style="color: #51cf66;"' : ""}>${TRIVIA_CHOICE_LABELS[i]}: ${escapeHtml(c.text)}${c.is_correct ? " ✓" : ""}</div>`).join("")}
+              ${choicesHtml}
             </div>
             <div class="button-group">
               <button onclick="presentTrivia('${escapeHtml(q.id)}')" class="primary" ${canPresent ? "" : "disabled"} title="${canPresent ? "Frage praesentieren" : "Nur waehrend WRITING und ohne aktive Trivia"}">Praesentieren</button>
@@ -1002,6 +1075,7 @@ if (typeof window !== "undefined") {
     addTriviaQuestion,
     addTriviaChoice,
     removeTriviaChoice,
+    toggleTriviaChoiceMode,
     presentTrivia,
     resolveTrivia,
     clearTrivia,
