@@ -1103,6 +1103,7 @@ function showTriviaOverlay() {
   }
 
   // Update choices (dynamic count)
+  choicesEl.dataset.count = gameState.activeTrivia.choices.length;
   choicesEl.innerHTML = gameState.activeTrivia.choices
     .map((choice, idx) => {
       const content = choice.image_url
