@@ -130,6 +130,14 @@ function init() {
   // Setup event delegation for data-action attributes (XSS prevention)
   setupEventDelegation();
 
+  // Setup audience score search filter
+  const audienceSearchInput = document.getElementById("audienceScoreSearch");
+  if (audienceSearchInput) {
+    audienceSearchInput.addEventListener("input", () => {
+      updateScores();
+    });
+  }
+
   // Restore panel from URL if present (allows reload to stay on same panel)
   restorePanelFromUrl();
 
@@ -462,6 +470,26 @@ function setupEventDelegation() {
       case "reveal-vote-labels":
         revealVoteLabels();
         break;
+
+      // Score editing
+      case "edit-player-score":
+        openScoreEditModal(
+          btn.dataset.playerId,
+          btn.dataset.playerName,
+          parseInt(btn.dataset.aiPoints, 10) || 0,
+          parseInt(btn.dataset.funnyPoints, 10) || 0,
+        );
+        break;
+      case "edit-audience-score":
+        openAudienceScoreEditModal(
+          btn.dataset.voterId,
+          btn.dataset.voterName,
+          parseInt(btn.dataset.aiPoints, 10) || 0,
+        );
+        break;
+      case "clear-audience-score":
+        clearAudienceScore(btn.dataset.voterId, btn.dataset.voterName);
+        break;
     }
   });
 }
@@ -695,6 +723,98 @@ function updateVenueOnlyModeUI() {
     venueStatus.textContent = gameState.venueOnlyMode ? "AKTIV" : "Inaktiv";
     venueStatus.style.color = gameState.venueOnlyMode ? "#22c55e" : "inherit";
   }
+}
+
+// Score editing functions
+function openScoreEditModal(playerId, playerName, aiPoints, funnyPoints) {
+  document.getElementById("scoreEditPlayerId").value = playerId;
+  document.getElementById("scoreEditPlayerName").textContent = playerName;
+  document.getElementById("scoreEditAiPoints").value = aiPoints;
+  document.getElementById("scoreEditFunnyPoints").value = funnyPoints;
+  document.getElementById("scoreEditModal").style.display = "flex";
+}
+
+function closeScoreEditModal() {
+  document.getElementById("scoreEditModal").style.display = "none";
+}
+
+function savePlayerScore() {
+  const playerId = document.getElementById("scoreEditPlayerId").value;
+  const aiPoints = parseInt(
+    document.getElementById("scoreEditAiPoints").value,
+    10,
+  );
+  const funnyPoints = parseInt(
+    document.getElementById("scoreEditFunnyPoints").value,
+    10,
+  );
+
+  if (
+    Number.isNaN(aiPoints) ||
+    aiPoints < 0 ||
+    Number.isNaN(funnyPoints) ||
+    funnyPoints < 0
+  ) {
+    showAlert("Bitte gültige Punktwerte eingeben (>= 0)", "error");
+    return;
+  }
+
+  wsConn.send({
+    t: "host_edit_player_score",
+    player_id: playerId,
+    ai_detect_points: aiPoints,
+    funny_points: funnyPoints,
+  });
+
+  closeScoreEditModal();
+  showAlert("Spieler-Punkte aktualisiert", "success");
+}
+
+function clearAudienceScore(voterId, voterName) {
+  if (!confirm(`Willst du wirklich alle Punkte von "${voterName}" löschen?`)) {
+    return;
+  }
+
+  wsConn.send({
+    t: "host_clear_audience_score",
+    voter_id: voterId,
+  });
+
+  showAlert("Publikums-Punkte gelöscht", "success");
+}
+
+// Audience score editing functions
+function openAudienceScoreEditModal(voterId, voterName, aiPoints) {
+  document.getElementById("audienceScoreEditVoterId").value = voterId;
+  document.getElementById("audienceScoreEditName").textContent = voterName;
+  document.getElementById("audienceScoreEditAiPoints").value = aiPoints;
+  document.getElementById("audienceScoreEditModal").style.display = "flex";
+}
+
+function closeAudienceScoreEditModal() {
+  document.getElementById("audienceScoreEditModal").style.display = "none";
+}
+
+function saveAudienceScore() {
+  const voterId = document.getElementById("audienceScoreEditVoterId").value;
+  const aiPoints = parseInt(
+    document.getElementById("audienceScoreEditAiPoints").value,
+    10,
+  );
+
+  if (Number.isNaN(aiPoints) || aiPoints < 0) {
+    showAlert("Bitte gültige Punktwerte eingeben (>= 0)", "error");
+    return;
+  }
+
+  wsConn.send({
+    t: "host_edit_audience_score",
+    voter_id: voterId,
+    ai_detect_points: aiPoints,
+  });
+
+  closeAudienceScoreEditModal();
+  showAlert("Publikums-Punkte aktualisiert", "success");
 }
 
 // Trivia Functions - Dynamic choice count (2-4)
@@ -1138,5 +1258,14 @@ if (typeof window !== "undefined") {
     // Utilities
     copyPlayerUrl,
     copyToClipboard,
+
+    // Score editing
+    openScoreEditModal,
+    closeScoreEditModal,
+    savePlayerScore,
+    clearAudienceScore,
+    openAudienceScoreEditModal,
+    closeAudienceScoreEditModal,
+    saveAudienceScore,
   });
 }

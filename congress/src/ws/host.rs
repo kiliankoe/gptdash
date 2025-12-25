@@ -857,3 +857,98 @@ pub async fn handle_reveal_vote_labels(state: &Arc<AppState>) -> Option<ServerMe
 
     None
 }
+
+// ========== Score Editing ==========
+
+pub async fn handle_edit_player_score(
+    state: &Arc<AppState>,
+    player_id: String,
+    ai_detect_points: u32,
+    funny_points: u32,
+) -> Option<ServerMessage> {
+    tracing::info!(
+        "Host editing player score: {} -> AI: {}, Funny: {}",
+        player_id,
+        ai_detect_points,
+        funny_points
+    );
+
+    match state
+        .edit_player_score(&player_id, ai_detect_points, funny_points)
+        .await
+    {
+        Ok(_) => {
+            // Broadcast updated leaderboards to host and beamer
+            let (players, audience) = state.get_leaderboards().await;
+            let msg = ServerMessage::Scores {
+                players,
+                audience_top: audience.into_iter().take(10).collect(),
+                ai_submission_id: None,
+            };
+            state.broadcast_to_host(msg.clone());
+            state.broadcast_to_beamer(msg);
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "EDIT_PLAYER_SCORE_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_clear_audience_score(
+    state: &Arc<AppState>,
+    voter_id: String,
+) -> Option<ServerMessage> {
+    tracing::info!("Host clearing audience score: {}", voter_id);
+
+    match state.clear_audience_score(&voter_id).await {
+        Ok(_) => {
+            // Broadcast updated leaderboards to host and beamer
+            let (players, audience) = state.get_leaderboards().await;
+            let msg = ServerMessage::Scores {
+                players,
+                audience_top: audience.into_iter().take(10).collect(),
+                ai_submission_id: None,
+            };
+            state.broadcast_to_host(msg.clone());
+            state.broadcast_to_beamer(msg);
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "CLEAR_AUDIENCE_SCORE_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_edit_audience_score(
+    state: &Arc<AppState>,
+    voter_id: String,
+    ai_detect_points: u32,
+) -> Option<ServerMessage> {
+    tracing::info!(
+        "Host editing audience score: {} -> AI: {}",
+        voter_id,
+        ai_detect_points
+    );
+
+    match state.edit_audience_score(&voter_id, ai_detect_points).await {
+        Ok(_) => {
+            // Broadcast updated leaderboards to host and beamer
+            let (players, audience) = state.get_leaderboards().await;
+            let msg = ServerMessage::Scores {
+                players,
+                audience_top: audience.into_iter().take(10).collect(),
+                ai_submission_id: None,
+            };
+            state.broadcast_to_host(msg.clone());
+            state.broadcast_to_beamer(msg);
+            None
+        }
+        Err(e) => Some(ServerMessage::Error {
+            code: "EDIT_AUDIENCE_SCORE_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}

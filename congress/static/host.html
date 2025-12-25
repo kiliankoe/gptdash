@@ -491,6 +491,9 @@
 
                 <div class="card">
                     <div class="card-header">Spieler-Punkte</div>
+                    <p style="opacity: 0.7; font-size: 0.9em; margin-bottom: 10px;">
+                        Klicke auf einen Spieler, um die Punkte zu bearbeiten.
+                    </p>
                     <div id="playerScores">
                         <p class="text-secondary">Noch keine Punkte</p>
                     </div>
@@ -498,8 +501,60 @@
 
                 <div class="card">
                     <div class="card-header">Top Publikum</div>
+                    <p style="opacity: 0.7; font-size: 0.9em; margin-bottom: 10px;">
+                        Klicke auf ein Publikum-Mitglied, um dessen Punkte zu löschen.
+                    </p>
+                    <input type="text" id="audienceScoreSearch" placeholder="Suche nach Name..." style="margin-bottom: 10px;">
                     <div id="audienceScores">
                         <p class="text-secondary">Noch keine Publikums-Punkte</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Score Edit Modal -->
+            <div id="scoreEditModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Spieler-Punkte bearbeiten</h3>
+                        <button type="button" class="modal-close" onclick="closeScoreEditModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p style="margin-bottom: 15px;">Spieler: <strong id="scoreEditPlayerName"></strong></p>
+                        <input type="hidden" id="scoreEditPlayerId">
+                        <div class="mb-15">
+                            <label class="form-label-bold">AI-Punkte:</label>
+                            <input type="number" id="scoreEditAiPoints" min="0" value="0" style="width: 100%;">
+                        </div>
+                        <div class="mb-15">
+                            <label class="form-label-bold">Funny-Punkte:</label>
+                            <input type="number" id="scoreEditFunnyPoints" min="0" value="0" style="width: 100%;">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="secondary" onclick="closeScoreEditModal()">Abbrechen</button>
+                        <button type="button" class="primary" onclick="savePlayerScore()">Speichern</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audience Score Edit Modal -->
+            <div id="audienceScoreEditModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Publikum-Punkte bearbeiten</h3>
+                        <button type="button" class="modal-close" onclick="closeAudienceScoreEditModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p style="margin-bottom: 15px;">Name: <strong id="audienceScoreEditName"></strong></p>
+                        <input type="hidden" id="audienceScoreEditVoterId">
+                        <div class="mb-15">
+                            <label class="form-label-bold">AI-Punkte:</label>
+                            <input type="number" id="audienceScoreEditAiPoints" min="0" value="0" style="width: 100%;">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="secondary" onclick="closeAudienceScoreEditModal()">Abbrechen</button>
+                        <button type="button" class="primary" onclick="saveAudienceScore()">Speichern</button>
                     </div>
                 </div>
             </div>

@@ -178,6 +178,21 @@ pub enum ClientMessage {
     },
     /// Reveal vote labels on beamer during VOTING phase (host only)
     HostRevealVoteLabels,
+    /// Edit a player's score (host only, absolute values)
+    HostEditPlayerScore {
+        player_id: PlayerId,
+        ai_detect_points: u32,
+        funny_points: u32,
+    },
+    /// Clear an audience member's score (host only)
+    HostClearAudienceScore {
+        voter_id: VoterId,
+    },
+    /// Edit an audience member's score (host only, absolute values)
+    HostEditAudienceScore {
+        voter_id: VoterId,
+        ai_detect_points: u32,
+    },
 }
 
 /// Input for creating a trivia question choice (from client)

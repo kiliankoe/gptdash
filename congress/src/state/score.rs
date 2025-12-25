@@ -199,6 +199,89 @@ impl AppState {
 
         (player_scores, audience_scores)
     }
+
+    /// Edit a player's score by setting absolute values.
+    /// Clears existing scores for the player and creates a synthetic score entry.
+    pub async fn edit_player_score(
+        &self,
+        player_id: &str,
+        ai_detect_points: u32,
+        funny_points: u32,
+    ) -> Result<(), String> {
+        // Verify player exists
+        let players = self.players.read().await;
+        let player = players
+            .get(player_id)
+            .ok_or_else(|| "Player not found".to_string())?;
+        let display_name = player.display_name.clone();
+        drop(players);
+
+        let mut scores = self.scores.write().await;
+
+        // Remove all existing scores for this player
+        scores.retain(|s| !(s.kind == ScoreKind::Player && s.ref_id == player_id));
+
+        // Create a new synthetic score entry with the specified values
+        let total = ai_detect_points + funny_points;
+        scores.push(Score {
+            id: ulid::Ulid::new().to_string(),
+            kind: ScoreKind::Player,
+            ref_id: player_id.to_string(),
+            display_name,
+            ai_detect_points,
+            funny_points,
+            total,
+            earliest_correct_ts: None,
+        });
+
+        Ok(())
+    }
+
+    /// Clear all scores for an audience member.
+    pub async fn clear_audience_score(&self, voter_id: &str) -> Result<(), String> {
+        let mut scores = self.scores.write().await;
+
+        let original_len = scores.len();
+        scores.retain(|s| !(s.kind == ScoreKind::Audience && s.ref_id == voter_id));
+
+        if scores.len() == original_len {
+            return Err("No scores found for this audience member".to_string());
+        }
+
+        Ok(())
+    }
+
+    /// Edit an audience member's score by setting absolute values.
+    /// Clears existing scores for the voter and creates a synthetic score entry.
+    pub async fn edit_audience_score(
+        &self,
+        voter_id: &str,
+        ai_detect_points: u32,
+    ) -> Result<(), String> {
+        // Get display name from audience members if available
+        let audience = self.audience_members.read().await;
+        let display_name = audience.get(voter_id).map(|m| m.display_name.clone());
+        drop(audience);
+
+        let mut scores = self.scores.write().await;
+
+        // Remove all existing scores for this voter
+        scores.retain(|s| !(s.kind == ScoreKind::Audience && s.ref_id == voter_id));
+
+        // Create a new synthetic score entry with the specified values
+        scores.push(Score {
+            id: ulid::Ulid::new().to_string(),
+            kind: ScoreKind::Audience,
+            ref_id: voter_id.to_string(),
+            display_name,
+            ai_detect_points,
+            funny_points: 0,
+            total: ai_detect_points,
+            earliest_correct_ts: None,
+        });
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

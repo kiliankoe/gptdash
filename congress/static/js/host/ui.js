@@ -171,30 +171,54 @@ export function updateScores() {
     gameState.scores.players.forEach((score, idx) => {
       const displayName = score.display_name || score.ref_id.substring(0, 12);
       playerContainer.innerHTML += `
-        <div class="info-item">
-          <div class="label">${idx + 1}. ${escapeHtml(displayName)}</div>
-          <div class="value">${score.total} Pkt</div>
+        <div class="score-item" data-action="edit-player-score" data-player-id="${escapeHtml(score.ref_id)}" data-player-name="${escapeHtml(displayName)}" data-ai-points="${score.ai_detect_points}" data-funny-points="${score.funny_points}" style="cursor: pointer;">
+          <div class="score-rank">${idx + 1}.</div>
+          <div class="score-name">${escapeHtml(displayName)}</div>
+          <div class="score-details">AI: ${score.ai_detect_points} | Funny: ${score.funny_points}</div>
+          <div class="score-total">${score.total} Pkt</div>
+          <div class="score-edit-icon">✏️</div>
         </div>
       `;
     });
   }
 
-  // Audience scores
+  // Audience scores (with search filter)
   const audienceContainer = document.getElementById("audienceScores");
+  const searchInput = document.getElementById("audienceScoreSearch");
+  const searchTerm = (searchInput?.value || "").toLowerCase().trim();
+
   audienceContainer.innerHTML = "";
 
   if (gameState.scores.audience_top.length === 0) {
     audienceContainer.innerHTML =
       '<p style="opacity: 0.6;">Noch keine Publikums-Punkte</p>';
   } else {
-    gameState.scores.audience_top.slice(0, 10).forEach((score, idx) => {
-      const displayName = score.display_name || score.ref_id.substring(0, 12);
-      audienceContainer.innerHTML += `
-        <div class="info-item">
-          <div class="label">${idx + 1}. ${escapeHtml(displayName)}</div>
-          <div class="value">${score.total} Pkt</div>
+    const filteredScores = gameState.scores.audience_top.filter((score) => {
+      if (!searchTerm) return true;
+      const displayName = (
+        score.display_name || score.ref_id.substring(0, 12)
+      ).toLowerCase();
+      return displayName.includes(searchTerm);
+    });
+
+    if (filteredScores.length === 0) {
+      audienceContainer.innerHTML =
+        '<p style="opacity: 0.6;">Keine Treffer</p>';
+    } else {
+      filteredScores.forEach((score, idx) => {
+        const displayName = score.display_name || score.ref_id.substring(0, 12);
+        audienceContainer.innerHTML += `
+        <div class="score-item">
+          <div class="score-item-main" data-action="edit-audience-score" data-voter-id="${escapeHtml(score.ref_id)}" data-voter-name="${escapeHtml(displayName)}" data-ai-points="${score.ai_detect_points}" style="cursor: pointer;">
+            <div class="score-rank">${idx + 1}.</div>
+            <div class="score-name">${escapeHtml(displayName)}</div>
+            <div class="score-total">${score.total} Pkt</div>
+            <div class="score-edit-icon">✏️</div>
+          </div>
+          <button type="button" class="score-delete-btn" data-action="clear-audience-score" data-voter-id="${escapeHtml(score.ref_id)}" data-voter-name="${escapeHtml(displayName)}" title="Punkte löschen">🗑️</button>
         </div>
       `;
-    });
+      });
+    }
   }
 }

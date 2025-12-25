@@ -280,6 +280,28 @@ pub async fn handle_message(
             check_host!(role, "reveal vote labels");
             host::handle_reveal_vote_labels(state).await
         }
+
+        ClientMessage::HostEditPlayerScore {
+            player_id,
+            ai_detect_points,
+            funny_points,
+        } => {
+            check_host!(role, "edit player scores");
+            host::handle_edit_player_score(state, player_id, ai_detect_points, funny_points).await
+        }
+
+        ClientMessage::HostClearAudienceScore { voter_id } => {
+            check_host!(role, "clear audience scores");
+            host::handle_clear_audience_score(state, voter_id).await
+        }
+
+        ClientMessage::HostEditAudienceScore {
+            voter_id,
+            ai_detect_points,
+        } => {
+            check_host!(role, "edit audience scores");
+            host::handle_edit_audience_score(state, voter_id, ai_detect_points).await
+        }
     }
 }
 
