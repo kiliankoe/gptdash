@@ -11,7 +11,7 @@ const jsDir = join(staticDir, "js");
 const distDir = join(jsDir, "dist");
 
 const entryPoints = [
-	{ name: "audience", entry: join(jsDir, "audience.js") },
+	{ name: "public", entry: join(jsDir, "audience.js") },
 	{ name: "beamer", entry: join(jsDir, "beamer.js") },
 	{ name: "player", entry: join(jsDir, "player.js") },
 	{ name: "host", entry: join(jsDir, "host.js") },
