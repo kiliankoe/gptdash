@@ -403,9 +403,14 @@ impl AppState {
 
                                     // Broadcast scores to all clients
                                     let (all_players, top_audience) = self.get_leaderboards().await;
+                                    let ai_submission_id = {
+                                        let rounds = self.rounds.read().await;
+                                        rounds.get(&rid).and_then(|r| r.ai_submission_id.clone())
+                                    };
                                     self.broadcast_to_all(crate::protocol::ServerMessage::Scores {
                                         players: all_players,
                                         audience_top: top_audience.into_iter().take(10).collect(),
+                                        ai_submission_id,
                                     });
                                 }
                                 Err(e) => {
@@ -417,11 +422,24 @@ impl AppState {
                         } else {
                             // Already scored, just re-broadcast the existing scores
                             let (all_players, top_audience) = self.get_leaderboards().await;
+                            let ai_submission_id = {
+                                let rounds = self.rounds.read().await;
+                                rounds.get(&rid).and_then(|r| r.ai_submission_id.clone())
+                            };
                             self.broadcast_to_all(crate::protocol::ServerMessage::Scores {
                                 players: all_players,
                                 audience_top: top_audience.into_iter().take(10).collect(),
+                                ai_submission_id,
                             });
                         }
+
+                        // Broadcast vote counts so beamer can determine winners
+                        let (ai_counts, funny_counts) = self.get_vote_counts_for_round(&rid).await;
+                        self.broadcast_to_all(crate::protocol::ServerMessage::BeamerVoteCounts {
+                            ai: ai_counts,
+                            funny: funny_counts,
+                            seq: 0,
+                        });
 
                         // Broadcast manual winners if set (for panic mode)
                         let rounds = self.rounds.read().await;
@@ -441,9 +459,14 @@ impl AppState {
                 } else if effective_phase == GamePhase::Podium {
                     // Re-broadcast scores for audience winner display
                     let (all_players, top_audience) = self.get_leaderboards().await;
+                    let ai_submission_id = self
+                        .get_current_round()
+                        .await
+                        .and_then(|r| r.ai_submission_id.clone());
                     self.broadcast_to_all(crate::protocol::ServerMessage::Scores {
                         players: all_players,
                         audience_top: top_audience.into_iter().take(10).collect(),
+                        ai_submission_id,
                     });
                 }
 

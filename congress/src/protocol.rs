@@ -242,6 +242,8 @@ pub enum ServerMessage {
     Scores {
         players: Vec<Score>,
         audience_top: Vec<Score>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        ai_submission_id: Option<SubmissionId>,
     },
     PlayersCreated {
         players: Vec<PlayerToken>,

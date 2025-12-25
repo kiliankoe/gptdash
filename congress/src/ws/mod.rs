@@ -386,9 +386,14 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                     GamePhase::Results | GamePhase::Podium => {
                         // Send scores for winner display (top 3 audience detection)
                         let (all_players, top_audience) = state.get_leaderboards().await;
+                        let ai_submission_id = state
+                            .get_current_round()
+                            .await
+                            .and_then(|r| r.ai_submission_id.clone());
                         let scores_msg = ServerMessage::Scores {
                             players: all_players,
                             audience_top: top_audience.into_iter().take(10).collect(),
+                            ai_submission_id,
                         };
                         if let Ok(msg) = serde_json::to_string(&scores_msg) {
                             let _ = sender.send(Message::Text(msg.into())).await;
@@ -549,9 +554,14 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
 
                 // Send scores
                 let (all_players, top_audience) = state.get_leaderboards().await;
+                let ai_submission_id = state
+                    .get_current_round()
+                    .await
+                    .and_then(|r| r.ai_submission_id.clone());
                 let scores_msg = ServerMessage::Scores {
                     players: all_players,
                     audience_top: top_audience.into_iter().take(10).collect(),
+                    ai_submission_id,
                 };
                 if let Ok(msg) = serde_json::to_string(&scores_msg) {
                     let _ = sender.send(Message::Text(msg.into())).await;

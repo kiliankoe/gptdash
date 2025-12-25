@@ -294,6 +294,11 @@ function handleSubmissions(msg) {
     updateVoteBarsAnimated();
   }
 
+  // Update result reveals if we're in results phase
+  if (gameState.phase === "RESULTS") {
+    updateResultReveals();
+  }
+
   updateRevealIndicator();
 }
 
@@ -320,6 +325,11 @@ function handleVoteCounts(msg) {
     funny: msg.funny || {},
   };
   updateVoteBarsAnimated();
+
+  // Update result reveals if we're in results phase
+  if (gameState.phase === "RESULTS") {
+    updateResultReveals();
+  }
 }
 
 function handleVoteLabelsRevealed() {
@@ -344,6 +354,15 @@ function handleScores(msg) {
     players: msg.players || [],
     audienceTop: msg.audience_top || [],
   };
+
+  // Store ai_submission_id for result label logic
+  if (msg.ai_submission_id) {
+    if (!gameState.currentRound) {
+      gameState.currentRound = {};
+    }
+    gameState.currentRound.ai_submission_id = msg.ai_submission_id;
+  }
+
   updateLeaderboard();
   updatePodium();
   updateResultReveals();
@@ -806,13 +825,11 @@ function updateAudienceLeaderboard() {
 function updateResultReveals() {
   const aiCounts = gameState.voteCounts.ai;
   const funnyCounts = gameState.voteCounts.funny;
+  const actualAiId = gameState.currentRound?.ai_submission_id;
 
-  // AI Winner: Use manual winner > ai_submission_id > most voted
+  // AI Winner: Use manual winner > most voted > actual AI (fallback)
   let aiDisplayId = gameState.manualAiWinner;
   const aiIsManual = !!aiDisplayId;
-  if (!aiDisplayId) {
-    aiDisplayId = gameState.currentRound?.ai_submission_id;
-  }
   if (!aiDisplayId) {
     let maxAiVotes = 0;
     for (const [id, count] of Object.entries(aiCounts)) {
@@ -821,6 +838,9 @@ function updateResultReveals() {
         aiDisplayId = id;
       }
     }
+  }
+  if (!aiDisplayId) {
+    aiDisplayId = actualAiId;
   }
 
   // Funny Winner: Use manual winner > most voted
@@ -839,6 +859,18 @@ function updateResultReveals() {
   // Update AI reveal
   const aiRevealAnswer = document.getElementById("aiRevealAnswer");
   const aiRevealMeta = document.getElementById("aiRevealMeta");
+  const aiRevealLabel = document.getElementById("aiRevealLabel");
+
+  // Update AI label based on ID comparison (independent of submission details)
+  if (aiDisplayId && aiRevealLabel) {
+    if (aiDisplayId === actualAiId) {
+      aiRevealLabel.textContent = "KI richtig erkannt!";
+    } else {
+      aiRevealLabel.textContent = "Am erfolgreichsten als KI überzeugt";
+    }
+  }
+
+  // Update AI answer and meta if submission found
   if (aiDisplayId && aiRevealAnswer) {
     const aiSub = gameState.submissions.find((s) => s.id === aiDisplayId);
     if (aiSub) {
@@ -855,6 +887,18 @@ function updateResultReveals() {
   // Update Funny reveal
   const funnyRevealAnswer = document.getElementById("funnyRevealAnswer");
   const funnyRevealMeta = document.getElementById("funnyRevealMeta");
+  const funnyRevealLabel = document.getElementById("funnyRevealLabel");
+
+  // Update Funny label based on ID comparison (independent of submission details)
+  if (funnyDisplayId && funnyRevealLabel) {
+    if (funnyDisplayId === actualAiId) {
+      funnyRevealLabel.textContent = "Die KI war am lustigsten?!";
+    } else {
+      funnyRevealLabel.textContent = "Am lustigsten";
+    }
+  }
+
+  // Update Funny answer and meta if submission found
   if (funnyDisplayId && funnyRevealAnswer) {
     const funnySub = gameState.submissions.find((s) => s.id === funnyDisplayId);
     if (funnySub) {
