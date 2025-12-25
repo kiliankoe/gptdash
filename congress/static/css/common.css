@@ -163,6 +163,24 @@ button.warning:hover {
   background: #d97706;
 }
 
+button.venue {
+  background: #9333ea;
+  color: white;
+}
+
+button.venue:hover {
+  background: #7e22ce;
+}
+
+button.venue-active {
+  background: #22c55e;
+  color: white;
+}
+
+button.venue-active:hover {
+  background: #16a34a;
+}
+
 /* Form Inputs */
 input,
 textarea,

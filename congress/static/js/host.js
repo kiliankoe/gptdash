@@ -146,6 +146,7 @@ function handleMessage(message) {
         gameState.validTransitions = message.valid_transitions || [];
         gameState.panicMode = message.game.panic_mode || false;
         gameState.softPanicMode = message.game.soft_panic_mode || false;
+        gameState.venueOnlyMode = message.game.venue_only_mode || false;
         gameState.deadline = message.game.phase_deadline || null;
         updateUI(uiCallbacks);
         updatePanicModeUI();
@@ -277,6 +278,11 @@ function handleMessage(message) {
         message.enabled ? "Prompt-Panik aktiviert" : "Prompt-Panik deaktiviert",
         message.enabled ? "warning" : "success",
       );
+      break;
+
+    case "venue_only_mode_update":
+      gameState.venueOnlyMode = message.enabled;
+      updateVenueOnlyModeUI();
       break;
 
     case "ai_generation_status":
@@ -657,6 +663,37 @@ function updateSoftPanicModeUI() {
   if (softPanicStatus) {
     softPanicStatus.textContent = gameState.softPanicMode ? "AKTIV" : "Inaktiv";
     softPanicStatus.classList.toggle("active", gameState.softPanicMode);
+  }
+}
+
+function toggleVenueOnlyMode() {
+  const newState = !gameState.venueOnlyMode;
+  if (
+    newState &&
+    !confirm(
+      "Venue-Only Modus aktivieren?\n\nNur Personen mit IPs aus den konfigurierten Bereichen (VENUE_IP_RANGES) können dann beitreten.",
+    )
+  ) {
+    return;
+  }
+  wsConn.send({ t: "host_toggle_venue_only_mode", enabled: newState });
+}
+
+function updateVenueOnlyModeUI() {
+  const venueBtn = document.getElementById("venueOnlyModeBtn");
+  const venueStatus = document.getElementById("venueOnlyStatus");
+
+  if (venueBtn) {
+    venueBtn.textContent = gameState.venueOnlyMode
+      ? "Venue-Only DEAKTIVIEREN"
+      : "Venue-Only aktivieren";
+    venueBtn.classList.toggle("venue", !gameState.venueOnlyMode);
+    venueBtn.classList.toggle("venue-active", gameState.venueOnlyMode);
+  }
+
+  if (venueStatus) {
+    venueStatus.textContent = gameState.venueOnlyMode ? "AKTIV" : "Inaktiv";
+    venueStatus.style.color = gameState.venueOnlyMode ? "#22c55e" : "inherit";
   }
 }
 
@@ -1070,6 +1107,9 @@ if (typeof window !== "undefined") {
     toggleSoftPanicMode,
     setManualWinner,
     extendTimer,
+
+    // Venue mode
+    toggleVenueOnlyMode,
 
     // Trivia
     addTriviaQuestion,

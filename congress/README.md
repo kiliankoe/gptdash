@@ -32,6 +32,7 @@ cargo run
 | `AUTO_SAVE_PATH` | ./state_backup.json | Auto-save file path |
 | `AUTO_SAVE_INTERVAL_SECS` | 5 | Auto-save interval |
 | `DISABLE_AUTO_SAVE` | (unset) | Set to 1 to disable auto-save |
+| `VENUE_IP_RANGES` | (none) | Comma-separated CIDR ranges for venue-only mode |
 
 ## Game Concept
 
@@ -164,6 +165,21 @@ Tie-breakers: Higher AI-detect points, then earliest correct vote timestamp.
 - **Vote challenge**: SHA256 challenge-response to block trivial vote scripting
 - **Anti-automation**: Server-side timing + automation detection (webdriver, PhantomJS, Nightmare, Cypress) with shadow rejection
 - **Shadowban**: Host can silently ignore spammy audience members
+- **Venue-only mode**: Restrict audience to specific IP ranges (see below)
+
+## Venue-Only Mode
+
+Restricts audience membership to people physically at the venue by IP address filtering. Players, host, and beamer are exempt.
+
+**Configuration:**
+- Set IP ranges via `VENUE_IP_RANGES` env var (comma-separated CIDR notation, e.g., `185.1.74.0/24,2001:db8::/32`)
+- Host toggles venue mode on/off via host panel
+
+**Behavior:**
+- Blocks both HTTP pages and WebSocket connections for non-venue audience
+- Supports X-Forwarded-For header for reverse proxy deployments
+- Empty ranges = allow all (safety default to prevent accidental lockout)
+- Enabled state persists in state export/import
 
 ## Future Work
 

@@ -2,11 +2,12 @@
 
 use axum::{
     body::Body,
-    extract::State,
-    http::{header, Request, Response, StatusCode},
+    extract::{ConnectInfo, State},
+    http::{header, HeaderMap, Request, Response, StatusCode},
     middleware::Next,
     response::IntoResponse,
 };
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 /// Authentication configuration
@@ -289,6 +290,46 @@ pub async fn panic_mode_middleware(
             .status(StatusCode::FORBIDDEN)
             .body(Body::from("Service temporarily unavailable"))
             .unwrap();
+    }
+
+    next.run(request).await
+}
+
+/// Extract client IP from request, considering X-Forwarded-For for reverse proxy
+fn extract_client_ip(headers: &HeaderMap, connect_info: &SocketAddr) -> IpAddr {
+    if let Some(xff) = headers.get("x-forwarded-for") {
+        if let Ok(xff_str) = xff.to_str() {
+            if let Some(first_ip) = xff_str.split(',').next() {
+                if let Ok(ip) = first_ip.trim().parse::<IpAddr>() {
+                    return ip;
+                }
+            }
+        }
+    }
+    connect_info.ip()
+}
+
+/// Middleware to block audience HTTP requests when venue-only mode is active and IP not allowed
+pub async fn venue_mode_middleware(
+    State(state): State<Arc<crate::state::AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request: Request<Body>,
+    next: Next,
+) -> Response<Body> {
+    if state.is_venue_only_mode().await {
+        let client_ip = extract_client_ip(request.headers(), &addr);
+        if !state.is_ip_allowed_by_venue(client_ip).await {
+            let message = state.get_venue_rejection_message().await;
+            tracing::info!(
+                "Venue-only mode: rejected HTTP request from IP {}",
+                client_ip
+            );
+            return Response::builder()
+                .status(StatusCode::FORBIDDEN)
+                .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+                .body(Body::from(message))
+                .unwrap();
+        }
     }
 
     next.run(request).await

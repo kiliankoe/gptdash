@@ -6,13 +6,14 @@ pub mod player;
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Query, State,
+        ConnectInfo, Query, State,
     },
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 use crate::protocol::{
@@ -54,6 +55,20 @@ pub struct WsQuery {
 
 fn token_required_for_role(role: &Role) -> bool {
     matches!(role, Role::Player | Role::Audience)
+}
+
+/// Extract client IP from request, considering X-Forwarded-For for reverse proxy
+fn extract_client_ip(headers: &HeaderMap, connect_info: &SocketAddr) -> IpAddr {
+    if let Some(xff) = headers.get("x-forwarded-for") {
+        if let Ok(xff_str) = xff.to_str() {
+            if let Some(first_ip) = xff_str.split(',').next() {
+                if let Ok(ip) = first_ip.trim().parse::<IpAddr>() {
+                    return ip;
+                }
+            }
+        }
+    }
+    connect_info.ip()
 }
 
 fn validate_message_for_role(
@@ -152,6 +167,8 @@ pub async fn ws_handler(
     ws: WebSocketUpgrade,
     Query(params): Query<WsQuery>,
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
 ) -> impl IntoResponse {
     let role = match params.role.as_deref() {
         Some("host") => Role::Host,
@@ -167,6 +184,19 @@ pub async fn ws_handler(
             "Audience connections temporarily disabled.",
         )
             .into_response();
+    }
+
+    // Block audience WebSocket connections during venue-only mode if IP not allowed
+    if role == Role::Audience && state.is_venue_only_mode().await {
+        let client_ip = extract_client_ip(&headers, &addr);
+        if !state.is_ip_allowed_by_venue(client_ip).await {
+            let message = state.get_venue_rejection_message().await;
+            tracing::info!(
+                "Venue-only mode: rejected audience connection from IP {}",
+                client_ip
+            );
+            return (StatusCode::FORBIDDEN, message).into_response();
+        }
     }
 
     if token_required_for_role(&role) && params.token.is_none() {
@@ -612,6 +642,14 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
             active_trivia_votes,
         };
         if let Ok(msg) = serde_json::to_string(&trivia_msg) {
+            let _ = sender.send(Message::Text(msg.into())).await;
+        }
+
+        // Send venue-only mode status
+        let venue_msg = ServerMessage::VenueOnlyModeUpdate {
+            enabled: state.is_venue_only_mode().await,
+        };
+        if let Ok(msg) = serde_json::to_string(&venue_msg) {
             let _ = sender.send(Message::Text(msg.into())).await;
         }
 

@@ -13,7 +13,8 @@ use std::collections::{HashMap, HashSet};
 /// Version 3: Prompt struct changed - submitter_id -> submitter_ids (Vec), added submission_count, created_at
 /// Version 4: Added audience_members with auto-generated display names
 /// Version 5: Added trivia_questions for audience entertainment during WRITING phase
-pub const EXPORT_SCHEMA_VERSION: u32 = 5;
+/// Version 6: Added venue_config for venue-only mode IP filtering
+pub const EXPORT_SCHEMA_VERSION: u32 = 6;
 
 /// A serializable snapshot of the entire game state.
 ///
@@ -55,6 +56,9 @@ pub struct GameStateExport {
     /// Trivia questions pool (persists across rounds/games)
     #[serde(default)]
     pub trivia_questions: Vec<TriviaQuestion>,
+    /// Venue-only mode IP filtering configuration
+    #[serde(default)]
+    pub venue_config: VenueConfig,
 }
 
 impl GameStateExport {
@@ -73,6 +77,7 @@ impl GameStateExport {
         prompt_pool: Vec<Prompt>,
         audience_members: HashMap<VoterId, AudienceMember>,
         trivia_questions: Vec<TriviaQuestion>,
+        venue_config: VenueConfig,
     ) -> Self {
         Self {
             schema_version: EXPORT_SCHEMA_VERSION,
@@ -89,6 +94,7 @@ impl GameStateExport {
             prompt_pool,
             audience_members,
             trivia_questions,
+            venue_config,
         }
     }
 
@@ -157,6 +163,7 @@ mod tests {
                 phase_deadline: None,
                 panic_mode: false,
                 soft_panic_mode: false,
+                venue_only_mode: false,
             }),
             HashMap::new(),
             HashMap::new(),
@@ -168,7 +175,8 @@ mod tests {
             HashSet::new(),
             Vec::new(),
             HashMap::new(),
-            Vec::new(), // trivia_questions
+            Vec::new(),             // trivia_questions
+            VenueConfig::default(), // venue_config
         );
 
         let json = serde_json::to_string_pretty(&export).unwrap();
@@ -193,6 +201,7 @@ mod tests {
                 phase_deadline: None,
                 panic_mode: false,
                 soft_panic_mode: false,
+                venue_only_mode: false,
             }),
             rounds: HashMap::new(),
             submissions: HashMap::new(),
@@ -205,6 +214,7 @@ mod tests {
             prompt_pool: Vec::new(),
             audience_members: HashMap::new(),
             trivia_questions: Vec::new(),
+            venue_config: VenueConfig::default(),
         };
 
         let result = export.validate();
@@ -229,6 +239,7 @@ mod tests {
             prompt_pool: Vec::new(),
             audience_members: HashMap::new(),
             trivia_questions: Vec::new(),
+            venue_config: VenueConfig::default(),
         };
 
         let result = export.validate();

@@ -235,6 +235,17 @@
                     </div>
                     <button id="softPanicModeBtn" class="warning" onclick="toggleSoftPanicMode()">Prompt-Panik aktivieren</button>
                 </div>
+
+                <div class="card" style="border: 2px solid #9333ea;">
+                    <div class="card-header" style="color: #9333ea;">VENUE-ONLY MODUS</div>
+                    <p style="opacity: 0.8; margin-bottom: 10px;">
+                        Beschränkt das Publikum auf Personen vor Ort (via VENUE_IP_RANGES env var).
+                    </p>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                        <span>Status: <strong id="venueOnlyStatus">Inaktiv</strong></span>
+                    </div>
+                    <button id="venueOnlyModeBtn" class="venue" onclick="toggleVenueOnlyMode()">Venue-Only aktivieren</button>
+                </div>
             </div>
 
             <!-- Players Panel -->

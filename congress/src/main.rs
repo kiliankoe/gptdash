@@ -88,6 +88,19 @@ async fn main() {
         state.create_game().await;
     }
 
+    // Load venue IP ranges from environment if configured
+    if let Ok(ranges) = std::env::var("VENUE_IP_RANGES") {
+        for range in ranges.split(',') {
+            let range = range.trim();
+            if !range.is_empty() {
+                match state.add_venue_ip_range(range.to_string()).await {
+                    Ok(_) => tracing::info!("Loaded venue IP range: {}", range),
+                    Err(e) => tracing::warn!("Invalid venue IP range '{}': {}", range, e),
+                }
+            }
+        }
+    }
+
     // Spawn background task for auto-saving state to disk
     broadcast::spawn_auto_save_task(state.clone());
 
@@ -146,11 +159,15 @@ async fn main() {
             abuse::ws_abuse_middleware,
         ));
 
-    // Audience routes with panic mode blocking
+    // Audience routes with panic mode and venue-only mode blocking
     // Only `/` serves the audience page; `/index.html` always returns 404
     let audience_routes = Router::new()
         .route("/", get(auth::serve_audience))
         .route("/index.html", get(|| async { StatusCode::NOT_FOUND }))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::venue_mode_middleware,
+        ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::panic_mode_middleware,
@@ -178,5 +195,10 @@ async fn main() {
     tracing::info!("Listening on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .unwrap();
 }

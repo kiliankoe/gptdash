@@ -168,6 +168,11 @@ pub async fn handle_message(
             host::handle_toggle_soft_panic_mode(state, enabled).await
         }
 
+        ClientMessage::HostToggleVenueOnlyMode { enabled } => {
+            check_host!(role, "toggle venue-only mode");
+            host::handle_toggle_venue_only_mode(state, enabled).await
+        }
+
         ClientMessage::HostSetManualWinner {
             winner_type,
             submission_id,

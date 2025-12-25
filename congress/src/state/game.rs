@@ -14,6 +14,7 @@ impl AppState {
             phase_deadline: None,
             panic_mode: false,
             soft_panic_mode: false,
+            venue_only_mode: false,
         };
 
         *self.game.write().await = Some(game.clone());
@@ -543,6 +544,7 @@ impl AppState {
             g.phase_deadline = None;
             g.panic_mode = false;
             g.soft_panic_mode = false;
+            g.venue_only_mode = false;
             g.version += 1;
         }
         drop(game);
@@ -552,6 +554,11 @@ impl AppState {
 
         // Broadcast soft panic mode reset to all clients
         self.broadcast_to_all(crate::protocol::ServerMessage::SoftPanicModeUpdate {
+            enabled: false,
+        });
+
+        // Broadcast venue-only mode reset to all clients
+        self.broadcast_to_all(crate::protocol::ServerMessage::VenueOnlyModeUpdate {
             enabled: false,
         });
 
@@ -643,6 +650,31 @@ impl AppState {
             .await
             .as_ref()
             .map(|g| g.soft_panic_mode)
+            .unwrap_or(false)
+    }
+
+    /// Toggle venue-only mode on/off (restricts audience to venue IPs)
+    pub async fn set_venue_only_mode(&self, enabled: bool) {
+        let mut game = self.game.write().await;
+        if let Some(ref mut g) = *game {
+            g.venue_only_mode = enabled;
+            g.version += 1;
+        }
+        drop(game);
+
+        // Broadcast venue-only mode change to all clients
+        self.broadcast_to_all(crate::protocol::ServerMessage::VenueOnlyModeUpdate { enabled });
+
+        tracing::info!("Venue-only mode set to: {}", enabled);
+    }
+
+    /// Check if venue-only mode is active
+    pub async fn is_venue_only_mode(&self) -> bool {
+        self.game
+            .read()
+            .await
+            .as_ref()
+            .map(|g| g.venue_only_mode)
             .unwrap_or(false)
     }
 

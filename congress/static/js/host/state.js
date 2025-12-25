@@ -22,6 +22,7 @@ export const gameState = {
   validTransitions: [], // Populated by server
   panicMode: false,
   softPanicMode: false,
+  venueOnlyMode: false,
   deadline: null,
   selectedAiSubmissionId: null, // Currently selected AI submission
   aiGenerationStatus: "idle", // idle, generating, completed, failed

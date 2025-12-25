@@ -160,6 +160,9 @@ Game, rounds, submissions, votes, players, scores, prompt pool, audience members
 ### Panic Mode
 Emergency toggle that disables all audience voting. Server rejects votes with `PANIC_MODE` error. Audience devices show "vote by clapping" overlay. Host can manually select winners via `HostSetManualWinner`.
 
+### Venue-Only Mode
+IP-based access control restricting audience to venue network. Boolean `venue_only_mode` in Game struct, `VenueConfig` stores CIDR ranges (configured via `VENUE_IP_RANGES` env var at startup). Checks at both HTTP middleware and WebSocket upgrade. Uses `ipnet` crate for CIDR parsing, supports X-Forwarded-For for reverse proxy. Players/host/beamer exempt. Empty ranges = allow all (safety default). Host can toggle mode on/off; enabled state persists in state export.
+
 ### Trivia System
 Entertainment during WRITING phase. Host adds 2-4 choice questions to pool, presents one, audience votes (hidden), host resolves to show results. No scoring, purely entertainment. Auto-clears on phase change. Persists in state exports.
 
@@ -221,3 +224,4 @@ biome lint static/ && biome format static/    # Frontend lints
 | `ABUSE_RATE_LIMIT` | true | Enable rate limiting |
 | `ABUSE_RATE_LIMIT_MAX` | 100 | Max requests per window |
 | `ABUSE_RATE_LIMIT_WINDOW` | 10 | Window duration (seconds) |
+| `VENUE_IP_RANGES` | (none) | Comma-separated CIDR ranges for venue-only mode |

@@ -310,6 +310,15 @@ pub async fn handle_toggle_soft_panic_mode(
     Some(ServerMessage::SoftPanicModeUpdate { enabled })
 }
 
+pub async fn handle_toggle_venue_only_mode(
+    state: &Arc<AppState>,
+    enabled: bool,
+) -> Option<ServerMessage> {
+    tracing::info!("Host toggling venue-only mode: {}", enabled);
+    state.set_venue_only_mode(enabled).await;
+    Some(ServerMessage::VenueOnlyModeUpdate { enabled })
+}
+
 pub async fn handle_set_manual_winner(
     state: &Arc<AppState>,
     winner_type: ManualWinnerType,

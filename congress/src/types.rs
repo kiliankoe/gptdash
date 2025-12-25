@@ -62,6 +62,7 @@ pub struct Game {
     pub phase_deadline: Option<String>, // ISO timestamp for phase timer (Writing, Voting, etc.)
     pub panic_mode: bool,               // When true, audience interactions are disabled
     pub soft_panic_mode: bool,          // When true, prompt submissions are disabled
+    pub venue_only_mode: bool,          // When true, only venue IPs can join as audience
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -232,4 +233,29 @@ pub struct TriviaVote {
     pub voter_id: VoterId,
     pub question_id: TriviaQuestionId,
     pub choice_index: usize,
+}
+
+// ========== Venue-Only Mode ==========
+
+/// Configuration for venue-only mode IP filtering
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VenueConfig {
+    /// List of allowed IP ranges in CIDR notation (e.g., "185.1.74.0/24")
+    pub allowed_ranges: Vec<String>,
+    /// Message shown to rejected users
+    #[serde(default = "default_venue_rejection_message")]
+    pub rejection_message: String,
+}
+
+fn default_venue_rejection_message() -> String {
+    "Sorry, aus Gründen™ ist die Anwendung nur noch im CCH erreichbar :sadpanda:".to_string()
+}
+
+impl Default for VenueConfig {
+    fn default() -> Self {
+        Self {
+            allowed_ranges: Vec::new(),
+            rejection_message: default_venue_rejection_message(),
+        }
+    }
 }

@@ -82,6 +82,10 @@ pub enum ClientMessage {
     HostToggleSoftPanicMode {
         enabled: bool,
     },
+    /// Toggle venue-only mode (restricts audience to venue IPs)
+    HostToggleVenueOnlyMode {
+        enabled: bool,
+    },
     HostSetManualWinner {
         winner_type: ManualWinnerType,
         submission_id: SubmissionId,
@@ -289,6 +293,10 @@ pub enum ServerMessage {
     },
     /// Broadcast when soft panic mode is toggled (prompt submissions only)
     SoftPanicModeUpdate {
+        enabled: bool,
+    },
+    /// Broadcast when venue-only mode is toggled
+    VenueOnlyModeUpdate {
         enabled: bool,
     },
     /// Sent to a player when their submission is accepted
