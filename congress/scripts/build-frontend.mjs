@@ -22,9 +22,7 @@ const obfuscatorOptions = {
 	controlFlowFlattening: true,
 	controlFlowFlatteningThreshold: 0.5,
 	identifierNamesGenerator: "mangled-shuffled",
-	stringArray: true,
-	stringArrayEncoding: ["base64"],
-	stringArrayThreshold: 0.5,
+	stringArray: false,
 	renameGlobals: false,
 };
 
