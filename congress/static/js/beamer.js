@@ -31,11 +31,14 @@ const gameState = {
   // Manual winners (panic mode)
   manualAiWinner: null,
   manualFunnyWinner: null,
+  // Panic mode state
+  panicMode: false,
 };
 
 // Connections and utilities
 let ws = null;
 let timer = null;
+let vuMeter = null;
 
 const MAX_PLAYER_LEADERBOARD_ROWS = 6;
 const MAX_AUDIENCE_LEADERBOARD_ROWS = 6;
@@ -137,6 +140,10 @@ function handleMessage(msg) {
     case "manual_winners":
       handleManualWinners(msg);
       break;
+    // Panic mode update
+    case "panic_mode_update":
+      handlePanicModeUpdate(msg);
+      break;
     // Vote label reveal (host action)
     case "vote_labels_revealed":
       handleVoteLabelsRevealed();
@@ -156,12 +163,18 @@ function handleWelcome(msg) {
   if (msg.game) {
     gameState.phase = msg.game.phase;
     gameState.roundNo = msg.game.round_no;
+    gameState.panicMode = msg.game.panic_mode || false;
     updateRoundBadge();
     showScene(phaseToScene(msg.game.phase));
 
     // Start timer if deadline exists
     if (msg.game.phase_deadline) {
       timer.start(msg.game.phase_deadline, msg.server_now);
+    }
+
+    // Initialize VU meter if panic mode is already active
+    if (gameState.panicMode) {
+      handlePanicModeUpdate({ enabled: true });
     }
   }
 }
@@ -1191,4 +1204,160 @@ function hideTriviaOverlays() {
 
   if (overlay) overlay.style.display = "none";
   if (resultOverlay) resultOverlay.style.display = "none";
+}
+
+// ========================
+// VU Meter (Panic Mode)
+// ========================
+
+class VUMeterManager {
+  constructor() {
+    this.audioContext = null;
+    this.analyser = null;
+    this.microphone = null;
+    this.animationId = null;
+    this.dataArray = null;
+    this.isInitialized = false;
+    this.permissionDenied = false;
+    this.peakLevel = 0;
+    this.lastPeakUpdate = 0;
+
+    this.segmentCount = 16;
+    this.peakHoldDuration = 500;
+  }
+
+  async initialize() {
+    if (this.isInitialized || this.permissionDenied) {
+      return this.isInitialized;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+
+      this.audioContext = new (
+        window.AudioContext || window.webkitAudioContext
+      )();
+
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.analyser.smoothingTimeConstant = 0.8;
+
+      this.microphone = this.audioContext.createMediaStreamSource(stream);
+      this.microphone.connect(this.analyser);
+
+      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+
+      this.isInitialized = true;
+      console.log("[VUMeter] Initialized successfully");
+      return true;
+    } catch (error) {
+      console.error("[VUMeter] Failed to initialize:", error);
+      this.permissionDenied = true;
+      return false;
+    }
+  }
+
+  start() {
+    if (!this.isInitialized) {
+      console.warn("[VUMeter] Not initialized, cannot start");
+      return;
+    }
+
+    if (this.audioContext.state === "suspended") {
+      this.audioContext.resume();
+    }
+
+    this.animate();
+  }
+
+  stop() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
+    this.resetDisplay();
+  }
+
+  animate() {
+    if (!this.analyser) return;
+
+    this.analyser.getByteFrequencyData(this.dataArray);
+
+    let sum = 0;
+    for (let i = 0; i < this.dataArray.length; i++) {
+      sum += this.dataArray[i] * this.dataArray[i];
+    }
+    const rms = Math.sqrt(sum / this.dataArray.length);
+
+    const normalizedVolume = rms / 255;
+    const activeSegments = Math.round(normalizedVolume * this.segmentCount);
+
+    const now = performance.now();
+    if (activeSegments >= this.peakLevel) {
+      this.peakLevel = activeSegments;
+      this.lastPeakUpdate = now;
+    } else if (now - this.lastPeakUpdate > this.peakHoldDuration) {
+      this.peakLevel = Math.max(activeSegments, this.peakLevel - 1);
+      this.lastPeakUpdate = now;
+    }
+
+    this.updateDisplay(activeSegments, this.peakLevel);
+
+    this.animationId = requestAnimationFrame(() => this.animate());
+  }
+
+  updateDisplay(activeCount, peakIndex) {
+    const segments = document.querySelectorAll("#vuMeter .vu-segment");
+
+    segments.forEach((segment, index) => {
+      const isActive = index < activeCount;
+      const isPeak = index === peakIndex - 1 && peakIndex > activeCount;
+
+      segment.classList.toggle("active", isActive);
+      segment.classList.toggle("peak", isPeak);
+    });
+  }
+
+  resetDisplay() {
+    const segments = document.querySelectorAll("#vuMeter .vu-segment");
+    segments.forEach((segment) => {
+      segment.classList.remove("active", "peak");
+    });
+    this.peakLevel = 0;
+  }
+}
+
+async function handlePanicModeUpdate(msg) {
+  console.log("[Beamer] Panic mode update:", msg.enabled);
+  gameState.panicMode = msg.enabled;
+
+  const overlay = document.getElementById("vuMeterOverlay");
+  if (!overlay) return;
+
+  if (msg.enabled) {
+    if (!vuMeter) {
+      vuMeter = new VUMeterManager();
+    }
+
+    const success = await vuMeter.initialize();
+
+    if (success) {
+      overlay.style.display = "block";
+      vuMeter.start();
+    } else {
+      overlay.style.display = "none";
+      console.log("[Beamer] VU meter hidden - mic access unavailable");
+    }
+  } else {
+    overlay.style.display = "none";
+    if (vuMeter) {
+      vuMeter.stop();
+    }
+  }
 }

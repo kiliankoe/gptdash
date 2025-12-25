@@ -1394,3 +1394,117 @@ body {
     gap: 15px;
   }
 }
+
+/* ========================
+   VU METER (Panic Mode)
+   ======================== */
+.vu-meter-overlay {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 20px 40px 30px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(20, 20, 20, 0.9) 30%
+  );
+  animation: fadeIn 0.3s ease-out;
+}
+
+.vu-meter-container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+.vu-meter-label {
+  font-family: var(--font-headline);
+  font-size: 18px;
+  font-variation-settings:
+    "wght" 100,
+    "wdth" 100;
+  color: var(--color-additional-01);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  animation: pulse 1.5s ease-in-out infinite;
+  min-width: 50px;
+}
+
+.vu-meter {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+  height: 40px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 8px;
+  border: 2px solid rgba(250, 245, 245, 0.1);
+}
+
+.vu-segment {
+  flex: 1;
+  height: 100%;
+  border-radius: 3px;
+  background: rgba(250, 245, 245, 0.08);
+  transition:
+    background-color 0.05s ease-out,
+    box-shadow 0.05s ease-out;
+}
+
+/* Green segments (0-9) */
+.vu-segment.active[data-index="0"],
+.vu-segment.active[data-index="1"],
+.vu-segment.active[data-index="2"],
+.vu-segment.active[data-index="3"],
+.vu-segment.active[data-index="4"],
+.vu-segment.active[data-index="5"],
+.vu-segment.active[data-index="6"],
+.vu-segment.active[data-index="7"],
+.vu-segment.active[data-index="8"],
+.vu-segment.active[data-index="9"] {
+  background: var(--color-primary);
+  box-shadow:
+    0 0 10px var(--color-primary),
+    0 0 20px rgba(0, 255, 0, 0.3);
+}
+
+/* Yellow segments (10-12) */
+.vu-segment.active[data-index="10"],
+.vu-segment.active[data-index="11"],
+.vu-segment.active[data-index="12"] {
+  background: var(--color-warning);
+  box-shadow:
+    0 0 10px var(--color-warning),
+    0 0 20px rgba(255, 193, 7, 0.3);
+}
+
+/* Red segments (13-15) */
+.vu-segment.active[data-index="13"],
+.vu-segment.active[data-index="14"],
+.vu-segment.active[data-index="15"] {
+  background: var(--color-additional-01);
+  box-shadow:
+    0 0 10px var(--color-additional-01),
+    0 0 20px rgba(255, 55, 25, 0.3);
+}
+
+/* Peak hold indicator */
+.vu-segment.peak {
+  box-shadow:
+    0 0 15px currentColor,
+    0 0 30px currentColor !important;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
