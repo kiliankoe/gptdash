@@ -19,8 +19,7 @@ const entryPoints = [
 
 const obfuscatorOptions = {
 	compact: true,
-	controlFlowFlattening: true,
-	controlFlowFlatteningThreshold: 0.5,
+	controlFlowFlattening: false,
 	stringArray: true,
 	stringArrayEncoding: ["base64"],
 	stringArrayThreshold: 0.5,
