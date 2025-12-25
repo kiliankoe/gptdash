@@ -21,6 +21,8 @@ cargo run
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `BIND_ADDR` | 0.0.0.0 | Server bind address |
+| `PORT` | 6573 | Server port |
 | `HOST_USERNAME` | (none) | Host panel basic auth username |
 | `HOST_PASSWORD` | (none) | Host panel basic auth password |
 | `OPENAI_API_KEY` | (none) | OpenAI API key |
@@ -30,9 +32,16 @@ cargo run
 | `LLM_TIMEOUT` | 30 | LLM request timeout (seconds) |
 | `LLM_MAX_TOKENS` | 150 | Max tokens for LLM responses |
 | `AUTO_SAVE_PATH` | ./state_backup.json | Auto-save file path |
-| `AUTO_SAVE_INTERVAL_SECS` | 5 | Auto-save interval |
+| `AUTO_SAVE_INTERVAL_SECS` | 5 | Auto-save interval (seconds) |
 | `DISABLE_AUTO_SAVE` | (unset) | Set to 1 to disable auto-save |
 | `VENUE_IP_RANGES` | (none) | Comma-separated CIDR ranges for venue-only mode |
+| `ABUSE_BLOCK_USER_AGENTS` | true | Block suspicious user agents |
+| `ABUSE_REQUIRE_BROWSER` | true | Require browser headers for WebSocket |
+| `ABUSE_RATE_LIMIT` | true | Enable rate limiting |
+| `ABUSE_RATE_LIMIT_MAX` | 100 | Max requests per rate limit window |
+| `ABUSE_RATE_LIMIT_WINDOW` | 10 | Rate limit window (seconds) |
+| `SKIP_VOTE_ANTI_AUTOMATION` | (unset) | Set to 1 to disable vote anti-automation (testing) |
+| `RUST_LOG` | gptdash=debug,tower_http=debug | Tracing log level |
 
 ## Game Concept
 
