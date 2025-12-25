@@ -254,6 +254,15 @@ function resetRoundUiState() {
   updateSubmissionCounter();
   updateRevealIndicator();
   clearPromptDisplay();
+
+  // Reset timer warning state
+  const writingTimer = document.getElementById("writingTimer");
+  const votingTimer = document.getElementById("votingTimer");
+  [writingTimer, votingTimer].forEach((el) => {
+    if (el) {
+      el.classList.remove("warning");
+    }
+  });
 }
 
 function clearPromptDisplay() {
