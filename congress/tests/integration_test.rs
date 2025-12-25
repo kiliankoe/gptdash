@@ -2,6 +2,7 @@ use gptdash::protocol::{ClientMessage, PlayerSubmissionStatus, ServerMessage};
 use gptdash::state::AppState;
 use gptdash::types::{GamePhase, PromptSource, Role};
 use gptdash::ws::handlers::handle_message;
+use serial_test::serial;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
@@ -14,6 +15,7 @@ fn compute_challenge_response(nonce: &str, voter_token: &str) -> String {
 
 /// End-to-end integration test for a complete game flow
 #[tokio::test]
+#[serial]
 async fn test_full_game_flow() {
     // Skip anti-automation checks (webdriver + timing) for this test
     std::env::set_var("SKIP_VOTE_ANTI_AUTOMATION", "1");
@@ -1369,6 +1371,7 @@ async fn test_create_manual_ai_submission_invalid_round() {
 
 /// Test removing a player mid-round
 #[tokio::test]
+#[serial]
 async fn test_remove_player_mid_round() {
     // Skip anti-automation checks (webdriver + timing) for this test
     std::env::set_var("SKIP_VOTE_ANTI_AUTOMATION", "1");
@@ -2645,6 +2648,7 @@ async fn test_panic_mode_disable_no_disconnect() {
 
 /// Test that manual winners are broadcast when entering Results phase
 #[tokio::test]
+#[serial]
 async fn test_manual_winners_broadcast() {
     // Skip anti-automation checks
     std::env::set_var("SKIP_VOTE_ANTI_AUTOMATION", "1");
@@ -3144,6 +3148,7 @@ async fn test_host_direct_prompt_selection() {
 
 /// Test that votes submitted within 500ms of VOTING phase start are shadow-rejected
 #[tokio::test]
+#[serial]
 async fn test_vote_timing_early_rejection() {
     // Ensure anti-automation is NOT disabled
     std::env::remove_var("SKIP_VOTE_ANTI_AUTOMATION");
@@ -3303,6 +3308,7 @@ async fn test_vote_timing_early_rejection() {
 
 /// Test that votes submitted after 500ms are accepted
 #[tokio::test]
+#[serial]
 async fn test_vote_timing_after_window() {
     // Ensure anti-automation is NOT disabled
     std::env::remove_var("SKIP_VOTE_ANTI_AUTOMATION");
