@@ -109,16 +109,17 @@ Frontend JS is bundled and obfuscated during `cargo build` via `build.rs`:
 
 1. **esbuild** bundles each entry point (audience, beamer, player, host) with all dependencies
 2. **javascript-obfuscator** applies medium obfuscation (control flow flattening, string encoding)
-3. Output goes to `static/js/dist/` (gitignored)
+3. Public bundles (audience, player) go to `static/js/dist/` (gitignored)
+4. Protected bundles (host, beamer) are inlined directly into their HTML files, output to `static/dist/` (gitignored)
 
-Build runs automatically on every `cargo build`. HTML files reference the bundled files (`/js/dist/*.min.js`).
+Build runs automatically on every `cargo build`. Public HTML files reference bundled files (`/js/dist/*.min.js`), while auth-protected pages (host, beamer) serve from `static/dist/` with inlined JS.
 
 To build frontend manually: `npm run build:frontend`
 
 ## Security
 
 ### Authentication
-Host panel and beamer display protected by HTTP Basic Auth via `HOST_USERNAME`/`HOST_PASSWORD` env vars. Credentials validated with constant-time comparison. Both HTTP routes and WebSocket connections (`role=host`, `role=beamer`) are protected.
+Host panel and beamer display protected by HTTP Basic Auth via `HOST_USERNAME`/`HOST_PASSWORD` env vars. Credentials validated with constant-time comparison. Both HTTP routes and WebSocket connections (`role=host`, `role=beamer`) are protected. JavaScript for these views is inlined into the HTML during build, ensuring JS bundles are also auth-protected.
 
 ### Anti-Abuse (src/abuse.rs)
 Applied to `/ws` route only:

@@ -217,9 +217,9 @@ pub async fn host_ws_auth_middleware(
         .unwrap()
 }
 
-/// Handler to serve host.html (used with auth middleware)
+/// Handler to serve host.html with inlined JS (used with auth middleware)
 pub async fn serve_host() -> impl IntoResponse {
-    match tokio::fs::read_to_string("static/host.html").await {
+    match tokio::fs::read_to_string("static/dist/host.html").await {
         Ok(content) => Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
@@ -232,9 +232,9 @@ pub async fn serve_host() -> impl IntoResponse {
     }
 }
 
-/// Handler to serve beamer.html
+/// Handler to serve beamer.html with inlined JS
 pub async fn serve_beamer() -> impl IntoResponse {
-    match tokio::fs::read_to_string("static/beamer.html").await {
+    match tokio::fs::read_to_string("static/dist/beamer.html").await {
         Ok(content) => Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
