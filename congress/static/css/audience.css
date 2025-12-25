@@ -978,3 +978,45 @@ button.secondary:hover {
   color: var(--color-dark);
   opacity: 0.9;
 }
+
+/* Small screen optimizations */
+@media (max-width: 380px) {
+  .content {
+    padding: 64px 12px 20px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .card h2 {
+    font-size: 22px;
+  }
+
+  .welcome-title {
+    font-size: 28px;
+  }
+
+  .winner-fullscreen h1 {
+    font-size: 48px;
+  }
+
+  .winner-trophy {
+    font-size: 80px;
+  }
+}
+
+/* Safe area for notched devices */
+@supports (padding: env(safe-area-inset-top)) {
+  .header-bar {
+    padding-top: env(safe-area-inset-top);
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
+  .content {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+}

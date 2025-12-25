@@ -237,3 +237,35 @@ button:hover {
   color: rgba(255, 255, 255, 0.9);
   transform: none;
 }
+
+/* Small screen optimizations */
+@media (max-width: 380px) {
+  body {
+    padding: 12px;
+  }
+
+  .header {
+    margin-bottom: 24px;
+  }
+
+  .header h1 {
+    font-size: 36px;
+  }
+
+  .card {
+    padding: 20px;
+  }
+
+  textarea {
+    min-height: 120px;
+  }
+}
+
+/* Safe area for notched devices */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+}

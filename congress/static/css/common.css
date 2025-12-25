@@ -361,3 +361,11 @@ textarea {
 .w-full {
   width: 100%;
 }
+
+/* Safe area for notched devices */
+@supports (padding: env(safe-area-inset-top)) {
+  .connection-status {
+    top: max(20px, env(safe-area-inset-top));
+    right: max(20px, env(safe-area-inset-right));
+  }
+}
