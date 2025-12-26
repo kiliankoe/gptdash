@@ -16,6 +16,7 @@ ARG GIT_HASH=unknown
 COPY --from=builder /build/target/release/gptdash .
 COPY static ./static
 COPY --from=builder /build/static/js/dist ./static/js/dist
-RUN sed -i "s/__GIT_HASH__/$GIT_HASH/g" static/host.html
+COPY --from=builder /build/static/dist ./static/dist
+RUN sed -i "s/__GIT_HASH__/$GIT_HASH/g" static/dist/host.html
 EXPOSE 6573
 CMD ["./gptdash"]
