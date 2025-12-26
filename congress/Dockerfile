@@ -5,6 +5,7 @@ COPY Cargo.toml Cargo.lock build.rs ./
 COPY package.json package-lock.json ./
 COPY scripts ./scripts
 COPY static/js ./static/js
+COPY static/beamer.html static/host.html ./static/
 COPY src ./src
 RUN cargo build --release
 
