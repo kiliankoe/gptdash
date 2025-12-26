@@ -369,11 +369,6 @@ function submitAnswer() {
     return;
   }
 
-  if (answer.length < 10) {
-    showError("submitError", "Antwort muss mindestens 10 Zeichen haben");
-    return;
-  }
-
   if (!requireConnection("submitError")) {
     return;
   }
