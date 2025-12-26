@@ -291,7 +291,7 @@ function joinGame() {
   const token = tokenInput.value.trim().toUpperCase();
 
   if (!token) {
-    showError("joinError", "Bitte gib einen Spieler-Token ein");
+    showError("joinError", "Bitte gib einen Token ein");
     return;
   }
 

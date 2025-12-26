@@ -152,7 +152,7 @@ impl ValidationError {
             },
             ValidationError::TokenMismatch => ServerMessage::Error {
                 code: "TOKEN_MISMATCH".to_string(),
-                msg: "Token mismatch for this connection".to_string(),
+                msg: "Ungültiger Token".to_string(),
             },
             ValidationError::UnauthorizedRole(msg) => ServerMessage::Error {
                 code: "UNAUTHORIZED_ROLE".to_string(),
@@ -290,8 +290,7 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                     tracing::warn!("Invalid player token attempted: {}", token);
                     let error = ServerMessage::Error {
                         code: "INVALID_PLAYER_TOKEN".to_string(),
-                        msg: "Invalid player token. Please get a valid token from the host."
-                            .to_string(),
+                        msg: "Lass dir bitte einen validen Token geben.".to_string(),
                     };
                     if let Ok(msg) = serde_json::to_string(&error) {
                         let _ = sender.send(Message::Text(msg.into())).await;
@@ -754,7 +753,7 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                         if text.len() > MAX_WS_MESSAGE_BYTES {
                             let error = ServerMessage::Error {
                                 code: "MESSAGE_TOO_LARGE".to_string(),
-                                msg: "Message too large".to_string(),
+                                msg: "Nachricht zu groß".to_string(),
                             };
                             if let Ok(json) = serde_json::to_string(&error) {
                                 let _ = sender.send(Message::Text(json.into())).await;
@@ -769,7 +768,7 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                         {
                             let error = ServerMessage::Error {
                                 code: "RATE_LIMITED".to_string(),
-                                msg: "Too many messages. Please slow down.".to_string(),
+                                msg: "Zu viele Nachrichten".to_string(),
                             };
                             if let Ok(json) = serde_json::to_string(&error) {
                                 let _ = sender.send(Message::Text(json.into())).await;
@@ -808,7 +807,7 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                                 tracing::error!("Failed to parse client message: {}", e);
                                 let error = ServerMessage::Error {
                                     code: "PARSE_ERROR".to_string(),
-                                    msg: format!("Invalid message format: {}", e),
+                                    msg: format!("Ungültiges Format: {}", e),
                                 };
                                 if let Ok(json) = serde_json::to_string(&error) {
                                     let _ = sender.send(Message::Text(json.into())).await;

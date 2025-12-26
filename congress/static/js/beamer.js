@@ -724,8 +724,7 @@ function updateRevealScene() {
     textEl.textContent = gameState.currentRevealSubmission.display_text;
   } else {
     numberEl.textContent = "Warte auf Antworten";
-    textEl.textContent =
-      "Die Antworten erscheinen hier, sobald der Host die Praesentation startet.";
+    textEl.textContent = "Die Antworten erscheinen gleich hier.";
   }
 }
 
@@ -808,7 +807,7 @@ function updateAudienceLeaderboard() {
 
   if (!audience || audience.length === 0) {
     container.innerHTML =
-      '<div class="body-text" style="opacity: 0.6; text-align: center;">Noch keine Detektive</div>';
+      '<div class="body-text" style="opacity: 0.6; text-align: center;">Noch niemand im Publikum</div>';
     return;
   }
 
@@ -953,7 +952,7 @@ function updatePlayerPodium() {
   if (sorted[0]) {
     const name1 = document.getElementById("podiumFirstName");
     const score1 = document.getElementById("podiumFirstScore");
-    if (name1) name1.textContent = sorted[0].display_name || "Spieler 1";
+    if (name1) name1.textContent = sorted[0].display_name || "Spieler:in 1";
     if (score1) score1.textContent = `${sorted[0].total} Punkte`;
   }
 
@@ -962,7 +961,7 @@ function updatePlayerPodium() {
   if (sorted[1]) {
     const name2 = document.getElementById("podiumSecondName");
     const score2 = document.getElementById("podiumSecondScore");
-    if (name2) name2.textContent = sorted[1].display_name || "Spieler 2";
+    if (name2) name2.textContent = sorted[1].display_name || "Spieler:in 2";
     if (score2) score2.textContent = `${sorted[1].total} Punkte`;
     if (podiumSecond) podiumSecond.style.visibility = "visible";
   } else if (podiumSecond) {
@@ -974,7 +973,7 @@ function updatePlayerPodium() {
   if (sorted[2]) {
     const name3 = document.getElementById("podiumThirdName");
     const score3 = document.getElementById("podiumThirdScore");
-    if (name3) name3.textContent = sorted[2].display_name || "Spieler 3";
+    if (name3) name3.textContent = sorted[2].display_name || "Spieler:in 3";
     if (score3) score3.textContent = `${sorted[2].total} Punkte`;
     if (podiumThird) podiumThird.style.visibility = "visible";
   } else if (podiumThird) {
@@ -1001,7 +1000,8 @@ function updateAudiencePodium() {
   if (sorted[0]) {
     const name1 = document.getElementById("audiencePodiumFirstName");
     const score1 = document.getElementById("audiencePodiumFirstScore");
-    if (name1) name1.textContent = sorted[0].display_name || "Detektiv 1";
+    if (name1)
+      name1.textContent = sorted[0].display_name || "Publikumsmensch 1";
     if (score1) score1.textContent = `${sorted[0].total} Punkte`;
     if (audienceFirst) audienceFirst.style.visibility = "visible";
   } else if (audienceFirst) {
@@ -1013,7 +1013,8 @@ function updateAudiencePodium() {
   if (sorted[1]) {
     const name2 = document.getElementById("audiencePodiumSecondName");
     const score2 = document.getElementById("audiencePodiumSecondScore");
-    if (name2) name2.textContent = sorted[1].display_name || "Detektiv 2";
+    if (name2)
+      name2.textContent = sorted[1].display_name || "Publikumsmensch 2";
     if (score2) score2.textContent = `${sorted[1].total} Punkte`;
     if (audienceSecond) audienceSecond.style.visibility = "visible";
   } else if (audienceSecond) {
@@ -1025,7 +1026,8 @@ function updateAudiencePodium() {
   if (sorted[2]) {
     const name3 = document.getElementById("audiencePodiumThirdName");
     const score3 = document.getElementById("audiencePodiumThirdScore");
-    if (name3) name3.textContent = sorted[2].display_name || "Detektiv 3";
+    if (name3)
+      name3.textContent = sorted[2].display_name || "Publikumsmensch 3";
     if (score3) score3.textContent = `${sorted[2].total} Punkte`;
     if (audienceThird) audienceThird.style.visibility = "visible";
   } else if (audienceThird) {

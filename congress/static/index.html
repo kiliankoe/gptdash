@@ -33,17 +33,12 @@
                     <span class="cycles">Dash</span>
                 </div>
                 <div class="card">
-                    <h2>Willkommen!</h2>
-                    <p>Du bist gleich bei GPTDash dabei, dem Spiel, bei dem Spieler versuchen, eine KI zu imitieren.</p>
+                    <p>Gleich geht's los mit GPTDash!</p>
                     <p>Deine Aufgabe: Finde heraus, welche Antwort die echte KI ist!</p>
 
                     <button data-action="joinAudience" id="joinButton">Mitmachen</button>
 
                     <div id="welcomeError" class="error-message" style="display: none;"></div>
-
-                    <div class="help-text">
-                        Du kannst bei jeder Runde abstimmen und um den besten Publikums-Score kämpfen!
-                    </div>
                 </div>
             </div>
 
@@ -53,18 +48,18 @@
                     <div class="waiting-content">
                         <div class="waiting-icon" id="waitingIcon">&#x23F3;</div>
                         <h3 id="waitingTitle">Warte auf die nächste Runde...</h3>
-                        <p id="waitingMessage">Schau auf die große Leinwand!</p>
+                        <p id="waitingMessage">Schau auf den Beamer!</p>
                     </div>
                 </div>
 
                 <!-- Prompt Submission Section -->
                 <div class="card prompt-submission-card" id="promptSubmissionCard">
                     <div class="prompt-submission-header" data-action="togglePromptSubmission">
-                        <h3>&#x1F4A1; Prompt vorschlagen</h3>
+                        <h3>Prompt vorschlagen</h3>
                         <span class="toggle-icon collapsed" id="promptToggleIcon">&#x25BC;</span>
                     </div>
                     <div class="prompt-submission-content collapsed" id="promptSubmissionContent">
-                        <p>Schlage eine Prompt vor!</p>
+                        <p>Schlage eine Prompt vor.</p>
                         <div id="promptDisabledNotice" class="disabled-notice" style="display: none;">
                             Prompt-Vorschläge sind momentan deaktiviert.
                         </div>
@@ -75,7 +70,7 @@
                         <button data-action="submitPrompt" id="submitPromptButton">Vorschlagen</button>
                         <div id="promptError" class="error-message" style="display: none;"></div>
                         <div id="promptSuccess" class="success-message" style="display: none;">
-                            &#x2705; Prompt wurde vorgeschlagen!
+                            Prompt wurde vorgeschlagen!
                         </div>
                     </div>
                 </div>
@@ -84,7 +79,7 @@
             <!-- Trivia Voting Screen -->
             <div class="screen" id="triviaScreen">
                 <div class="card">
-                    <h2>&#x1F3AF; Trivia</h2>
+                    <h2>Trivia</h2>
                     <div class="trivia-question-text" id="triviaQuestionText">
                         Trivia-Frage wird geladen...
                     </div>
@@ -96,7 +91,7 @@
                     <div id="triviaError" class="error-message" style="display: none;"></div>
 
                     <div class="help-text">
-                        Waehle die richtige Antwort!
+                        Wähle deine Antwort!
                     </div>
                 </div>
             </div>
@@ -110,10 +105,10 @@
                         <p>Deine Antwort wurde gespeichert.</p>
                         <p id="triviaVoteSummary" class="text-center" style="margin-top: 10px; font-style: italic;"></p>
 
-                        <button data-action="changeTriviaVote" class="secondary">Antwort aendern</button>
+                        <button data-action="changeTriviaVote" class="secondary">Antwort ändern</button>
 
                         <div class="help-text">
-                            Warte auf die Aufloesung...
+                            Warte auf die Auflösung...
                         </div>
                     </div>
                 </div>
@@ -122,7 +117,7 @@
             <!-- Trivia Result Screen -->
             <div class="screen" id="triviaResultScreen">
                 <div class="card">
-                    <h2>&#x1F3AF; Trivia Ergebnis</h2>
+                    <h2>Trivia Ergebnis</h2>
                     <div class="trivia-question-text" id="triviaResultQuestionText">
                         Trivia-Frage...
                     </div>
@@ -140,8 +135,8 @@
             <!-- Prompt Voting Screen -->
             <div class="screen" id="promptVotingScreen">
                 <div class="card">
-                    <h2>&#x1F4AC; Wähle einen Prompt!</h2>
-                    <p class="text-center mb-16">Für welchen Prompt soll gespielt werden?</p>
+                    <h2>Wähle einen Prompt!</h2>
+                    <p class="text-center mb-16">Welche Prompt willst du in der nächsten Runde sehen?</p>
 
                     <div class="prompt-options" id="promptOptions">
                         <!-- Prompt options will be inserted here -->
@@ -152,7 +147,7 @@
                     <div id="promptVoteError" class="error-message" style="display: none;"></div>
 
                     <div class="help-text">
-                        Stimme für den Prompt ab, der gespielt werden soll!
+                        Stimme für die Prompt ab, die gespielt werden soll!
                     </div>
                 </div>
             </div>
@@ -169,7 +164,7 @@
                         <button data-action="changePromptVote" class="secondary">Stimme ändern</button>
 
                         <div class="help-text">
-                            Warte auf die Auswahl des Gewinners...
+                            Warte auf die Auswahl...
                         </div>
                     </div>
                 </div>
@@ -187,7 +182,6 @@
 
                     <div class="vote-section">
                         <h3>
-                            <span class="icon">&#x1F916;</span>
                             <span class="text-primary">Welche Antwort ist die KI?</span>
                         </h3>
                         <div class="answer-options" id="aiAnswerOptions">
@@ -197,7 +191,6 @@
 
                     <div class="vote-section">
                         <h3>
-                            <span class="icon">&#x1F602;</span>
                             <span class="text-secondary">Welche ist am lustigsten?</span>
                         </h3>
                         <div class="answer-options" id="funnyAnswerOptions">
@@ -243,14 +236,12 @@
             <div class="screen" id="resultsScreen">
                 <div class="card">
                     <div class="results-content">
-                        <div class="results-icon">&#x1F4CA;</div>
                         <h3>Auflösung kommt gleich</h3>
-                        <p>Schau auf die große Leinwand für die Auflösung!</p>
+                        <p>Schau auf den Beamer für die Auflösung!</p>
                     </div>
 
                     <div id="winnerBadge" style="display: none;">
                         <div class="winner-badge">
-                            <div class="icon">&#x1F3C6;</div>
                             <h3>Top-Detektiv!</h3>
                             <p>Du hast die KI richtig erkannt!</p>
                         </div>

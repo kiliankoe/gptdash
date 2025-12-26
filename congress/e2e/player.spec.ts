@@ -857,7 +857,7 @@ test.describe("Player", () => {
 
     // Verify the locked screen has appropriate message (generic locked screen)
     await expect(reconnectedPlayer.locator("#lockedScreen")).toContainText(
-      "Schau auf die große Leinwand",
+      "Schau auf den Beamer",
     );
 
     debugLog("Player reconnect during VOTING test completed successfully!");

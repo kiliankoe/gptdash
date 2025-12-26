@@ -113,21 +113,21 @@ pub async fn handle_vote(
             tracing::info!("Vote rejected: panic mode active");
             Some(ServerMessage::Error {
                 code: "PANIC_MODE".to_string(),
-                msg: "Voting is temporarily disabled".to_string(),
+                msg: "Die Abstimmung ist gerade deaktiviert".to_string(),
             })
         }
         VoteResult::WrongPhase => {
             tracing::info!("Vote rejected: not in voting phase");
             Some(ServerMessage::Error {
                 code: "WRONG_PHASE".to_string(),
-                msg: "Voting is only allowed during the voting phase".to_string(),
+                msg: "Stimmen sind nur während der Abstimmung zulässig".to_string(),
             })
         }
         VoteResult::InvalidPick => {
             tracing::info!("Vote rejected: invalid pick(s)");
             Some(ServerMessage::Error {
                 code: "INVALID_VOTE".to_string(),
-                msg: "Invalid vote. Please pick two different answers from this round.".to_string(),
+                msg: "Ungültige Auswahl, wähle bitte andere Antworten.".to_string(),
             })
         }
         VoteResult::UnknownVoter => {
@@ -222,13 +222,13 @@ pub async fn handle_prompt_vote(
         if game.phase != crate::types::GamePhase::PromptSelection {
             return Some(ServerMessage::Error {
                 code: "WRONG_PHASE".to_string(),
-                msg: "Prompt voting only available during prompt selection".to_string(),
+                msg: "Prompt-Stimmen sind nur während der Abstimmung zulässig".to_string(),
             });
         }
     } else {
         return Some(ServerMessage::Error {
             code: "NO_GAME".to_string(),
-            msg: "No active game".to_string(),
+            msg: "Kein aktives Spiel".to_string(),
         });
     }
 
@@ -266,13 +266,13 @@ pub async fn handle_submit_trivia_vote(
         if game.phase != crate::types::GamePhase::Writing {
             return Some(ServerMessage::Error {
                 code: "WRONG_PHASE".to_string(),
-                msg: "Trivia voting only available during writing phase".to_string(),
+                msg: "Trivia-Stimmen sind nur während der Abstimmung zulässig".to_string(),
             });
         }
     } else {
         return Some(ServerMessage::Error {
             code: "NO_GAME".to_string(),
-            msg: "No active game".to_string(),
+            msg: "Kein aktives Spiel".to_string(),
         });
     }
 
@@ -282,7 +282,7 @@ pub async fn handle_submit_trivia_vote(
         None => {
             return Some(ServerMessage::Error {
                 code: "NO_ACTIVE_TRIVIA".to_string(),
-                msg: "No trivia question is currently active".to_string(),
+                msg: "Keine aktive Trivia-Frage".to_string(),
             });
         }
     };

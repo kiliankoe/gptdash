@@ -45,7 +45,7 @@ pub async fn handle_submit_answer(
             None => {
                 return Some(ServerMessage::Error {
                     code: "INVALID_PLAYER_TOKEN".to_string(),
-                    msg: "Invalid player token".to_string(),
+                    msg: "Ungültiger Token".to_string(),
                 });
             }
         }
@@ -81,7 +81,7 @@ pub async fn handle_request_typo_check(
         None => {
             return Some(ServerMessage::Error {
                 code: "INVALID_PLAYER_TOKEN".to_string(),
-                msg: "Invalid player token".to_string(),
+                msg: "Ungültiger Token".to_string(),
             });
         }
     };
@@ -161,7 +161,7 @@ pub async fn handle_update_submission(
         None => {
             return Some(ServerMessage::Error {
                 code: "INVALID_PLAYER_TOKEN".to_string(),
-                msg: "Invalid player token".to_string(),
+                msg: "Ungültiger Token".to_string(),
             });
         }
     };

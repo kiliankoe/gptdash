@@ -14,7 +14,6 @@
     <div class="container">
         <div class="header">
             <h1>GPTDash</h1>
-            <div class="subtitle">Spieler-Portal</div>
         </div>
 
         <div class="status-indicator">
@@ -26,18 +25,14 @@
         <div class="screen active" id="joinScreen">
             <div class="card">
                 <h2>Ab ins Spiel</h2>
-                <p style="margin-bottom: 20px; opacity: 0.9;">Gib den Spieler-Token ein, den du vom Host bekommen hast.</p>
+                <p style="margin-bottom: 20px; opacity: 0.9;">Gib den Token ein, den du vom Host bekommen hast.</p>
 
-                <input type="text" id="tokenInput" placeholder="Spieler-Token eingeben"
+                <input type="text" id="tokenInput" placeholder="Token eingeben"
                     style="text-transform: uppercase; font-family: monospace;">
 
                 <button data-action="joinGame" id="joinButton">Los geht's</button>
 
                 <div id="joinError" class="error-message" style="display: none;"></div>
-
-                <div class="help-text">
-                    Token-Format: player_XXXX
-                </div>
             </div>
         </div>
 
@@ -146,7 +141,7 @@
                 <div class="waiting-message">
                     <div class="icon">🔒</div>
                     <h3>Zeit abgelaufen!</h3>
-                    <p class="mt-10">Schau auf die große Leinwand für die Auflösung!</p>
+                    <p class="mt-10">Schau auf den Beamer für die Auflösung!</p>
                 </div>
             </div>
         </div>

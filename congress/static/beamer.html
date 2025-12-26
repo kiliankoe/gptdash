@@ -48,8 +48,7 @@
              SCENE: PROMPT SELECTION
              ======================== -->
         <section class="scene scene-prompt-selection" id="scenePromptSelection">
-            <h2 class="headline headline-lg text-center mb-40">Welcher Prompt?</h2>
-            <p class="text-center mb-20" style="opacity: 0.7;" id="promptVoteInstruction">Stimmt mit eurem Handy ab!</p>
+            <h2 class="headline headline-lg text-center mb-40">Welche Prompt?</h2>
             <div class="prompt-grid" id="promptGrid">
                 <!-- Prompt cards will be dynamically generated -->
             </div>
@@ -60,7 +59,7 @@
              ======================== -->
         <section class="scene scene-writing" id="sceneWriting">
             <div class="writing-prompt">
-                <div class="label">Aktueller Prompt</div>
+                <div class="label">Aktuelle Prompt</div>
                 <div class="writing-prompt-image" id="writingPromptImage" style="display: none;">
                     <!-- Image will be inserted here for multimodal prompts -->
                 </div>
@@ -162,7 +161,6 @@
                 <!-- AI Reveal -->
                 <div class="result-card ai-reveal">
                     <div class="result-label">
-                        <span class="result-icon">🤖</span>
                         <span class="headline headline-sm text-primary" id="aiRevealLabel">Das war die KI!</span>
                     </div>
                     <div class="result-answer" id="aiRevealAnswer">
@@ -173,7 +171,6 @@
                 <!-- Funniest -->
                 <div class="result-card funny-reveal">
                     <div class="result-label">
-                        <span class="result-icon">😂</span>
                         <span class="headline headline-sm text-secondary" id="funnyRevealLabel">Am lustigsten!</span>
                     </div>
                     <div class="result-answer" id="funnyRevealAnswer">
@@ -184,8 +181,7 @@
                 <!-- Player Leaderboard -->
                 <div class="result-card leaderboard">
                     <div class="result-label">
-                        <span class="result-icon">🏆</span>
-                        <span class="headline headline-sm">Spieler</span>
+                        <span class="headline headline-sm">Spieler:innen</span>
                     </div>
                     <div class="leaderboard-list" id="leaderboardList">
                         <!-- Leaderboard rows will be generated dynamically -->
@@ -194,8 +190,7 @@
                 <!-- Audience Leaderboard -->
                 <div class="result-card leaderboard audience-leaderboard">
                     <div class="result-label">
-                        <span class="result-icon">🕵️</span>
-                        <span class="headline headline-sm">Top Detektive</span>
+                        <span class="headline headline-sm">Publikum</span>
                     </div>
                     <div class="leaderboard-list" id="audienceLeaderboardList">
                         <!-- Audience leaderboard rows will be generated dynamically -->
@@ -208,11 +203,11 @@
              SCENE: PODIUM
              ======================== -->
         <section class="scene scene-podium" id="scenePodium">
-            <h2 class="headline headline-xl text-primary">Siegerehrung</h2>
+            <h2 class="headline headline-xl text-primary">Preisverleihung</h2>
             <div class="podium-sections">
                 <!-- Player Podium -->
                 <div class="podium-section">
-                    <h3 class="headline headline-md text-secondary mb-20">🎭 Spieler</h3>
+                    <h3 class="headline headline-md text-secondary mb-20">Spieler:innen</h3>
                     <div class="podium-container">
                         <!-- 2nd Place -->
                         <div class="podium-place" id="podiumSecond">
@@ -239,7 +234,7 @@
                 </div>
                 <!-- Audience Podium -->
                 <div class="podium-section audience-podium-section">
-                    <h3 class="headline headline-md text-additional-02 mb-20">🕵️ Top Detektive</h3>
+                    <h3 class="headline headline-md text-additional-02 mb-20">Publikum</h3>
                     <div class="podium-container podium-container-audience">
                         <!-- 2nd Place -->
                         <div class="podium-place podium-place-audience" id="audiencePodiumSecond">

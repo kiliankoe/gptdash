@@ -339,9 +339,9 @@ function updatePhase(phase) {
           showPromptVotingScreen();
         } else {
           updateWaitingMessage(
-            "&#x1F4AC;",
+            "",
             "Prompt-Auswahl",
-            "Schau auf die große Leinwand - es wird ein Prompt ausgewählt!",
+            "Schau auf den Beamer - es wird eine Prompt ausgewählt!",
           );
           showScreen("waitingScreen");
         }
@@ -351,9 +351,9 @@ function updatePhase(phase) {
     case "WRITING":
       if (voterToken) {
         updateWaitingMessage(
-          "&#x270D;&#xFE0F;",
-          "Spieler schreiben...",
-          "Die Spieler denken sich gerade ihre Antworten aus. Gleich kannst du abstimmen!",
+          "",
+          "Antworten werden geschrieben...",
+          "Die Spieler:innen denken sich gerade ihre Antworten aus. Gleich geht's weiter.",
         );
         showScreen("waitingScreen");
       }
@@ -362,9 +362,9 @@ function updatePhase(phase) {
     case "REVEAL":
       if (voterToken) {
         updateWaitingMessage(
-          "&#x1F440;",
+          "",
           "Antworten werden enthüllt",
-          "Schau auf die große Leinwand - die Antworten werden vorgelesen!",
+          "Schau auf den Beamer - die Antworten werden angezeigt!",
         );
         showScreen("waitingScreen");
       }
@@ -388,9 +388,9 @@ function updatePhase(phase) {
           showScreen("winnerFullscreen");
         } else {
           updateWaitingMessage(
-            "&#x1F3C6;",
-            "Siegerehrung",
-            "Die Gewinner werden verkündet! Schau auf die große Leinwand.",
+            "",
+            "Preisverleihung",
+            "Die Gewinnenden werden verkündet, schau auf den Beamer!",
           );
           showScreen("waitingScreen");
         }
@@ -400,7 +400,7 @@ function updatePhase(phase) {
     case "INTERMISSION":
       if (voterToken) {
         updateWaitingMessage(
-          "&#x2615;",
+          "",
           "Pause",
           "Kurze Pause. Gleich geht es weiter!",
         );
@@ -652,7 +652,7 @@ function submitPrompt() {
   const text = input?.value?.trim();
 
   if (!text) {
-    showError("promptError", "Bitte gib einen Prompt ein");
+    showError("promptError", "Bitte gib eine Prompt ein");
     return;
   }
 
@@ -775,7 +775,7 @@ function submitPromptVote() {
   }
 
   if (!selectedPrompt) {
-    showError("promptVoteError", "Bitte wähle einen Prompt aus");
+    showError("promptVoteError", "Bitte wähle eine Prompt aus");
     return;
   }
 
@@ -870,9 +870,9 @@ function handleTriviaClear() {
   // Return to waiting screen if in WRITING phase
   if (currentPhase === "WRITING") {
     updateWaitingMessage(
-      "&#x270D;&#xFE0F;",
-      "Spieler schreiben...",
-      "Die Spieler denken sich gerade ihre Antworten aus. Gleich kannst du abstimmen!",
+      "",
+      "Antworten werden geschrieben...",
+      "Die Spieler:innen denken sich gerade ihre Antworten aus. Gleich geht's weiter.",
     );
     showScreen("waitingScreen");
   }
