@@ -7,11 +7,10 @@ services:
     restart: unless-stopped
     volumes:
       - gptdash-data:/app/data
+    env_file:
+      - .env
     environment:
       - AUTO_SAVE_PATH=/app/data/state_backup.json
-      - HOST_USERNAME=${HOST_USERNAME}
-      - HOST_PASSWORD=${HOST_PASSWORD}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
     networks:
       - internal
 
