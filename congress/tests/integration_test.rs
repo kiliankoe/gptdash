@@ -2285,7 +2285,7 @@ async fn test_submit_answer_invalid_token() {
     match result {
         Some(ServerMessage::Error { code, msg }) => {
             assert_eq!(code, "INVALID_PLAYER_TOKEN");
-            assert!(msg.contains("Invalid player token"));
+            assert!(msg.contains("Ungültiger Token"));
         }
         _ => panic!(
             "Expected INVALID_PLAYER_TOKEN error for invalid token, got: {:?}",
