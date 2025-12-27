@@ -342,12 +342,12 @@ button.secondary:hover {
 }
 
 .welcome-title .power {
-  display: block;
+  display: inline;
   color: var(--color-primary);
 }
 
 .welcome-title .cycles {
-  display: block;
+  display: inline;
   color: var(--color-neutral);
 }
 
