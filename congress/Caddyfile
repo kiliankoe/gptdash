@@ -2,5 +2,7 @@
     @blocked remote_ip 151.219.62.0/23 2001:67c:20a1:1561::/64
     respond @blocked "Access denied" 403
 
-    reverse_proxy localhost:6573
+    reverse_proxy localhost:6573 {
+        header_up X-Forwarded-For {remote_host}
+    }
 }
