@@ -161,7 +161,11 @@ Game, rounds, submissions, votes, players, scores, prompt pool, audience members
 Emergency toggle that disables all audience voting. Server rejects votes with `PANIC_MODE` error. Audience devices show "vote by clapping" overlay. Host can manually select winners via `HostSetManualWinner`.
 
 ### Venue-Only Mode
-IP-based access control restricting audience to venue network. Boolean `venue_only_mode` in Game struct, `VenueConfig` stores CIDR ranges (configured via `VENUE_IP_RANGES` env var at startup). Checks at both HTTP middleware and WebSocket upgrade. Uses `ipnet` crate for CIDR parsing, supports X-Forwarded-For for reverse proxy. Players/host/beamer exempt. Empty ranges = allow all (safety default). Host can toggle mode on/off; enabled state persists in state export.
+IP-based access control restricting audience to venue network. Two-layer approach:
+- **Caddy layer**: Always blocks `151.219.62.0/23` and `2001:67c:20a1:1561::/64` (all roles)
+- **App layer**: When venue-only mode enabled, allows only `94.45.224.0/19`, `151.219.0.0/16`, `2001:67c:20a1::/48` (audience only)
+
+Boolean `venue_only_mode` in Game struct. IP ranges hardcoded in `types.rs` (`VENUE_ALLOWED_IP_RANGES`). Checks at both HTTP middleware and WebSocket upgrade. Uses `ipnet` crate for CIDR parsing, supports X-Forwarded-For for reverse proxy. Players/host/beamer exempt from app-layer checks. Host can toggle mode on/off; enabled state persists in state export.
 
 ### Trivia System
 Entertainment during WRITING phase. Host adds 2-4 choice questions to pool, presents one, audience votes (hidden), host resolves to show results. No scoring, purely entertainment. Auto-clears on phase change. Persists in state exports.
@@ -220,7 +224,6 @@ biome lint static/ && biome format static/    # Frontend lints
 | `AUTO_SAVE_PATH` | ./state_backup.json | Auto-save file path |
 | `AUTO_SAVE_INTERVAL_SECS` | 5 | Auto-save interval (seconds) |
 | `DISABLE_AUTO_SAVE` | (unset) | Set to 1 to disable auto-save |
-| `VENUE_IP_RANGES` | (none) | Comma-separated CIDR ranges for venue-only mode |
 | `ABUSE_BLOCK_USER_AGENTS` | true | Block suspicious user agents |
 | `ABUSE_REQUIRE_BROWSER` | true | Require browser headers for WebSocket |
 | `ABUSE_RATE_LIMIT` | true | Enable rate limiting |

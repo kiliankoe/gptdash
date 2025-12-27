@@ -318,8 +318,8 @@ pub async fn venue_mode_middleware(
 ) -> Response<Body> {
     if state.is_venue_only_mode().await {
         let client_ip = extract_client_ip(request.headers(), &addr);
-        if !state.is_ip_allowed_by_venue(client_ip).await {
-            let message = state.get_venue_rejection_message().await;
+        if !state.is_ip_allowed_by_venue(client_ip) {
+            let message = state.get_venue_rejection_message();
             tracing::info!(
                 "Venue-only mode: rejected HTTP request from IP {}",
                 client_ip

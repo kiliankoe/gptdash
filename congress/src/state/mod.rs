@@ -119,8 +119,6 @@ pub struct AppState {
     pub audience_disconnect: broadcast::Sender<()>,
     /// Per-token rate limiters for WebSocket message rate limiting
     rate_limiters: Arc<RwLock<HashMap<String, WsTokenBucket>>>,
-    /// Venue-only mode IP filtering configuration
-    pub venue_config: Arc<RwLock<VenueConfig>>,
 }
 
 impl AppState {
@@ -166,7 +164,6 @@ impl AppState {
             connected_hosts: Arc::new(AtomicU32::new(0)),
             audience_disconnect: audience_disconnect_tx,
             rate_limiters: Arc::new(RwLock::new(HashMap::new())),
-            venue_config: Arc::new(RwLock::new(VenueConfig::default())),
         }
     }
 
@@ -275,43 +272,11 @@ impl AppState {
     // Venue-Only Mode (IP filtering)
     // =========================================================================
 
-    /// Add an IP range to the venue allowlist
-    /// Returns error if CIDR notation is invalid
-    pub async fn add_venue_ip_range(&self, range: String) -> Result<(), String> {
-        range
-            .parse::<ipnet::IpNet>()
-            .map_err(|e| format!("Invalid CIDR notation: {}", e))?;
+    /// Check if an IP is allowed by venue config (hardcoded ranges for 38C3)
+    pub fn is_ip_allowed_by_venue(&self, ip: std::net::IpAddr) -> bool {
+        use crate::types::VENUE_ALLOWED_IP_RANGES;
 
-        let mut config = self.venue_config.write().await;
-        if !config.allowed_ranges.contains(&range) {
-            config.allowed_ranges.push(range);
-        }
-        Ok(())
-    }
-
-    /// Remove an IP range from the venue allowlist
-    /// Returns true if the range was found and removed
-    pub async fn remove_venue_ip_range(&self, range: &str) -> bool {
-        let mut config = self.venue_config.write().await;
-        let before = config.allowed_ranges.len();
-        config.allowed_ranges.retain(|r| r != range);
-        config.allowed_ranges.len() < before
-    }
-
-    /// Get all venue IP ranges
-    pub async fn get_venue_ip_ranges(&self) -> Vec<String> {
-        self.venue_config.read().await.allowed_ranges.clone()
-    }
-
-    /// Check if an IP is allowed by venue config
-    /// Returns true if: (1) no ranges configured, or (2) IP matches any configured range
-    pub async fn is_ip_allowed_by_venue(&self, ip: std::net::IpAddr) -> bool {
-        let config = self.venue_config.read().await;
-        if config.allowed_ranges.is_empty() {
-            return true;
-        }
-
-        for range_str in &config.allowed_ranges {
+        for range_str in VENUE_ALLOWED_IP_RANGES {
             if let Ok(network) = range_str.parse::<ipnet::IpNet>() {
                 if network.contains(&ip) {
                     return true;
@@ -322,13 +287,8 @@ impl AppState {
     }
 
     /// Get the venue rejection message
-    pub async fn get_venue_rejection_message(&self) -> String {
-        self.venue_config.read().await.rejection_message.clone()
-    }
-
-    /// Get full venue config (for host state recovery)
-    pub async fn get_venue_config(&self) -> VenueConfig {
-        self.venue_config.read().await.clone()
+    pub fn get_venue_rejection_message(&self) -> &'static str {
+        crate::types::VENUE_REJECTION_MESSAGE
     }
 
     // =========================================================================
@@ -1104,7 +1064,6 @@ impl AppState {
         let prompt_pool: Vec<Prompt> = self.prompt_pool.read().await.values().cloned().collect();
         let audience_members = self.audience_members.read().await.clone();
         let trivia_questions = self.trivia_questions.read().await.clone();
-        let venue_config = self.venue_config.read().await.clone();
 
         GameStateExport::new(
             game,
@@ -1119,7 +1078,6 @@ impl AppState {
             prompt_pool,
             audience_members,
             trivia_questions,
-            venue_config,
         )
     }
 
@@ -1164,7 +1122,6 @@ impl AppState {
             .collect();
         *self.audience_members.write().await = export.audience_members.clone();
         *self.trivia_questions.write().await = export.trivia_questions;
-        *self.venue_config.write().await = export.venue_config;
 
         // Rebuild used_display_names from imported audience_members
         *self.used_display_names.write().await = export
@@ -2500,164 +2457,45 @@ mod tests {
         assert!(!state.is_venue_only_mode().await);
     }
 
-    #[tokio::test]
-    async fn test_venue_ip_range_add_valid() {
+    #[test]
+    fn test_venue_ip_allowed_in_hardcoded_range() {
         let state = AppState::new();
 
-        // Add valid CIDR ranges
-        assert!(state
-            .add_venue_ip_range("192.168.1.0/24".to_string())
-            .await
-            .is_ok());
-        assert!(state
-            .add_venue_ip_range("10.0.0.0/8".to_string())
-            .await
-            .is_ok());
-        assert!(state
-            .add_venue_ip_range("2001:db8::/32".to_string())
-            .await
-            .is_ok());
+        // IP in first hardcoded range (94.45.224.0/19)
+        let ip: std::net::IpAddr = "94.45.230.100".parse().unwrap();
+        assert!(state.is_ip_allowed_by_venue(ip));
 
-        let ranges = state.get_venue_ip_ranges().await;
-        assert_eq!(ranges.len(), 3);
-        assert!(ranges.contains(&"192.168.1.0/24".to_string()));
-        assert!(ranges.contains(&"10.0.0.0/8".to_string()));
-        assert!(ranges.contains(&"2001:db8::/32".to_string()));
+        // IP in second hardcoded range (151.219.0.0/16)
+        let ip: std::net::IpAddr = "151.219.50.1".parse().unwrap();
+        assert!(state.is_ip_allowed_by_venue(ip));
+
+        // IPv6 in third hardcoded range (2001:67c:20a1::/48)
+        let ip: std::net::IpAddr = "2001:67c:20a1:1234::1".parse().unwrap();
+        assert!(state.is_ip_allowed_by_venue(ip));
     }
 
-    #[tokio::test]
-    async fn test_venue_ip_range_add_invalid() {
+    #[test]
+    fn test_venue_ip_not_allowed_outside_hardcoded_ranges() {
         let state = AppState::new();
 
-        // Invalid CIDR should fail
-        assert!(state
-            .add_venue_ip_range("not-an-ip".to_string())
-            .await
-            .is_err());
-        assert!(state
-            .add_venue_ip_range("192.168.1.0/33".to_string())
-            .await
-            .is_err());
-        assert!(state.add_venue_ip_range("".to_string()).await.is_err());
-
-        // No ranges should be added
-        assert!(state.get_venue_ip_ranges().await.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_venue_ip_range_add_duplicate() {
-        let state = AppState::new();
-
-        // Add same range twice - duplicates are silently ignored
-        assert!(state
-            .add_venue_ip_range("192.168.1.0/24".to_string())
-            .await
-            .is_ok());
-        assert!(state
-            .add_venue_ip_range("192.168.1.0/24".to_string())
-            .await
-            .is_ok());
-
-        // Only one range should exist (duplicate was ignored)
-        assert_eq!(state.get_venue_ip_ranges().await.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn test_venue_ip_range_remove() {
-        let state = AppState::new();
-
-        // Add and remove
-        state
-            .add_venue_ip_range("192.168.1.0/24".to_string())
-            .await
-            .unwrap();
-        assert!(state.remove_venue_ip_range("192.168.1.0/24").await);
-        assert!(state.get_venue_ip_ranges().await.is_empty());
-
-        // Remove non-existent returns false
-        assert!(!state.remove_venue_ip_range("10.0.0.0/8").await);
-    }
-
-    #[tokio::test]
-    async fn test_venue_ip_allowed_in_range() {
-        let state = AppState::new();
-        state
-            .add_venue_ip_range("192.168.1.0/24".to_string())
-            .await
-            .unwrap();
-
-        // IP in range
+        // IP outside all hardcoded ranges
         let ip: std::net::IpAddr = "192.168.1.100".parse().unwrap();
-        assert!(state.is_ip_allowed_by_venue(ip).await);
+        assert!(!state.is_ip_allowed_by_venue(ip));
 
-        // IP at start of range
-        let ip: std::net::IpAddr = "192.168.1.0".parse().unwrap();
-        assert!(state.is_ip_allowed_by_venue(ip).await);
+        let ip: std::net::IpAddr = "8.8.8.8".parse().unwrap();
+        assert!(!state.is_ip_allowed_by_venue(ip));
 
-        // IP at end of range
-        let ip: std::net::IpAddr = "192.168.1.255".parse().unwrap();
-        assert!(state.is_ip_allowed_by_venue(ip).await);
+        // IPv6 outside range
+        let ip: std::net::IpAddr = "2001:db8::1".parse().unwrap();
+        assert!(!state.is_ip_allowed_by_venue(ip));
     }
 
-    #[tokio::test]
-    async fn test_venue_ip_not_allowed_out_of_range() {
-        let state = AppState::new();
-        state
-            .add_venue_ip_range("192.168.1.0/24".to_string())
-            .await
-            .unwrap();
-
-        // IP outside range
-        let ip: std::net::IpAddr = "192.168.2.100".parse().unwrap();
-        assert!(!state.is_ip_allowed_by_venue(ip).await);
-
-        let ip: std::net::IpAddr = "10.0.0.1".parse().unwrap();
-        assert!(!state.is_ip_allowed_by_venue(ip).await);
-    }
-
-    #[tokio::test]
-    async fn test_venue_ip_empty_ranges_allows_all() {
+    #[test]
+    fn test_venue_rejection_message() {
         let state = AppState::new();
 
-        // No ranges configured = allow all (safety default to prevent accidental lockout)
-        let ip: std::net::IpAddr = "192.168.1.100".parse().unwrap();
-        assert!(state.is_ip_allowed_by_venue(ip).await);
-
-        let ip: std::net::IpAddr = "127.0.0.1".parse().unwrap();
-        assert!(state.is_ip_allowed_by_venue(ip).await);
-    }
-
-    #[tokio::test]
-    async fn test_venue_ip_multiple_ranges() {
-        let state = AppState::new();
-        state
-            .add_venue_ip_range("192.168.1.0/24".to_string())
-            .await
-            .unwrap();
-        state
-            .add_venue_ip_range("10.0.0.0/8".to_string())
-            .await
-            .unwrap();
-
-        // IP in first range
-        let ip: std::net::IpAddr = "192.168.1.50".parse().unwrap();
-        assert!(state.is_ip_allowed_by_venue(ip).await);
-
-        // IP in second range
-        let ip: std::net::IpAddr = "10.5.5.5".parse().unwrap();
-        assert!(state.is_ip_allowed_by_venue(ip).await);
-
-        // IP in neither
-        let ip: std::net::IpAddr = "172.16.0.1".parse().unwrap();
-        assert!(!state.is_ip_allowed_by_venue(ip).await);
-    }
-
-    #[tokio::test]
-    async fn test_venue_rejection_message() {
-        let state = AppState::new();
-
-        // Default message contains CCH reference
-        let message = state.get_venue_rejection_message().await;
+        // Message contains CCH reference
+        let message = state.get_venue_rejection_message();
         assert!(message.contains("CCH"));
     }
 }

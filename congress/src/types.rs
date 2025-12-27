@@ -237,25 +237,10 @@ pub struct TriviaVote {
 
 // ========== Venue-Only Mode ==========
 
-/// Configuration for venue-only mode IP filtering
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VenueConfig {
-    /// List of allowed IP ranges in CIDR notation (e.g., "185.1.74.0/24")
-    pub allowed_ranges: Vec<String>,
-    /// Message shown to rejected users
-    #[serde(default = "default_venue_rejection_message")]
-    pub rejection_message: String,
-}
+/// Allowed IP ranges when venue-only mode is active (hardcoded for 38C3)
+pub const VENUE_ALLOWED_IP_RANGES: &[&str] =
+    &["94.45.224.0/19", "151.219.0.0/16", "2001:67c:20a1::/48"];
 
-fn default_venue_rejection_message() -> String {
-    "Sorry, aus Gründen™ ist die Anwendung nur noch im CCH erreichbar :sadpanda:".to_string()
-}
-
-impl Default for VenueConfig {
-    fn default() -> Self {
-        Self {
-            allowed_ranges: Vec::new(),
-            rejection_message: default_venue_rejection_message(),
-        }
-    }
-}
+/// Default rejection message for venue-only mode
+pub const VENUE_REJECTION_MESSAGE: &str =
+    "Sorry, aus Gründen™ ist die Anwendung nur noch im CCH erreichbar :sadpanda:";

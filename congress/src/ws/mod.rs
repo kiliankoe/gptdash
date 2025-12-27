@@ -189,8 +189,8 @@ pub async fn ws_handler(
     // Block audience WebSocket connections during venue-only mode if IP not allowed
     if role == Role::Audience && state.is_venue_only_mode().await {
         let client_ip = extract_client_ip(&headers, &addr);
-        if !state.is_ip_allowed_by_venue(client_ip).await {
-            let message = state.get_venue_rejection_message().await;
+        if !state.is_ip_allowed_by_venue(client_ip) {
+            let message = state.get_venue_rejection_message();
             tracing::info!(
                 "Venue-only mode: rejected audience connection from IP {}",
                 client_ip

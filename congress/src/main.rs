@@ -88,19 +88,6 @@ async fn main() {
         state.create_game().await;
     }
 
-    // Load venue IP ranges from environment if configured
-    if let Ok(ranges) = std::env::var("VENUE_IP_RANGES") {
-        for range in ranges.split(',') {
-            let range = range.trim();
-            if !range.is_empty() {
-                match state.add_venue_ip_range(range.to_string()).await {
-                    Ok(_) => tracing::info!("Loaded venue IP range: {}", range),
-                    Err(e) => tracing::warn!("Invalid venue IP range '{}': {}", range, e),
-                }
-            }
-        }
-    }
-
     // Spawn background task for auto-saving state to disk
     broadcast::spawn_auto_save_task(state.clone());
 

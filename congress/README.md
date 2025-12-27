@@ -34,7 +34,6 @@ cargo run
 | `AUTO_SAVE_PATH` | ./state_backup.json | Auto-save file path |
 | `AUTO_SAVE_INTERVAL_SECS` | 5 | Auto-save interval (seconds) |
 | `DISABLE_AUTO_SAVE` | (unset) | Set to 1 to disable auto-save |
-| `VENUE_IP_RANGES` | (none) | Comma-separated CIDR ranges for venue-only mode |
 | `ABUSE_BLOCK_USER_AGENTS` | true | Block suspicious user agents |
 | `ABUSE_REQUIRE_BROWSER` | true | Require browser headers for WebSocket |
 | `ABUSE_RATE_LIMIT` | true | Enable rate limiting |
@@ -180,14 +179,14 @@ Tie-breakers: Higher AI-detect points, then earliest correct vote timestamp.
 
 Restricts audience membership to people physically at the venue by IP address filtering. Players, host, and beamer are exempt.
 
-**Configuration:**
-- Set IP ranges via `VENUE_IP_RANGES` env var (comma-separated CIDR notation, e.g., `185.1.74.0/24,2001:db8::/32`)
+**IP Filtering:**
+- Always-blocked IPs (at Caddy level): `151.219.62.0/23`, `2001:67c:20a1:1561::/64`
+- Venue-allowed IPs (when mode enabled): `94.45.224.0/19`, `151.219.0.0/16`, `2001:67c:20a1::/48`
 - Host toggles venue mode on/off via host panel
 
 **Behavior:**
 - Blocks both HTTP pages and WebSocket connections for non-venue audience
 - Supports X-Forwarded-For header for reverse proxy deployments
-- Empty ranges = allow all (safety default to prevent accidental lockout)
 - Enabled state persists in state export/import
 
 ## Future Work
