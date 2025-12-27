@@ -61,6 +61,7 @@ fn token_required_for_role(role: &Role) -> bool {
 fn extract_client_ip(headers: &HeaderMap, connect_info: &SocketAddr) -> IpAddr {
     if let Some(xff) = headers.get("x-forwarded-for") {
         if let Ok(xff_str) = xff.to_str() {
+            tracing::debug!("X-Forwarded-For header: {}", xff_str);
             if let Some(first_ip) = xff_str.split(',').next() {
                 if let Ok(ip) = first_ip.trim().parse::<IpAddr>() {
                     return ip;
@@ -68,6 +69,10 @@ fn extract_client_ip(headers: &HeaderMap, connect_info: &SocketAddr) -> IpAddr {
             }
         }
     }
+    tracing::debug!(
+        "No valid X-Forwarded-For, using connect_info: {}",
+        connect_info.ip()
+    );
     connect_info.ip()
 }
 

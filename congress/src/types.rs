@@ -237,7 +237,7 @@ pub struct TriviaVote {
 
 // ========== Venue-Only Mode ==========
 
-/// Allowed IP ranges when venue-only mode is active (hardcoded for 38C3)
+/// Allowed IP ranges when venue-only mode is active (hardcoded for 39c3)
 pub const VENUE_ALLOWED_IP_RANGES: &[&str] =
     &["94.45.224.0/19", "151.219.0.0/16", "2001:67c:20a1::/48"];
 
