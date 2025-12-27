@@ -5,6 +5,8 @@ services:
       args:
         GIT_HASH: ${GIT_HASH:-unknown}
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:6573:6573"
     volumes:
       - gptdash-data:/app/data
     env_file:
@@ -17,17 +19,13 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    network_mode: host
     environment:
       - DOMAIN=${DOMAIN}
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
-    networks:
-      - internal
     depends_on:
       - gptdash
 
