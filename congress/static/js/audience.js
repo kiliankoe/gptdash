@@ -28,6 +28,7 @@ let promptSubmissionExpanded = false;
 let challengeSolver = null; // Vote challenge solver (anti-automation)
 let softPanicMode = false; // When true, prompt submissions are disabled
 const STORAGE_KEY = "gptdash_voter_token";
+let isReturningUser = false;
 
 // Prompt voting state
 let promptCandidates = [];
@@ -46,10 +47,10 @@ let audienceLeaderboard = [];
 
 // Initialize
 function init() {
-  // Check if voter token is in localStorage
   voterToken = localStorage.getItem(STORAGE_KEY);
-  // Ensure we always have a token before connecting (server requires it)
-  if (!voterToken) {
+  if (voterToken) {
+    isReturningUser = true;
+  } else {
     voterToken = generateId("voter");
     localStorage.setItem(STORAGE_KEY, voterToken);
   }
@@ -99,6 +100,13 @@ function handleMessage(message) {
         ) {
           audienceTimer.start(message.game.phase_deadline, message.server_now);
         }
+      }
+      // Auto-join for returning users (skip welcome screen on refresh)
+      if (
+        isReturningUser &&
+        document.getElementById("welcomeScreen").classList.contains("active")
+      ) {
+        joinAudience();
       }
       break;
 
