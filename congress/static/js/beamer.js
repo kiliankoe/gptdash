@@ -1083,7 +1083,7 @@ function handleTriviaResult(msg) {
     question: msg.question,
     image_url: msg.image_url,
     choices: msg.choices,
-    correct_index: msg.correct_index,
+    correct_indices: msg.correct_indices,
     vote_counts: msg.vote_counts,
     total_votes: msg.total_votes,
   };
@@ -1180,7 +1180,7 @@ function showTriviaResult() {
   // Update choices with results (dynamic count)
   choicesEl.innerHTML = result.choices
     .map((choice, idx) => {
-      const isCorrect = idx === result.correct_index;
+      const isCorrect = result.correct_indices.includes(idx);
       const voteCount = result.vote_counts[idx] || 0;
       const percent = (voteCount / maxVotes) * 100;
       const content = choice.image_url

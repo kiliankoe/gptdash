@@ -703,18 +703,6 @@ pub async fn handle_add_trivia_question(
         });
     }
 
-    // Validate exactly one choice is marked as correct
-    let correct_count = choices.iter().filter(|c| c.is_correct).count();
-    if correct_count != 1 {
-        return Some(ServerMessage::Error {
-            code: "INVALID_TRIVIA_QUESTION".to_string(),
-            msg: format!(
-                "Exactly one choice must be marked as correct, found {}",
-                correct_count
-            ),
-        });
-    }
-
     // Convert protocol choices to state choices
     let state_choices: Vec<crate::state::trivia::TriviaChoiceInput> = choices
         .into_iter()
@@ -817,7 +805,7 @@ pub async fn handle_resolve_trivia(state: &Arc<AppState>) -> Option<ServerMessag
                 question: result.question,
                 image_url: result.image_url,
                 choices,
-                correct_index: result.correct_index,
+                correct_indices: result.correct_indices,
                 vote_counts: result.vote_counts,
                 total_votes: result.total_votes,
             };

@@ -843,7 +843,7 @@ function renderTriviaChoices() {
     html += `
       <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 6px;" data-choice-index="${i}">
         <div style="display: flex; gap: 10px; align-items: center;">
-          <input type="radio" name="triviaCorrect" value="${i}" id="triviaCorrect${i}" ${i === 0 ? "checked" : ""} style="width: 18px; height: 18px;">
+          <input type="checkbox" id="triviaCorrect${i}" style="width: 18px; height: 18px;">
           <label for="triviaCorrect${i}" style="font-weight: bold; min-width: 20px;">${TRIVIA_CHOICE_LABELS[i]}:</label>
           <button type="button" onclick="toggleTriviaChoiceMode(${i})" style="padding: 4px 8px; font-size: 0.85em; background: ${mode === "text" ? "#228be6" : "#40c057"};">
             ${mode === "text" ? "Text" : "Bild"}
@@ -918,8 +918,7 @@ function addTriviaQuestion() {
   for (let i = 0; i < triviaChoiceCount; i++) {
     const mode = triviaChoiceModes[i] || "text";
     const isCorrect =
-      document.querySelector(`input[name="triviaCorrect"]:checked`)?.value ===
-      String(i);
+      document.getElementById(`triviaCorrect${i}`)?.checked || false;
 
     if (mode === "text") {
       const choiceText = document
@@ -968,7 +967,6 @@ function addTriviaQuestion() {
   triviaChoiceModes[2] = "text";
   triviaChoiceModes[3] = "text";
   renderTriviaChoices();
-  document.getElementById("triviaCorrect0").checked = true;
 
   showAlert("Trivia-Frage hinzugefügt", "success");
 }

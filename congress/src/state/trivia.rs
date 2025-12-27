@@ -30,7 +30,7 @@ pub struct TriviaResultData {
     pub question: String,
     pub image_url: Option<String>,
     pub choices: Vec<TriviaChoiceData>,
-    pub correct_index: usize,
+    pub correct_indices: Vec<usize>,
     pub vote_counts: Vec<u32>,
     pub total_votes: u32,
 }
@@ -94,12 +94,6 @@ impl AppState {
                     MAX_TRIVIA_CHOICE_LENGTH
                 ));
             }
-        }
-
-        // Validate exactly one correct answer
-        let correct_count = choices.iter().filter(|c| c.is_correct).count();
-        if correct_count != 1 {
-            return Err("Trivia question must have exactly one correct answer".to_string());
         }
 
         let now = chrono::Utc::now().to_rfc3339();
@@ -227,12 +221,14 @@ impl AppState {
         let active_id = self.active_trivia.read().await.clone()?;
         let question = self.get_trivia_question(&active_id).await?;
 
-        // Find correct answer index
-        let correct_index = question
+        // Find all correct answer indices
+        let correct_indices: Vec<usize> = question
             .choices
             .iter()
-            .position(|c| c.is_correct)
-            .unwrap_or(0);
+            .enumerate()
+            .filter(|(_, c)| c.is_correct)
+            .map(|(i, _)| i)
+            .collect();
 
         // Get vote counts
         let vote_counts = self
@@ -254,9 +250,9 @@ impl AppState {
         *self.active_trivia.write().await = None;
 
         tracing::info!(
-            "Resolved trivia question: {} (correct: {}, votes: {})",
+            "Resolved trivia question: {} (correct: {:?}, votes: {})",
             active_id,
-            correct_index,
+            correct_indices,
             total_votes
         );
 
@@ -265,7 +261,7 @@ impl AppState {
             question: question.question,
             image_url: question.image_url.clone(),
             choices,
-            correct_index,
+            correct_indices,
             vote_counts,
             total_votes,
         })
@@ -753,7 +749,7 @@ mod tests {
 
         assert_eq!(result.question_id, question.id);
         assert_eq!(result.question, "Test?");
-        assert_eq!(result.correct_index, 1);
+        assert_eq!(result.correct_indices, vec![1]);
         assert_eq!(result.vote_counts, vec![1, 2, 0]);
         assert_eq!(result.total_votes, 3);
 
@@ -1015,7 +1011,7 @@ mod tests {
         let result = state.resolve_trivia().await.unwrap();
         assert_eq!(result.choices.len(), 4);
         assert_eq!(result.vote_counts.len(), 4);
-        assert_eq!(result.correct_index, 3);
+        assert_eq!(result.correct_indices, vec![3]);
         assert_eq!(result.total_votes, 4);
     }
 }

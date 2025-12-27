@@ -412,7 +412,7 @@ pub enum ServerMessage {
         #[serde(skip_serializing_if = "Option::is_none")]
         image_url: Option<String>,
         choices: Vec<TriviaChoiceOutput>,
-        correct_index: usize,
+        correct_indices: Vec<usize>,
         vote_counts: Vec<u32>,
         total_votes: u32,
     },

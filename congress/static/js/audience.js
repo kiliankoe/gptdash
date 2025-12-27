@@ -851,7 +851,7 @@ function handleTriviaResult(message) {
     question: message.question,
     image_url: message.image_url,
     choices: message.choices,
-    correct_index: message.correct_index,
+    correct_indices: message.correct_indices,
     vote_counts: message.vote_counts,
     total_votes: message.total_votes,
   };
@@ -1006,7 +1006,7 @@ function showTriviaResultScreen() {
   container.innerHTML = "";
 
   triviaResult.choices.forEach((choice, idx) => {
-    const isCorrect = idx === triviaResult.correct_index;
+    const isCorrect = triviaResult.correct_indices.includes(idx);
     const voteCount = triviaResult.vote_counts[idx] || 0;
 
     // For image choices, show only the label; for text choices, show the text
