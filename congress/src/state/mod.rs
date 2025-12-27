@@ -776,20 +776,22 @@ impl AppState {
             }
         }
 
-        // Fuzzy deduplication: check for similar prompts (only for text prompts)
-        if let Some(ref prompt_text) = text {
-            if let Some(similar_id) = self.find_similar_prompt(prompt_text).await {
-                // Found similar prompt - add submitter to existing prompt instead
-                let mut pool = self.prompt_pool.write().await;
-                if let Some(existing) = pool.get_mut(&similar_id) {
-                    // Add submitter if not already in list
-                    if let Some(ref voter_id) = submitter_id {
-                        if !existing.submitter_ids.contains(voter_id) {
-                            existing.submitter_ids.push(voter_id.clone());
+        // Fuzzy deduplication: check for similar prompts (only for text prompts, skip for host)
+        if source != PromptSource::Host {
+            if let Some(ref prompt_text) = text {
+                if let Some(similar_id) = self.find_similar_prompt(prompt_text).await {
+                    // Found similar prompt - add submitter to existing prompt instead
+                    let mut pool = self.prompt_pool.write().await;
+                    if let Some(existing) = pool.get_mut(&similar_id) {
+                        // Add submitter if not already in list
+                        if let Some(ref voter_id) = submitter_id {
+                            if !existing.submitter_ids.contains(voter_id) {
+                                existing.submitter_ids.push(voter_id.clone());
+                            }
                         }
+                        existing.submission_count += 1;
+                        return Ok(existing.clone());
                     }
-                    existing.submission_count += 1;
-                    return Ok(existing.clone());
                 }
             }
         }
