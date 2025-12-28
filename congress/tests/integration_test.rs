@@ -3532,3 +3532,84 @@ async fn test_audience_prompt_fuzzy_deduplication() {
 
     println!("✅ Audience prompt fuzzy deduplication test passed!");
 }
+
+// ============================================================================
+// Game Reset Audience Preservation Tests
+// ============================================================================
+
+/// Test that audience members are preserved after game reset, even with cleanup
+///
+/// Bug scenario: cleanup_stale_audience() removes audience members after reset because:
+/// 1. reset_game() clears scores → all audience have 0 points
+/// 2. If their last_seen is stale, cleanup removes them
+/// 3. Their subsequent votes get shadow-rejected as UnknownVoter
+#[tokio::test]
+#[serial]
+async fn test_game_reset_preserves_audience_members() {
+    std::env::set_var("SKIP_VOTE_ANTI_AUTOMATION", "1");
+
+    let state = Arc::new(AppState::new());
+    state.create_game().await;
+
+    // Create audience member
+    let member = state.get_or_create_audience_member("test_voter").await;
+    let original_name = member.display_name.clone();
+
+    // Verify audience member exists
+    assert!(
+        state
+            .audience_members
+            .read()
+            .await
+            .contains_key("test_voter"),
+        "Audience member should exist after creation"
+    );
+
+    // Simulate time passing BEFORE reset (audience connected a while ago)
+    {
+        let mut members = state.audience_members.write().await;
+        if let Some(m) = members.get_mut("test_voter") {
+            m.last_seen = Some("2020-01-01T00:00:00Z".to_string());
+        }
+    }
+
+    // Reset game (this clears scores, making audience eligible for cleanup)
+    // FIX: reset_game() should refresh last_seen for all audience members
+    state.reset_game().await;
+
+    // Verify audience member is still present after reset
+    assert!(
+        state
+            .audience_members
+            .read()
+            .await
+            .contains_key("test_voter"),
+        "Audience member should be preserved immediately after reset"
+    );
+
+    // Run cleanup with TTL=1 minute
+    // Before fix: audience would be removed (0 points + old last_seen from 2020)
+    // After fix: audience preserved (reset_game refreshed last_seen to now)
+    let removed_count = state.cleanup_stale_audience(1).await;
+
+    // Verify audience member is STILL present (this assertion fails before fix)
+    let member_exists = state
+        .audience_members
+        .read()
+        .await
+        .contains_key("test_voter");
+    assert!(
+        member_exists,
+        "Audience member should be preserved after game reset + cleanup (removed {} members)",
+        removed_count
+    );
+
+    // Verify they can reconnect and get the same display name
+    let reconnected_member = state.get_or_create_audience_member("test_voter").await;
+    assert_eq!(
+        reconnected_member.display_name, original_name,
+        "Audience member should retain their display name after reset"
+    );
+
+    println!("✅ Game reset preserves audience members test passed!");
+}

@@ -460,6 +460,23 @@ impl AppState {
         tracing::info!("Cleared {} audience members", count);
     }
 
+    /// Refresh last_seen for all audience members to prevent stale cleanup
+    ///
+    /// Called during game reset to ensure audience members aren't cleaned up
+    /// just because their scores were cleared (which makes them eligible for
+    /// stale cleanup if their last_seen is old).
+    pub async fn refresh_all_audience_last_seen(&self) {
+        let now = chrono::Utc::now().to_rfc3339();
+        let mut members = self.audience_members.write().await;
+        let count = members.len();
+        for member in members.values_mut() {
+            member.last_seen = Some(now.clone());
+        }
+        if count > 0 {
+            tracing::debug!("Refreshed last_seen for {} audience members", count);
+        }
+    }
+
     /// Cleanup stale audience members who:
     /// - Have 0 points AND
     /// - Haven't connected in the given TTL duration

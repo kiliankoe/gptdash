@@ -544,6 +544,11 @@ impl AppState {
         // Clear trivia questions (treated like prompt_pool - persists across rounds but cleared on full reset)
         self.clear_trivia_questions().await;
 
+        // Refresh audience last_seen to prevent stale cleanup after score reset
+        // (Without this, audience members would be removed by cleanup_stale_audience
+        // because they now have 0 points and may have old last_seen timestamps)
+        self.refresh_all_audience_last_seen().await;
+
         // Reset game to initial state
         let mut game = self.game.write().await;
         if let Some(ref mut g) = *game {
