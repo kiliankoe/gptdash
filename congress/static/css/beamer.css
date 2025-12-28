@@ -464,11 +464,7 @@ body {
 
 .prompt-vote-bar-fill {
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    var(--color-primary),
-    var(--color-secondary)
-  );
+  background: var(--color-primary);
   border-radius: 20px;
   transition: width 0.3s ease-out;
   min-width: 0;
