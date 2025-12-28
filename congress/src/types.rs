@@ -44,9 +44,9 @@ pub struct GameConfig {
 impl Default for GameConfig {
     fn default() -> Self {
         Self {
-            writing_seconds: 60,
+            writing_seconds: 120,
             voting_seconds: 30,
-            max_answer_chars: 500,
+            max_answer_chars: 1000,
         }
     }
 }
