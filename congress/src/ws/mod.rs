@@ -218,7 +218,8 @@ pub async fn ws_handler(
         params.token
     );
 
-    ws.on_upgrade(move |socket| handle_socket(socket, params, state))
+    ws.max_message_size(MAX_WS_MESSAGE_BYTES)
+        .on_upgrade(move |socket| handle_socket(socket, params, state))
 }
 
 /// Handle individual WebSocket connection
@@ -773,17 +774,6 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
             ws_msg = receiver.next() => {
                 match ws_msg {
                     Some(Ok(Message::Text(text))) => {
-                        if text.len() > MAX_WS_MESSAGE_BYTES {
-                            let error = ServerMessage::Error {
-                                code: "MESSAGE_TOO_LARGE".to_string(),
-                                msg: "Nachricht zu groß".to_string(),
-                            };
-                            if let Ok(json) = serde_json::to_string(&error) {
-                                let _ = sender.send(Message::Text(json.into())).await;
-                            }
-                            break;
-                        }
-
                         // Rate limit non-trusted roles (skip for host/beamer)
                         if role != Role::Host
                             && role != Role::Beamer
