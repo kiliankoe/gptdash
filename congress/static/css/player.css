@@ -269,3 +269,74 @@ button:hover {
     padding-bottom: max(20px, env(safe-area-inset-bottom));
   }
 }
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #0f172a;
+  }
+
+  .card {
+    background: #1e293b;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  }
+
+  input,
+  textarea {
+    background: #1e293b;
+    border-color: #334155;
+  }
+
+  input:focus,
+  textarea:focus {
+    background: #334155;
+  }
+
+  .prompt-display {
+    background: #1e293b;
+    border-color: #334155;
+  }
+
+  .comparison-box {
+    background: #1e293b;
+    border-color: #334155;
+  }
+
+  .comparison-box.original {
+    border-color: rgba(239, 68, 68, 0.4);
+  }
+
+  .comparison-box.corrected {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.4);
+  }
+
+  .connection-status {
+    background: rgba(30, 41, 59, 0.9);
+  }
+
+  .status-indicator {
+    background: #1e293b;
+  }
+
+  button:disabled {
+    background: #334155;
+    color: #64748b;
+  }
+
+  .button-group button.secondary {
+    background: #334155;
+  }
+
+  .button-group button.secondary:hover {
+    background: #475569;
+  }
+
+  .text-button {
+    color: #94a3b8;
+  }
+
+  .text-button:hover {
+    color: #e2e8f0;
+  }
+}
