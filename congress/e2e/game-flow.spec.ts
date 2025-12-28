@@ -763,8 +763,8 @@ test.describe("Game Flow", () => {
     debugLog(`New tokens: ${newTokens.join(", ")}`);
     // Verify we got valid tokens
     expect(newTokens.length).toBe(2);
-    expect(newTokens[0]).toMatch(/^[A-Z0-9]{5}$/);
-    expect(newTokens[1]).toMatch(/^[A-Z0-9]{5}$/);
+    expect(newTokens[0]).toMatch(/^[A-Z0-9]{8}$/);
+    expect(newTokens[1]).toMatch(/^[A-Z0-9]{8}$/);
 
     // Verify new tokens were created (2 new tokens for the new game)
     expect(newTokens.length).toBe(2);

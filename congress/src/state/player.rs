@@ -5,9 +5,9 @@ use rand::Rng;
 
 /// Safe character set for short codes (excludes 0/O, 1/I/L to avoid confusion)
 const CODE_CHARS: &[u8] = b"ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-const CODE_LENGTH: usize = 5;
+const CODE_LENGTH: usize = 8;
 
-/// Generate a random short code (5 characters)
+/// Generate a random short code (8 characters)
 fn generate_short_code() -> String {
     let mut rng = rand::rng();
     (0..CODE_LENGTH)
@@ -25,7 +25,7 @@ impl AppState {
             if !players.values().any(|p| p.token == code) {
                 break code;
             }
-            // Collision - try again (extremely rare with 24M combinations)
+            // Collision - try again (extremely rare with 1T+ combinations)
         };
 
         let player = Player {
