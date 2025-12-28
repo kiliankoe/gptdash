@@ -117,6 +117,9 @@ pub struct Round {
     // Panic mode manual winners (host picks when audience voting is disabled)
     pub manual_ai_winner: Option<SubmissionId>,
     pub manual_funny_winner: Option<SubmissionId>,
+    // RESULTS phase step: 0 = answer breakdown, 1 = leaderboards
+    #[serde(default)]
+    pub results_step: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

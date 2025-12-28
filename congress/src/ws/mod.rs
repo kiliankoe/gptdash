@@ -584,6 +584,16 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
                             let _ = sender.send(Message::Text(msg.into())).await;
                         }
                     }
+
+                    // Send current results step (for breakdown vs leaderboards display)
+                    if game.phase == GamePhase::Results {
+                        let step_msg = ServerMessage::ResultsStepUpdate {
+                            step: round.results_step,
+                        };
+                        if let Ok(msg) = serde_json::to_string(&step_msg) {
+                            let _ = sender.send(Message::Text(msg.into())).await;
+                        }
+                    }
                 }
 
                 // Send scores

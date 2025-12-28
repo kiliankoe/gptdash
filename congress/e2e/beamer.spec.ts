@@ -1,12 +1,12 @@
-import { test, expect, type BrowserContext } from "@playwright/test";
+import { expect, test, type BrowserContext } from "@playwright/test";
 import {
-  type GameClients,
-  waitForConnection,
-  waitForBeamerScene,
-  resetGameState,
-  createGameClients,
   closeContexts,
+  createGameClients,
   getPlayerTokens,
+  resetGameState,
+  waitForBeamerScene,
+  waitForConnection,
+  type GameClients,
 } from "./test-utils";
 
 /**
@@ -185,10 +185,15 @@ test.describe("Beamer", () => {
     await audience[0].click("#voteButton");
     await audience[0].waitForSelector("#confirmedScreen.active");
 
-    // Transition to RESULTS
+    // Transition to RESULTS (starts at breakdown step)
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await host.click('button[data-phase="RESULTS"]');
-    await waitForBeamerScene(beamer, "sceneResults");
+    await waitForBeamerScene(beamer, "sceneResultsBreakdown");
+
+    // Advance to leaderboards step where AI reveal is shown
+    await host.click('.sidebar-item:has-text("bersicht")');
+    await host.click("#overviewPrimaryActionBtn"); // "Leaderboards zeigen"
+    await waitForBeamerScene(beamer, "sceneResultsLeaderboards");
     // Wait for scores message to arrive with ai_submission_id
     await beamer.waitForTimeout(500);
 
@@ -197,7 +202,7 @@ test.describe("Beamer", () => {
     await expect(aiLabel).toHaveText("KI richtig erkannt!");
   });
 
-  test("results show 'Am erfolgreichsten als KI überzeugt' when player fools audience", async () => {
+  test("results show 'Beste KI-Imitation' when player fools audience", async () => {
     test.setTimeout(60000);
 
     const { host, beamer, players, audience } = clients;
@@ -299,17 +304,22 @@ test.describe("Beamer", () => {
     await audience[0].click("#voteButton");
     await audience[0].waitForSelector("#confirmedScreen.active");
 
-    // Transition to RESULTS
+    // Transition to RESULTS (starts at breakdown step)
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await host.click('button[data-phase="RESULTS"]');
-    await waitForBeamerScene(beamer, "sceneResults");
+    await waitForBeamerScene(beamer, "sceneResultsBreakdown");
+
+    // Advance to leaderboards step where AI reveal is shown
+    await host.click('.sidebar-item:has-text("bersicht")');
+    await host.click("#overviewPrimaryActionBtn"); // "Leaderboards zeigen"
+    await waitForBeamerScene(beamer, "sceneResultsLeaderboards");
     // Wait for scores message to arrive with ai_submission_id
     await beamer.waitForTimeout(500);
 
     // Since audience voted for player's answer as AI (but it's not the real AI),
-    // label should show "Am erfolgreichsten als KI überzeugt"
+    // label should show "Beste KI-Imitation"
     const aiLabel = beamer.locator("#aiRevealLabel");
-    await expect(aiLabel).toHaveText("Am erfolgreichsten als KI überzeugt");
+    await expect(aiLabel).toHaveText("Beste KI-Imitation");
   });
 
   test("results show 'Die KI war am lustigsten?!' when AI wins funny vote", async () => {
@@ -411,10 +421,15 @@ test.describe("Beamer", () => {
     await audience[0].click("#voteButton");
     await audience[0].waitForSelector("#confirmedScreen.active");
 
-    // Transition to RESULTS
+    // Transition to RESULTS (starts at breakdown step)
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await host.click('button[data-phase="RESULTS"]');
-    await waitForBeamerScene(beamer, "sceneResults");
+    await waitForBeamerScene(beamer, "sceneResultsBreakdown");
+
+    // Advance to leaderboards step where AI reveal is shown
+    await host.click('.sidebar-item:has-text("bersicht")');
+    await host.click("#overviewPrimaryActionBtn"); // "Leaderboards zeigen"
+    await waitForBeamerScene(beamer, "sceneResultsLeaderboards");
     // Wait for scores message to arrive with ai_submission_id
     await beamer.waitForTimeout(500);
 
@@ -522,10 +537,15 @@ test.describe("Beamer", () => {
     await audience[0].click("#voteButton");
     await audience[0].waitForSelector("#confirmedScreen.active");
 
-    // Transition to RESULTS
+    // Transition to RESULTS (starts at breakdown step)
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
     await host.click('button[data-phase="RESULTS"]');
-    await waitForBeamerScene(beamer, "sceneResults");
+    await waitForBeamerScene(beamer, "sceneResultsBreakdown");
+
+    // Advance to leaderboards step where AI reveal is shown
+    await host.click('.sidebar-item:has-text("bersicht")');
+    await host.click("#overviewPrimaryActionBtn"); // "Leaderboards zeigen"
+    await waitForBeamerScene(beamer, "sceneResultsLeaderboards");
     // Wait for scores message to arrive with ai_submission_id
     await beamer.waitForTimeout(500);
 

@@ -4,12 +4,12 @@
  */
 
 import {
-  WSConnection,
   CountdownTimer,
   QRCodeManager,
+  WSConnection,
   escapeHtml,
-  updateConnectionStatus,
   renderPromptDisplay,
+  updateConnectionStatus,
 } from "./common.js";
 
 // Game state
@@ -33,6 +33,8 @@ const gameState = {
   manualFunnyWinner: null,
   // Panic mode state
   panicMode: false,
+  // RESULTS phase step (0 = breakdown, 1 = leaderboards)
+  resultsStep: 0,
 };
 
 // Connections and utilities
@@ -148,6 +150,10 @@ function handleMessage(msg) {
     case "vote_labels_revealed":
       handleVoteLabelsRevealed();
       break;
+    // Results step navigation
+    case "results_step_update":
+      handleResultsStepUpdate(msg);
+      break;
     case "error":
       console.error("[Beamer] Error:", msg.code, msg.msg);
       break;
@@ -251,6 +257,7 @@ function resetRoundUiState() {
   gameState.promptVoteCounts = {};
   gameState.manualAiWinner = null;
   gameState.manualFunnyWinner = null;
+  gameState.resultsStep = 0;
   updateSubmissionCounter();
   updateRevealIndicator();
   clearPromptDisplay();
@@ -412,13 +419,19 @@ function handleDeadlineUpdate(msg) {
 // ========================
 
 function phaseToScene(phase) {
+  // RESULTS phase has two steps: breakdown (0) and leaderboards (1)
+  if (phase === "RESULTS") {
+    return gameState.resultsStep === 0
+      ? "sceneResultsBreakdown"
+      : "sceneResultsLeaderboards";
+  }
+
   const mapping = {
     LOBBY: "sceneLobby",
     PROMPT_SELECTION: "scenePromptSelection",
     WRITING: "sceneWriting",
     REVEAL: "sceneReveal",
     VOTING: "sceneVoting",
-    RESULTS: "sceneResults",
     PODIUM: "scenePodium",
     INTERMISSION: "sceneIntermission",
     ENDED: "sceneEnded",
@@ -445,7 +458,9 @@ function showScene(sceneId) {
     updateWritingScene();
   } else if (sceneId === "sceneReveal") {
     updateRevealScene();
-  } else if (sceneId === "sceneResults") {
+  } else if (sceneId === "sceneResultsBreakdown") {
+    renderBreakdownGrid();
+  } else if (sceneId === "sceneResultsLeaderboards") {
     updateResultReveals();
   } else if (sceneId === "scenePodium") {
     triggerPodiumConfetti();
@@ -887,7 +902,7 @@ function updateResultReveals() {
     if (aiDisplayId === actualAiId) {
       aiRevealLabel.textContent = "KI richtig erkannt!";
     } else {
-      aiRevealLabel.textContent = "Am erfolgreichsten als KI überzeugt";
+      aiRevealLabel.textContent = "Beste KI-Imitation";
     }
   }
 
@@ -1058,6 +1073,68 @@ function handleManualWinners(msg) {
   if (gameState.phase === "RESULTS") {
     updateResultReveals();
   }
+}
+
+// ========================
+// Results Step Navigation
+// ========================
+
+function handleResultsStepUpdate(msg) {
+  console.log("[Beamer] Results step update:", msg.step);
+  gameState.resultsStep = msg.step;
+
+  if (gameState.phase === "RESULTS") {
+    showScene(phaseToScene("RESULTS"));
+  }
+}
+
+/**
+ * Render the breakdown grid showing all answers with their vote counts.
+ * AI submission is NOT revealed - all cards look identical.
+ */
+function renderBreakdownGrid() {
+  const grid = document.getElementById("breakdownGrid");
+  if (!grid) return;
+
+  const submissions = gameState.submissions;
+  const aiCounts = gameState.voteCounts.ai;
+  const funnyCounts = gameState.voteCounts.funny;
+
+  if (submissions.length === 0) {
+    grid.innerHTML =
+      '<div class="breakdown-card"><div class="breakdown-answer">Keine Antworten vorhanden</div></div>';
+    return;
+  }
+
+  // Sort by total votes descending for drama
+  const sorted = [...submissions].sort((a, b) => {
+    const aTotal = (aiCounts[a.id] || 0) + (funnyCounts[a.id] || 0);
+    const bTotal = (aiCounts[b.id] || 0) + (funnyCounts[b.id] || 0);
+    return bTotal - aTotal;
+  });
+
+  grid.innerHTML = sorted
+    .map((sub, idx) => {
+      const aiVotes = aiCounts[sub.id] || 0;
+      const funnyVotes = funnyCounts[sub.id] || 0;
+
+      return `
+        <div class="breakdown-card" style="animation-delay: ${idx * 0.1}s">
+          <div class="breakdown-answer">${escapeHtml(sub.display_text)}</div>
+          <div class="breakdown-votes">
+            <div class="breakdown-vote-item">
+              <span class="breakdown-vote-count ai">${aiVotes}</span>
+              <span class="breakdown-vote-label">KI-Verdacht</span>
+            </div>
+            <div class="breakdown-vote-item">
+              <span class="breakdown-vote-label">Lustig</span>
+              <span class="breakdown-vote-count funny">${funnyVotes}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
 }
 
 // ========================

@@ -90,7 +90,45 @@ export function updateOverviewFlow() {
   const canStartPromptSelection =
     queuedCount > 0 && canTransitionTo("PROMPT_SELECTION");
 
-  if (phase === "LOBBY" || phase === "RESULTS" || phase === "PODIUM") {
+  // Handle RESULTS phase with two steps
+  if (phase === "RESULTS") {
+    const resultsStep = gameState.resultsStep || 0;
+
+    if (resultsStep === 0) {
+      // Step 0: Breakdown - show "Leaderboards zeigen" button
+      setOverviewActions({
+        primary: {
+          label: " Leaderboards zeigen",
+          enabled: true,
+          action: () => callbacks.resultsNextStep?.(),
+        },
+        secondary: {
+          label: null,
+          enabled: false,
+          action: null,
+        },
+        hint: "Zeigt alle Antworten mit Stimmverteilung. Weiter zu Leaderboards.",
+      });
+    } else {
+      // Step 1: Leaderboards - show "Podium" button with back option
+      setOverviewActions({
+        primary: {
+          label: " Podium",
+          enabled: canTransitionTo("PODIUM"),
+          action: () => callbacks.transitionPhase?.("PODIUM"),
+        },
+        secondary: {
+          label: " Zurck zu Stimmen",
+          enabled: true,
+          action: () => callbacks.resultsPrevStep?.(),
+        },
+        hint: "KI und lustigste Antwort aufgelst. Weiter zum Podium.",
+      });
+    }
+    return;
+  }
+
+  if (phase === "LOBBY" || phase === "PODIUM") {
     if (playerCount === 0) {
       setOverviewActions({
         primary: {

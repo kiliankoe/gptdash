@@ -382,6 +382,15 @@ impl AppState {
                         self.broadcast_submissions(rid).await;
                     }
                 } else if effective_phase == GamePhase::Results {
+                    // Reset results step to 0 (breakdown) when entering RESULTS phase
+                    if let Some(rid) = &round_id {
+                        let mut rounds = self.rounds.write().await;
+                        if let Some(round) = rounds.get_mut(rid) {
+                            round.results_step = 0;
+                        }
+                        drop(rounds);
+                    }
+
                     // Compute scores when entering RESULTS phase (idempotent)
                     if let Some(rid) = round_id {
                         // Check if already scored
@@ -763,5 +772,63 @@ impl AppState {
         } else {
             Err("Round not found".to_string())
         }
+    }
+
+    /// Advance to next step in RESULTS phase (0 = breakdown, 1 = leaderboards)
+    pub async fn results_next_step(&self) -> Result<u8, String> {
+        let game = self.get_game().await.ok_or("No active game")?;
+        if game.phase != GamePhase::Results {
+            return Err("Can only advance results step during RESULTS phase".to_string());
+        }
+
+        let round_id = game.current_round_id.ok_or("No active round")?;
+        let mut rounds = self.rounds.write().await;
+        let round = rounds.get_mut(&round_id).ok_or("Current round not found")?;
+
+        if round.results_step >= 1 {
+            return Err("Already at final results step".to_string());
+        }
+
+        round.results_step = 1;
+        let step = round.results_step;
+        drop(rounds);
+
+        // Broadcast step update to all clients
+        self.broadcast_to_all(crate::protocol::ServerMessage::ResultsStepUpdate { step });
+
+        Ok(step)
+    }
+
+    /// Go back to previous step in RESULTS phase
+    pub async fn results_prev_step(&self) -> Result<u8, String> {
+        let game = self.get_game().await.ok_or("No active game")?;
+        if game.phase != GamePhase::Results {
+            return Err("Can only change results step during RESULTS phase".to_string());
+        }
+
+        let round_id = game.current_round_id.ok_or("No active round")?;
+        let mut rounds = self.rounds.write().await;
+        let round = rounds.get_mut(&round_id).ok_or("Current round not found")?;
+
+        if round.results_step == 0 {
+            return Err("Already at first results step".to_string());
+        }
+
+        round.results_step = 0;
+        let step = round.results_step;
+        drop(rounds);
+
+        // Broadcast step update to all clients
+        self.broadcast_to_all(crate::protocol::ServerMessage::ResultsStepUpdate { step });
+
+        Ok(step)
+    }
+
+    /// Get current results step for the active round
+    pub async fn get_results_step(&self) -> Option<u8> {
+        let game = self.get_game().await?;
+        let round_id = game.current_round_id?;
+        let rounds = self.rounds.read().await;
+        rounds.get(&round_id).map(|r| r.results_step)
     }
 }

@@ -153,9 +153,19 @@
         </section>
 
         <!-- ========================
-             SCENE: RESULTS
+             SCENE: RESULTS - STEP 0: BREAKDOWN (all answers with vote counts)
              ======================== -->
-        <section class="scene scene-results" id="sceneResults">
+        <section class="scene scene-results-breakdown" id="sceneResultsBreakdown">
+            <h2 class="headline headline-lg text-center">Stimmenverteilung</h2>
+            <div class="breakdown-grid" id="breakdownGrid">
+                <!-- Answer breakdown cards will be generated dynamically -->
+            </div>
+        </section>
+
+        <!-- ========================
+             SCENE: RESULTS - STEP 1: LEADERBOARDS (AI reveal + winners + scores)
+             ======================== -->
+        <section class="scene scene-results-leaderboards" id="sceneResultsLeaderboards">
             <h2 class="headline headline-lg text-center">Ergebnisse</h2>
             <div class="results-grid">
                 <!-- AI Reveal -->

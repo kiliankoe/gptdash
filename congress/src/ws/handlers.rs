@@ -302,6 +302,16 @@ pub async fn handle_message(
             check_host!(role, "edit audience scores");
             host::handle_edit_audience_score(state, voter_id, ai_detect_points).await
         }
+
+        ClientMessage::HostResultsNextStep => {
+            check_host!(role, "advance results step");
+            host::handle_results_next_step(state).await
+        }
+
+        ClientMessage::HostResultsPrevStep => {
+            check_host!(role, "go back in results");
+            host::handle_results_prev_step(state).await
+        }
     }
 }
 

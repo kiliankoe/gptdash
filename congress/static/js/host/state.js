@@ -40,6 +40,8 @@ export const gameState = {
   activeTrivia: null, // Currently presented trivia question (full object)
   activeTriviaVoteCount: 0, // Vote count for active trivia
   triviaResultShowing: false, // True when trivia result is being displayed
+  // RESULTS phase step (0 = breakdown, 1 = leaderboards)
+  resultsStep: 0,
 };
 
 // Prompt section collapse state (persisted in localStorage)
@@ -64,6 +66,7 @@ export function resetRoundUiState(callbacks) {
   gameState.revealOrder = [];
   gameState.selectedAiSubmissionId = null;
   gameState.aiGenerationStatus = "idle";
+  gameState.resultsStep = 0;
 
   // Call update callbacks if provided
   if (callbacks) {

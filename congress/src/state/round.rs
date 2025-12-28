@@ -23,6 +23,7 @@ impl AppState {
             scored_at: None,
             manual_ai_winner: None,
             manual_funny_winner: None,
+            results_step: 0,
         };
 
         self.rounds

@@ -940,3 +940,29 @@ pub async fn handle_edit_audience_score(
         }),
     }
 }
+
+// ========== Results Step Navigation ==========
+
+pub async fn handle_results_next_step(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host advancing results step");
+
+    match state.results_next_step().await {
+        Ok(step) => Some(ServerMessage::ResultsStepUpdate { step }),
+        Err(e) => Some(ServerMessage::Error {
+            code: "RESULTS_NEXT_STEP_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}
+
+pub async fn handle_results_prev_step(state: &Arc<AppState>) -> Option<ServerMessage> {
+    tracing::info!("Host going back in results step");
+
+    match state.results_prev_step().await {
+        Ok(step) => Some(ServerMessage::ResultsStepUpdate { step }),
+        Err(e) => Some(ServerMessage::Error {
+            code: "RESULTS_PREV_STEP_FAILED".to_string(),
+            msg: e,
+        }),
+    }
+}

@@ -356,7 +356,7 @@ test.describe("Game Flow", () => {
     await expect(host.locator("#overviewPhase")).toHaveText("RESULTS", {
       timeout: 5000,
     });
-    await waitForBeamerScene(beamer, "sceneResults");
+    await waitForBeamerScene(beamer, "sceneResultsBreakdown");
 
     // Audience should see results screen
     await audience[0].waitForSelector("#resultsScreen.active", {
@@ -365,6 +365,15 @@ test.describe("Game Flow", () => {
     await audience[1].waitForSelector("#resultsScreen.active", {
       timeout: 5000,
     });
+
+    // Verify breakdown view shows vote counts
+    const breakdownGrid = beamer.locator("#breakdownGrid");
+    await expect(breakdownGrid).toBeVisible();
+
+    // Advance to leaderboards step
+    await host.click('.sidebar-item:has-text("bersicht")');
+    await host.click("#overviewPrimaryActionBtn"); // "Leaderboards zeigen"
+    await waitForBeamerScene(beamer, "sceneResultsLeaderboards");
 
     // ============================================
     // STEP 13: Verify scores are displayed
@@ -390,7 +399,8 @@ test.describe("Game Flow", () => {
     debugLog("Step 14: Transitioning to podium and checking winner screens...");
 
     await host.click('.sidebar-item:has-text("Spiel-Steuerung")');
-    await host.click('button[data-phase="PODIUM"]');
+    await host.click('.sidebar-item:has-text("bersicht")');
+    await host.click("#overviewPrimaryActionBtn"); // "Podium"
 
     await expect(host.locator("#overviewPhase")).toHaveText("PODIUM", {
       timeout: 5000,

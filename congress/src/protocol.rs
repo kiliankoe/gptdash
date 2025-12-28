@@ -193,6 +193,10 @@ pub enum ClientMessage {
         voter_id: VoterId,
         ai_detect_points: u32,
     },
+    /// Advance to next step in RESULTS phase (breakdown -> leaderboards)
+    HostResultsNextStep,
+    /// Go back to previous step in RESULTS phase (leaderboards -> breakdown)
+    HostResultsPrevStep,
 }
 
 /// Input for creating a trivia question choice (from client)
@@ -428,6 +432,10 @@ pub enum ServerMessage {
     ManualWinners {
         ai_winner_id: Option<SubmissionId>,
         funny_winner_id: Option<SubmissionId>,
+    },
+    /// Broadcast when host navigates between RESULTS steps (0 = breakdown, 1 = leaderboards)
+    ResultsStepUpdate {
+        step: u8,
     },
     /// Broadcast to beamer to reveal vote labels during VOTING phase
     VoteLabelsRevealed,

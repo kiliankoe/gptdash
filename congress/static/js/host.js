@@ -108,6 +108,8 @@ function init() {
     closeWriting,
     extendTimer,
     revealNext,
+    resultsNextStep,
+    resultsPrevStep,
   });
 
   // Initialize timer
@@ -386,6 +388,11 @@ function handleMessage(message) {
       updateTriviaUI();
       break;
 
+    case "results_step_update":
+      gameState.resultsStep = message.step;
+      updateOverviewFlow();
+      break;
+
     default:
       console.log("Unhandled message type:", message.t, message);
       break;
@@ -532,6 +539,14 @@ function revealNext() {
 function revealPrev() {
   wsConn.send({ t: "host_reveal_prev" });
   log("Zur vorherigen Antwort gewechselt", "info");
+}
+
+function resultsNextStep() {
+  wsConn.send({ t: "host_results_next_step" });
+}
+
+function resultsPrevStep() {
+  wsConn.send({ t: "host_results_prev_step" });
 }
 
 function revealVoteLabels() {

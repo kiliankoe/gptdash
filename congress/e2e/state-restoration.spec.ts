@@ -877,12 +877,21 @@ test.describe("State Restoration", () => {
       // Verify phase is RESULTS
       await expect(host.locator("#overviewPhase")).toHaveText("RESULTS");
 
-      // Beamer should show results scene
-      await beamer.waitForSelector("#sceneResults.active", { timeout: 5000 });
+      // Beamer should show results breakdown scene (step 0)
+      await beamer.waitForSelector("#sceneResultsBreakdown.active", {
+        timeout: 5000,
+      });
 
       // Verify that the backup file still has the scores (server loaded them correctly)
       const restoredBackup = fs.readFileSync(backupPath, "utf-8");
       expect(restoredBackup).toContain("ScorePlayer");
+
+      // Advance to leaderboards step to verify leaderboard display
+      await host.click('.sidebar-item:has-text("bersicht")');
+      await host.click("#overviewPrimaryActionBtn"); // "Leaderboards zeigen"
+      await beamer.waitForSelector("#sceneResultsLeaderboards.active", {
+        timeout: 5000,
+      });
 
       // The beamer receives scores on reconnect in RESULTS phase
       // Wait for leaderboard to appear on beamer
