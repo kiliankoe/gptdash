@@ -175,6 +175,11 @@ function handleWelcome(msg) {
 
     // Start timer if deadline exists
     if (msg.game.phase_deadline) {
+      if (msg.game.phase === "WRITING") {
+        timer.setElement("writingTimer");
+      } else if (msg.game.phase === "VOTING") {
+        timer.setElement("votingTimer");
+      }
       timer.start(msg.game.phase_deadline, msg.server_now);
     }
 

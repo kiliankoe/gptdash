@@ -465,6 +465,14 @@ async fn handle_socket(socket: WebSocket, params: WsQuery, state: Arc<AppState>)
             GamePhase::Voting => {
                 // Send submissions list and current vote counts
                 if let Some(round) = state.get_current_round().await {
+                    // Send current prompt for display
+                    if let Some(prompt) = round.selected_prompt.clone() {
+                        let prompt_msg = ServerMessage::PromptSelected { prompt };
+                        if let Ok(msg) = serde_json::to_string(&prompt_msg) {
+                            let _ = sender.send(Message::Text(msg.into())).await;
+                        }
+                    }
+
                     let submissions = state.get_submissions(&round.id).await;
                     let submissions_msg = ServerMessage::Submissions {
                         list: submissions.iter().map(SubmissionInfo::from).collect(),
