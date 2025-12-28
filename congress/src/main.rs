@@ -1,4 +1,5 @@
 use axum::{
+    extract::DefaultBodyLimit,
     http::StatusCode,
     middleware,
     routing::{get, post},
@@ -119,7 +120,11 @@ async fn main() {
         .route("/host", get(auth::serve_host))
         .route("/beamer", get(auth::serve_beamer))
         .route("/api/state/export", get(api::export_state))
-        .route("/api/state/import", post(api::import_state))
+        .route(
+            "/api/state/import",
+            // Allow up to 100 MB for state import
+            post(api::import_state).layer(DefaultBodyLimit::max(100 * 1024 * 1024)),
+        )
         .route("/api/models", get(api::list_available_models))
         .layer(middleware::from_fn_with_state(
             auth_config.clone(),
