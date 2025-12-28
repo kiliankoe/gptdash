@@ -100,6 +100,9 @@ function handleMessage(message) {
       playerId = message.player_id;
       playerName = message.display_name;
       hasSubmitted = message.has_submitted;
+      if (!hasSubmitted) {
+        resetAnswerInput();
+      }
       // Recover prompt from state if available
       if (message.current_prompt) {
         currentPrompt = message.current_prompt;
