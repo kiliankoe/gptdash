@@ -21,7 +21,7 @@
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "dotenv": "^17.2.3",
-    "esbuild": "^0.27.2",
+    "esbuild": "^0.28.1",
     "javascript-obfuscator": "^5.1.0"
   }
 }
