@@ -1,5 +1,9 @@
 # GPTdash
 
+This project isn't currently being maintained or kept up to date. It was super fun at Datenspuren 2024/25 and [39c3](https://media.ccc.de/v/39c3-gptdash-der-reverse-turing-test).
+
+---
+
 A real-time party game based loosely on [Balderdash](https://en.wikipedia.org/wiki/Balderdash), but with AI. Players answer questions while trying to impersonate the AI, then vote to identify the real AI answer. Score points by fooling others or correctly identifying the AI!
 
 This project was originally built for [Datenspuren 2024](https://www.datenspuren.de/2024/), also played at [Datenspuren 2025](https://www.datenspuren.de/2025/), see `/datenspuren`.
